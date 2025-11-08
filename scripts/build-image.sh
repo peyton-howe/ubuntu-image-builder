@@ -41,25 +41,14 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 ROOT_DIR=$(pwd)
-KERNEL_DIR="${ROOT_DIR}/kernel"
-BLOBS_DIR="${ROOT_DIR}/blobs"
-# if [ -z "$1" ]; then
-#     echo "Usage: $0 path/to/rootfs.tar"
-#     exit 1
-# fi
+KERNEL_DIR="${ROOT_DIR}/build/kernel"
+BLOBS_DIR="${ROOT_DIR}/build/u-boot"
 
-# rootfs_tar=$(readlink -f "$1")
-# if [[ ! -f "$rootfs_tar" ]]; then
-#     echo "Rootfs tarball not found: $rootfs_tar"
-#     exit 1
-# fi
-rootfs_tar=$(readlink -f rootfs/ubuntu-questing-desktop-arm64.tar.gz)
-
-# # Kernel DEBs (optional, for installing custom kernel)
-# KERNEL_DEB_DIR="${2:-~/kernel}"   # optional second arg
-# if [ -d "$KERNEL_DEB_DIR" ]; then
-#     KERNEL_DEBS=( "$KERNEL_DEB_DIR"/*.deb )
-# fi
+rootfs_tar=$(readlink -f build/rootfs/ubuntu-${RELEASE}-${FLAVOR}-arm64.tar.gz)
+if [[ ! -f "$rootfs_tar" ]]; then
+    echo "Rootfs tarball not found: $rootfs_tar"
+    exit 1
+fi
 
 # Output directories
 cd "$(dirname "$0")"/..
@@ -73,9 +62,6 @@ echo "[+] Creating empty image..."
 IMG="../images/$(basename "${rootfs_tar}" .tar)-rk3588.img"
 size="$(( $(wc -c < "${rootfs_tar}" ) / 1024 / 1024 ))"
 truncate -s "$(( size + 4096 ))M" "${IMG}"
-
-# echo "[+] Creating empty image..."
-# dd if=/dev/zero of="$IMG" bs=1M count=$((BOOT_SIZE_MB + ROOTFS_SIZE_MB))
 
 echo "[+] Creating loop device..."
 loop="$(losetup -f)"
@@ -152,16 +138,18 @@ dd if="${BLOBS_DIR}/u-boot.itb" of="$loop" seek=16384 conv=notrunc
 #     dd if=blobs/trust.img of="$loop" seek=24576 conv=notrunc
 # fi
 
-# Enable USB 2.0 port
-cp "${ROOT_DIR}/packages/enable-usb2.service" "${mount_point}/writable/usr/lib/systemd/system/enable-usb2.service"
-chroot "${mount_point}/writable/" systemctl --no-reload enable enable-usb2
+# Source board-specific configuration
+if [[ -f "${ROOT_DIR}/configs/boards/${BOARD}.sh" ]]; then
+    source "${ROOT_DIR}/configs/boards/${BOARD}.sh"
+else
+    echo "Warning: No board config found for ${BOARD}"
+fi
 
-# Enable bluetooth for AP6275P
-mkdir -p "${mount_point}/writable/usr/lib/scripts"
-cp "${ROOT_DIR}/overlay/usr/lib/systemd/system/ap6275p-bluetooth.service" "${mount_point}/writable/usr/lib/systemd/system/ap6275p-bluetooth.service"
-cp "${ROOT_DIR}/overlay/usr/lib/scripts/ap6275p-bluetooth.sh" "${mount_point}/writable/usr/lib/scripts/ap6275p-bluetooth.sh"
-cp "${ROOT_DIR}/overlay/usr/bin/brcm_patchram_plus" "${mount_point}/writable/usr/bin/brcm_patchram_plus"
-chroot "${mount_point}/writable" systemctl enable ap6275p-bluetooth
+# Run build image hook to handle board specific changes
+if [[ $(type -t build_image_hook__${BOARD}) == function ]]; then
+    echo "[+] Writing image changes..."
+    build_image_hook__${BOARD} "${ROOT_DIR}/overlay" "${mount_point}/writable" "${SUITE}" "${root_uuid}"
+fi
 
 # =========================
 # Configure u-boot defaults (add quiet splash)
