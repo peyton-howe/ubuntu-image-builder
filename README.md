@@ -1,2 +1,2 @@
-# ubuntu-sbc
-BuildUbuntu images for various SBCs
+# ubuntu-image-builder
+Build Ubuntu images for various SBC platforms
