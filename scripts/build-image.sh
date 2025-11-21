@@ -44,7 +44,7 @@ ROOT_DIR=$(pwd)
 KERNEL_DIR="${ROOT_DIR}/build/kernel"
 BLOBS_DIR="${ROOT_DIR}/build/u-boot"
 
-rootfs_tar=$(readlink -f build/rootfs/ubuntu-${RELEASE}-${FLAVOR}-arm64.tar.gz)
+rootfs_tar=$(readlink -f build/rootfs/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64.tar.gz)
 if [[ ! -f "$rootfs_tar" ]]; then
     echo "Rootfs tarball not found: $rootfs_tar"
     exit 1
@@ -59,7 +59,7 @@ cd build
 ### Create disk image
 ### =========================
 echo "[+] Creating empty image..."
-IMG="../images/$(basename "${rootfs_tar}" .tar)-rk3588.img"
+IMG="../images/$(basename "${rootfs_tar}" .tar.gz)-rk3588.img"
 size="$(( $(wc -c < "${rootfs_tar}" ) / 1024 / 1024 ))"
 truncate -s "$(( size + 4096 ))M" "${IMG}"
 
@@ -131,12 +131,26 @@ echo "UUID=${root_uuid,,} /              ext4    defaults,x-systemd.growfs    0 
 ### Write bootloader / optional trust.img
 ### =========================
 echo "[+] Writing bootloader..."
-dd if="${BLOBS_DIR}/idbloader.img" of="$loop" seek=64 conv=notrunc
-dd if="${BLOBS_DIR}/u-boot.itb" of="$loop" seek=16384 conv=notrunc
+# dd if="${BLOBS_DIR}/idbloader.img" of="$loop" seek=64 conv=notrunc
+# dd if="${BLOBS_DIR}/u-boot.itb" of="$loop" seek=16384 conv=notrunc
 
-# if [ -f "{$BLOBS_DIR}/trust.img" ]; then
-#     dd if=blobs/trust.img of="$loop" seek=24576 conv=notrunc
-# fi
+if [ -f "${BLOBS_DIR}/idbloader.img" ]; then
+    echo "writing idbloader.img"
+    dd if="${BLOBS_DIR}/idbloader.img" of="$loop" seek=64 conv=notrunc
+fi
+
+if [ -f "${BLOBS_DIR}/u-boot.itb" ]; then
+    echo "writing u-boot.itb"
+    dd if="${BLOBS_DIR}/u-boot.itb" of="$loop" seek=16384 conv=notrunc
+fi
+
+mount -t proc /proc "${mount_point}/writable/proc"
+mount --rbind /sys "${mount_point}/writable/sys"
+mount --rbind /dev "${mount_point}/writable/dev"
+mount --make-rslave "${mount_point}/writable/sys"
+mount --make-rslave "${mount_point}/writable/dev"
+mount --rbind /run "${mount_point}/writable/run"
+mount --make-rslave "${mount_point}/writable/run"
 
 # Source board-specific configuration
 if [[ -f "${ROOT_DIR}/configs/boards/${BOARD}.sh" ]]; then
@@ -162,14 +176,43 @@ mkdir -p /etc/default
 
 # Remove any previous CMDLINE definition to avoid duplicates
 sed -i '/^U_BOOT_PARAMETERS=/d' /etc/default/u-boot || true
+rm /etc/default/u-boot
 
 # Add new parameters (you can append others as needed)
 cat >> /etc/default/u-boot <<EOF
+# /etc/default/u-boot - configuration file for u-boot-update(8)
+
+#U_BOOT_UPDATE=\"true\"
+
+#U_BOOT_ALTERNATIVES=\"default recovery\"
+#U_BOOT_DEFAULT=\"l0\"
+#U_BOOT_PROMPT=\"1\"
+#U_BOOT_ENTRIES=\"all\"
+#U_BOOT_MENU_LABEL=\"Debian GNU/Linux\"
 U_BOOT_PARAMETERS=\"console=ttyS2,1500000 console=tty1 root=UUID=${root_uuid,,} rw rootwait quiet splash plymouth.ignore-serial-consoles cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory\"
+#U_BOOT_ROOT=\"\"
+#U_BOOT_TIMEOUT=\"50\"
+U_BOOT_FDT=\"device-tree/rockchip/rk3588s-orangepi-5b.dtb\"
+#U_BOOT_FDT_DIR=\"/lib/firmware/\"
+#U_BOOT_FDT_OVERLAYS=\"\"
+#U_BOOT_FDT_OVERLAYS_DIR=\"/boot/dtbo/\"
+#U_BOOT_SYNC_DTBS=\"false\"
 EOF
+
+# cat /etc/default/u-boot
+
+# # Add new parameters (you can append others as needed)
+# cat >> /etc/default/u-boot <<EOF
+# U_BOOT_PARAMETERS=\"console=ttyS2,1500000 console=tty1 root=UUID=${root_uuid,,} rw rootwait quiet splash plymouth.ignore-serial-consoles cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory\"
+# EOF
 "
 
 chroot ${mount_point}/writable/ u-boot-update
+
+umount -lf "${mount_point}/writable/proc" || true
+umount -lf "${mount_point}/writable/sys" || true
+umount -lf "${mount_point}/writable/dev" || true
+umount -lf "${mount_point}/writable/run" || true
 
 sync --file-system
 sync

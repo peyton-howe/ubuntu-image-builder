@@ -1,11 +1,41 @@
 #!/usr/bin/env bash
 set -eE
+trap 'echo Error: in $0 on line $LINENO' ERR
+
+if [ "$(id -u)" -ne 0 ]; then 
+    echo "Please run as root"
+    exit 1
+fi
+
+cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ..
+mkdir -p build/rootfs && cd build/rootfs
+
+if [[ -z ${RELEASE} ]]; then
+    echo "Error: RELEASE is not set"
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "../../configs/releases/${RELEASE}.sh"
+
+if [[ -z ${FLAVOR} ]]; then
+    echo "Error: FLAVOR is not set"
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "../../configs/flavors/${FLAVOR}.sh"
+
+if [[ -f ubuntu-${RELASE_VERSION}-preinstalled-${FLAVOR}-arm64.rootfs.tar.xz ]]; then
+    exit 0
+fi
+
+pushd .
 
 # Variables
-SUITE=questing
 ARCH=arm64
-ROOTFS_DIR=rootfs/${SUITE}-desktop
-KERNEL_DIR=kernel  # Folder containing your built .deb files
+ROOTFS_DIR=${RELEASE}-desktop
+KERNEL_DIR=../kernel  # Folder containing your built .deb files
 PACKAGES_DIR=packages
 MIRROR=http://ports.ubuntu.com/ubuntu-ports
 
@@ -15,7 +45,7 @@ apt install -y mmdebstrap qemu-user-static binfmt-support
 # =========================
 # 1. Build base rootfs
 # =========================
-mmdebstrap --arch=${ARCH} ${SUITE} ${ROOTFS_DIR} \
+mmdebstrap --arch=${ARCH} ${RELEASE} ${ROOTFS_DIR} \
   --include=ubuntu-desktop,casper,ca-certificates,netplan.io,network-manager,sudo,ssh,dbus-user-session,gnome-shell-extension-prefs \
   --components=main,universe,multiverse \
   ${MIRROR}
@@ -74,12 +104,7 @@ apt-get install -y \
   yaru-theme-gtk yaru-theme-icon adwaita-icon-theme \
   ubuntu-settings shared-mime-info fastfetch \
   geoip-database tzdata console-setup keyboard-configuration \
-  mesa-vulkan-drivers
-
-echo '[+] Installing firefox...'
-add-apt-repository -y ppa:mozillateam/ppa
-apt update
-apt-get install -y firefox
+  mesa-vulkan-drivers nano
 
 apt-get install -y gnome-system-monitor gnome-calculator gnome-calendar \
    gnome-characters gnome-font-viewer gnome-logs gnome-screenshot \
@@ -211,6 +236,8 @@ X-GNOME-Autostart-enabled=true
 EOF
 
 exit
+
+u-boot-update
 "
 
 umount -lf "${ROOTFS_DIR}/proc" || true
@@ -222,4 +249,4 @@ umount -lf "${ROOTFS_DIR}/run" || true
 # 5. Compress result
 # =========================
 echo '[+] Compressing to tar...'
-tar czf rootfs/ubuntu-${SUITE}-desktop-arm64.tar.gz -C ${ROOTFS_DIR} .
+tar czf ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64.tar.gz -C ${ROOTFS_DIR} .
