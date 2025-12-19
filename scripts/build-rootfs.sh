@@ -42,6 +42,10 @@ MIRROR=http://ports.ubuntu.com/ubuntu-ports
 # Install mmdebstrap + qemu
 apt install -y mmdebstrap qemu-user-static binfmt-support
 
+if [[ -f ${ROOTFS_DIR} ]]; then
+  rm -r ${ROOTFS_DIR}
+fi
+
 # =========================
 # 1. Build base rootfs
 # =========================
@@ -119,6 +123,20 @@ apt-get install -y \
   gvfs gvfs-daemons gvfs-fuse gvfs-backends gvfs-libs \
   gvfs-common udisks2 dbus-x11 avahi-daemon \
   samba samba-common-bin nautilus-share
+
+echo '[+] Installing firefox...'
+add-apt-repository -y ppa:mozillateam/ppa
+
+# Force apt to prefer the .deb package over the snap
+cat > /etc/apt/preferences.d/mozilla-firefox <<EOF
+Package: firefox*
+Pin: release o=LP-PPA-mozillateam
+Pin-Priority: 501
+EOF
+
+# Install Firefox .deb
+apt-get update
+apt-get install -y firefox
 
 echo '[+] Installing custom kernel DEBs...'
 dpkg -i /tmp/kernel-debs/*.deb || apt-get -f install -y
