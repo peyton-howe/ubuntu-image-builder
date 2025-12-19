@@ -29,5 +29,12 @@ function build_image_hook__orangepi-5b() {
     cp "${overlay}/usr/lib/systemd/system/enable-usb2.service" "${mount_point}/usr/lib/systemd/system/enable-usb2.service"
     chroot "${mount_point}" systemctl --no-reload enable enable-usb2
 
+    # Copy firmware
+    echo "[+] Enabling Rockchip Firmware"
+    cp -r "${overlay}/firmware/" "${mount_point}/lib/"
+
+    echo '[+] Regenerating initramfs...'
+    chroot "${mount_point}" update-initramfs -u -k all
+
     return 0
 }
