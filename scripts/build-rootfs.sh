@@ -138,12 +138,8 @@ EOF
 apt-get update
 apt-get install -y firefox
 
-echo '[+] Installing custom kernel DEBs...'
+echo '[+] Installing kernel DEBs...'
 dpkg -i /tmp/kernel-debs/*.deb || apt-get -f install -y
-
-add-apt-repository -y ppa:phowe6/rockchip
-apt-get update
-apt-get install -y rockchip-firmware
 
 #echo '[+] Regenerating initramfs...'
 #update-initramfs -u -k all
