@@ -8,6 +8,8 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+ROOT_DIR=$(pwd)
+
 if [[ -z ${UBOOT_RULES_TARGET} ]]; then
     echo "Error: UBOOT_CONFIG is not set"
     # Source board-specific configuration
@@ -27,6 +29,9 @@ git clone --depth=1 --progress https://source.denx.de/u-boot/u-boot.git
 git clone --depth=1 --progress https://github.com/rockchip-linux/rkbin.git
 
 cd u-boot
+
+git apply "${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch"
+
 make clean
 make CROSS_COMPILE=aarch64-linux-gnu- \
      ROCKCHIP_TPL=../rkbin/bin/rk35/rk3588_ddr_lp4_2112MHz_lp5_2400MHz_v1.19.bin \
