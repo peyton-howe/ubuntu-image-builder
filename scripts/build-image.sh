@@ -134,15 +134,17 @@ echo "[+] Writing bootloader..."
 # dd if="${BLOBS_DIR}/idbloader.img" of="$loop" seek=64 conv=notrunc
 # dd if="${BLOBS_DIR}/u-boot.itb" of="$loop" seek=16384 conv=notrunc
 
-if [ -f "${BLOBS_DIR}/idbloader.img" ]; then
-    echo "writing idbloader.img"
-    dd if="${BLOBS_DIR}/idbloader.img" of="$loop" seek=64 conv=notrunc
-fi
+# if [ -f "${BLOBS_DIR}/idbloader.img" ]; then
+#     echo "writing idbloader.img"
+#     dd if="${BLOBS_DIR}/idbloader.img" of="$loop" seek=64 conv=notrunc
+# fi
 
-if [ -f "${BLOBS_DIR}/u-boot.itb" ]; then
-    echo "writing u-boot.itb"
-    dd if="${BLOBS_DIR}/u-boot.itb" of="$loop" seek=16384 conv=notrunc
-fi
+# if [ -f "${BLOBS_DIR}/u-boot.itb" ]; then
+#     echo "writing u-boot.itb"
+#     dd if="${BLOBS_DIR}/u-boot.itb" of="$loop" seek=16384 conv=notrunc
+# fi
+
+dd if="${BLOBS_DIR}/u-boot-rockchip.bin" of="$loop" bs=32k seek=1 conv=notrunc status=none
 
 mount -t proc /proc "${mount_point}/writable/proc"
 mount --rbind /sys "${mount_point}/writable/sys"

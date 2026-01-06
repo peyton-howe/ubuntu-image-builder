@@ -25,7 +25,7 @@ cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ..
 mkdir -p build && cd build
 mkdir -p u-boot && cd u-boot
 
-git clone --depth=1 --progress https://source.denx.de/u-boot/u-boot.git
+git clone --depth=1 --progress -b v2026.01 https://github.com/u-boot/u-boot.git
 git clone --depth=1 --progress https://github.com/rockchip-linux/rkbin.git
 
 cd u-boot
@@ -38,6 +38,7 @@ make CROSS_COMPILE=aarch64-linux-gnu- \
      BL31=../rkbin/bin/rk35/rk3588_bl31_v1.51.elf \
      ${UBOOT_RULES_TARGET} all -j${nproc}  
 
-cp idbloader.img ..
-cp u-boot.itb ..
+# cp idbloader.img ..
+# cp u-boot.itb ..
+cp u-boot-rockchip.bin ..
 
