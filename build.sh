@@ -207,7 +207,7 @@ if [[ ! -e "$(find build/kernel/linux-image-*.deb | sort | tail -n1)" || ! -e "$
 fi
 
 # Build U-Boot if not found
-if [[ ! -e "$(find build/u-boot/idbloader.img | sort | tail -n1)" ]]; then
+if [[ ! -e "$(find build/u-boot/u-boot-rockchip.bin | sort | tail -n1)" ]]; then
     ./scripts/build-u-boot.sh
 fi
 
