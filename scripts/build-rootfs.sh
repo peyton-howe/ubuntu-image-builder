@@ -112,7 +112,7 @@ apt-get install -y \
 
 apt-get install -y gnome-system-monitor gnome-calculator gnome-calendar \
    gnome-characters gnome-font-viewer gnome-logs gnome-screenshot \
-   gnome-weather gnome-maps gnome-contacts eog evince
+   gnome-weather gnome-maps gnome-contacts gnome-text-editor eog evince
 
 apt-get install -y libreoffice libreoffice-gtk3 thunderbird simple-scan \
   rhythmbox cheese totem file-roller baobab
