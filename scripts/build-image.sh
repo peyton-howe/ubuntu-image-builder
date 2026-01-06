@@ -196,8 +196,8 @@ U_BOOT_PARAMETERS=\"console=ttyS2,1500000 console=tty1 root=UUID=${root_uuid,,} 
 #U_BOOT_TIMEOUT=\"50\"
 U_BOOT_FDT=\"device-tree/rockchip/rk3588s-orangepi-5b.dtb\"
 #U_BOOT_FDT_DIR=\"/lib/firmware/\"
-#U_BOOT_FDT_OVERLAYS=\"\"
-#U_BOOT_FDT_OVERLAYS_DIR=\"/boot/dtbo/\"
+U_BOOT_FDT_OVERLAYS=\"rockchip-rk3588-panthor-gpu.dtbo\"
+U_BOOT_FDT_OVERLAYS_DIR=\"/lib/firmware/6.1.115-1-rockchip/device-tree/rockchip/overlay\"
 #U_BOOT_SYNC_DTBS=\"false\"
 EOF
 
