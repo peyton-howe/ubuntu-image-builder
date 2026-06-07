@@ -1,0 +1,22 @@
+From: ubuntu-image-builder
+Subject: [PATCH] media: rockchip: rkisp2: select V4L2_ISP
+
+rkisp2-params.c calls v4l2_isp_params_validate_buffer_size() and
+v4l2_isp_params_validate_buffer() which are exported by V4L2_ISP, but
+the rkisp2 Kconfig entry does not select it. rkisp1's Kconfig does
+select it; add the same select here to fix modpost symbol errors when
+building VIDEO_ROCKCHIP_ISP2 without VIDEO_ROCKCHIP_ISP1.
+
+---
+ drivers/media/platform/rockchip/rkisp2/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/drivers/media/platform/rockchip/rkisp2/Kconfig
++++ b/drivers/media/platform/rockchip/rkisp2/Kconfig
+@@ -10,6 +10,7 @@ config VIDEO_ROCKCHIP_ISP2
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	select VIDEOBUF2_VMALLOC
+ 	select V4L2_FWNODE
+ 	select GENERIC_PHY_MIPI_DPHY
++	select V4L2_ISP
+ 	default n
