@@ -213,9 +213,7 @@ sed -i '/XKBLAYOUT/d' /etc/default/keyboard || true
 # =========================
 # Plymouth splash & kernel overlay
 # =========================
-echo '[+] Configuring Plymouth and kernel overlays...'
-echo 'U_BOOT_FDT="device-tree/rockchip/rk3588s-orangepi-5b.dtb"' >> /etc/default/u-boot || true
-echo 'U_BOOT_FDT_OVERLAYS="device-tree/rockchip/overlay/rockchip-rk3588-panthor-gpu.dtbo"' >> /etc/default/u-boot || true
+echo '[+] Configuring Plymouth...'
 
 
 # Use Ubuntu's default plymouth theme and enable quiet splash

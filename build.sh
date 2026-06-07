@@ -1,25 +1,26 @@
 #!/usr/bin/env bash
 set -eE
-trap 'echo "Error in $0 on line $LINENO"; cleanup_loopdev "$loop"' ERR
+trap 'echo "Error in $0 on line $LINENO"' ERR
 
 cd "$(dirname -- "$(readlink -f -- "$0")")"
 
 usage() {
 cat << HEREDOC
-Usage: $0 --board=[orangepi-5] --release=[questing] --flavor=[server|desktop]
+Usage: $0 --board=[orangepi-5|rock-5b-plus] --release=[questing] --flavor=[server|desktop]
 
 Required arguments:
-  -b, --board=BOARD      target board 
-  -r, --release=RELEASE  ubuntu release 
-  -f, --flavor=FLAVOR    ubuntu flavor
+  -b, --board=BOARD           target board
+  -r, --release=RELEASE       ubuntu release
+  -f, --flavor=FLAVOR         ubuntu flavor
 
 Optional arguments:
-  -h,  --help            show this help message and exit
-  -c,  --clean           clean the build directory
-  -ko, --kernel-only     only compile the kernel
-  -uo, --uboot-only      only compile uboot
-  -ro, --rootfs-only     only build rootfs
-  -v,  --verbose         increase the verbosity of the bash script
+  -h,  --help                 show this help message and exit
+  -c,  --clean                clean the build directory
+  -kt, --kernel-type=TYPE     kernel type: vendor (default) or mainline
+  -ko, --kernel-only          only compile the kernel
+  -uo, --uboot-only           only compile uboot
+  -ro, --rootfs-only          only build rootfs
+  -v,  --verbose              increase the verbosity of the bash script
 HEREDOC
 }
 
@@ -61,6 +62,14 @@ while [ "$#" -gt 0 ]; do
             ;;
         -f|--flavor)
             export FLAVOR="${2}"
+            shift 2
+            ;;
+        -kt=*|--kernel-type=*)
+            export KERNEL_TYPE="${1#*=}"
+            shift
+            ;;
+        -kt|--kernel-type)
+            export KERNEL_TYPE="${2}"
             shift 2
             ;;
         -ko|--kernel-only)
@@ -157,9 +166,27 @@ if [ -n "${BOARD}" ]; then
 fi
 
 if [ "${CLEAN}" == "Y" ]; then
-    if [ -d build/rootfs ]; then
-        umount -lf build/rootfs/dev/pts 2> /dev/null || true
-        umount -lf build/rootfs/* 2> /dev/null || true
+    if [ -d build ]; then
+        BUILD_ABS="$(readlink -f build)"
+
+        # Recursively unmount bind-mount trees (sys has many submounts; -R handles all of them)
+        for mnt_dir in build/rootfs/*/sys build/rootfs/*/dev build/rootfs/*/proc build/rootfs/*/run; do
+            [ -d "${mnt_dir}" ] && umount -R -lf "${mnt_dir}" 2>/dev/null || true
+        done
+
+        # Catch anything else under build/ by reading /proc/mounts deepest-first
+        while read -r _ mnt _; do
+            case "${mnt}" in
+                "${BUILD_ABS}/"*) umount -lf "${mnt}" 2>/dev/null || true ;;
+            esac
+        done < <(awk '{print $1, $2, $3}' /proc/mounts | sort -rk2)
+
+        # Detach loop devices pointing at image files inside build/
+        losetup --list --output NAME,BACK-FILE --noheadings \
+            | awk -v p="${BUILD_ABS}" '$2 ~ p {print $1}' \
+            | while read -r loop; do
+                losetup -d "${loop}" 2>/dev/null || true
+              done
     fi
     rm -rf build
 fi

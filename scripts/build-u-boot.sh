@@ -22,23 +22,27 @@ if [[ -z ${UBOOT_RULES_TARGET} ]]; then
 fi
 
 cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ..
-mkdir -p build && cd build
-mkdir -p u-boot && cd u-boot
+mkdir -p build/u-boot && cd build/u-boot
 
-git clone --depth=1 --progress -b v2026.01 https://github.com/u-boot/u-boot.git
-git clone --depth=1 --progress https://github.com/rockchip-linux/rkbin.git
+if [ ! -d u-boot ]; then
+    git clone --depth=1 --progress -b v2026.04 https://github.com/u-boot/u-boot.git
+fi
+if [ ! -d rkbin ]; then
+    git clone --depth=1 --progress https://github.com/rockchip-linux/rkbin.git
+fi
 
 cd u-boot
 
-git apply "${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch"
+# Apply board-specific patches if present
+if [[ "${BOARD}" == "orangepi-5b" ]] && [ -f "${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch" ]; then
+    git apply "${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch" || true
+fi
 
 make clean
 make CROSS_COMPILE=aarch64-linux-gnu- \
      ROCKCHIP_TPL=../rkbin/bin/rk35/rk3588_ddr_lp4_2112MHz_lp5_2400MHz_v1.19.bin \
      BL31=../rkbin/bin/rk35/rk3588_bl31_v1.51.elf \
-     ${UBOOT_RULES_TARGET} all -j${nproc}  
+     "${UBOOT_RULES_TARGET}" all -j"$(nproc)"
 
-# cp idbloader.img ..
-# cp u-boot.itb ..
 cp u-boot-rockchip.bin ..
 
