@@ -114,8 +114,12 @@ apt-get install -y gnome-system-monitor gnome-calculator gnome-calendar \
    gnome-characters gnome-font-viewer gnome-logs gnome-screenshot \
    gnome-weather gnome-maps gnome-contacts gnome-text-editor eog evince
 
+EXTRA_APPS="rhythmbox totem file-roller baobab"
+if [[ "${RELEASE}" != "resolute" ]]; then
+    EXTRA_APPS="${EXTRA_APPS} cheese"
+fi
 apt-get install -y libreoffice libreoffice-gtk3 thunderbird simple-scan \
-  rhythmbox cheese totem file-roller baobab
+  ${EXTRA_APPS}
 
 echo '[+] Ensuring Nautilus supports network and other locations...'
 apt-get clean
