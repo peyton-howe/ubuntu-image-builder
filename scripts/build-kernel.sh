@@ -133,6 +133,14 @@ if [[ "${KERNEL_TYPE}" == "mainline" ]]; then
         --module CONFIG_VIDEO_IMX415 \
         --module CONFIG_VIDEO_IMX708
 
+    # GPU and display — Panthor (Mali G610 CSF on RK3588), Rockchip VOP2/HDMI pipeline
+    "${SRC_DIR}/scripts/config" --file "${BUILD_DIR}/.config" \
+        --module CONFIG_DRM_PANTHOR \
+        --module CONFIG_DRM_ROCKCHIP \
+        --module CONFIG_PHY_ROCKCHIP_SAMSUNG_HDPTX \
+        --module CONFIG_ROCKCHIP_LVDS \
+        --module CONFIG_DW_HDMI
+
     # NPU accelerator
     "${SRC_DIR}/scripts/config" --file "${BUILD_DIR}/.config" \
         --enable CONFIG_DRM_ACCEL \
