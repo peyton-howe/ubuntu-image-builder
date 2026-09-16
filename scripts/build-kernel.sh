@@ -11,18 +11,15 @@ fi
 cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ..
 mkdir -p build/kernel && cd build/kernel
 
-if [[ -z ${RELEASE} ]]; then
-    echo "Error: RELEASE is not set"
-    exit 1
-fi
-
 if compgen -G "linux-image-*.deb" > /dev/null; then
     echo "already built kernel, exiting"
     exit 0
 fi
 
 # shellcheck source=/dev/null
-source "../../configs/releases/${RELEASE}.sh"
+if [[ -n ${RELEASE} ]]; then
+    source "../../configs/releases/${RELEASE}.sh"
+fi
 
 # shellcheck disable=SC2046
 export $(dpkg-architecture -aarm64)
@@ -71,7 +68,9 @@ if [[ "${KERNEL_TYPE}" == "mainline" ]]; then
         --enable CONFIG_MEMCG \
         --enable CONFIG_BPF_SYSCALL \
         --enable CONFIG_CGROUP_BPF \
-        --module CONFIG_BINFMT_MISC
+        --module CONFIG_BINFMT_MISC \
+        --enable CONFIG_FW_LOADER_COMPRESS \
+        --enable CONFIG_FW_LOADER_COMPRESS_ZSTD
 
     # Filesystems
     "${SRC_DIR}/scripts/config" --file "${BUILD_DIR}/.config" \
@@ -121,6 +120,7 @@ if [[ "${KERNEL_TYPE}" == "mainline" ]]; then
     # Rockchip media platform — MIPI PHY, CIF capture, ISP2, RGA 2D engine
     "${SRC_DIR}/scripts/config" --file "${BUILD_DIR}/.config" \
         --enable CONFIG_PHY_ROCKCHIP_INNO_CSIDPHY \
+        --enable CONFIG_VIDEO_DW_MIPI_CSI2RX \
         --enable CONFIG_GENERIC_PHY_MIPI_DPHY \
         --enable CONFIG_UDMABUF \
         --module CONFIG_VIDEO_ROCKCHIP_CIF \

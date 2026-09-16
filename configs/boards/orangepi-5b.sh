@@ -38,6 +38,14 @@ function build_image_hook__orangepi-5b() {
 
         echo '[+] Regenerating initramfs...'
         chroot "${mount_point}" update-initramfs -u -k all
+    elif [[ "${KERNEL_TYPE}" == "mainline" ]]; then
+        # Copy AP6275P firmware
+        echo "[+] Copying AP6275P firmware"
+        mkdir -p "${mount_point}/lib/firmware/ap6275p"
+        cp -r "${overlay}/firmware/ap6275p/." "${mount_point}/lib/firmware/ap6275p/"
+
+        echo '[+] Regenerating initramfs...'
+        chroot "${mount_point}" update-initramfs -u -k all
     fi
 
     return 0

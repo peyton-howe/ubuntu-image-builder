@@ -50,7 +50,7 @@ fi
 # 1. Build base rootfs
 # =========================
 mmdebstrap --arch=${ARCH} ${RELEASE} ${ROOTFS_DIR} \
-  --include=ubuntu-desktop,casper,ca-certificates,netplan.io,network-manager,sudo,ssh,dbus-user-session,gnome-shell-extension-prefs \
+  --include=ubuntu-desktop-minimal,ca-certificates,netplan.io,network-manager,sudo,ssh,dbus-user-session \
   --components=main,universe,multiverse \
   ${MIRROR}
 
@@ -89,6 +89,8 @@ mount --make-rslave "${ROOTFS_DIR}/run"
 chroot ${ROOTFS_DIR} /bin/bash -c "
 set -e
 export DEBIAN_FRONTEND=noninteractive
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
 
 echo '[+] Updating apt sources...'
 apt-get update
@@ -96,30 +98,35 @@ apt-get update
 echo '[+] Installing base packages...'
 echo '[+] Installing base Ubuntu Desktop packages...'
 
+apt-get install -y locales
+locale-gen en_US.UTF-8
+
 apt-get install -y \
   initramfs-tools linux-base u-boot-menu u-boot-tools \
-  plymouth plymouth-themes plymouth-theme-spinner \
-  desktop-base cloud-initramfs-growroot \
-  gdm3 ubuntu-desktop gnome-shell-extension-manager \
+  plymouth plymouth-theme-spinner plymouth-theme-ubuntu-text \
+  gdm3 \
   gnome-initial-setup gnome-control-center gnome-disk-utility \
-  gnome-session gnome-keyring gnome-software gnome-software-plugin-snap \
-  gnome-terminal gedit gsettings-desktop-schemas gnome-online-accounts \
+  gnome-session gnome-keyring gnome-software \
+  ptyxis gsettings-desktop-schemas gnome-online-accounts \
+  gnome-shell-extension-appindicator gnome-shell-extension-desktop-icons-ng \
+  gnome-shell-extension-ubuntu-dock gnome-shell-extension-ubuntu-tiling-assistant \
   gnome-bluetooth-3-common bluez bluez-obexd rfkill \
-  yaru-theme-gtk yaru-theme-icon adwaita-icon-theme \
+  yaru-theme-gtk yaru-theme-icon adwaita-icon-theme ubuntu-wallpapers \
   ubuntu-settings shared-mime-info fastfetch \
-  geoip-database tzdata console-setup keyboard-configuration \
-  mesa-vulkan-drivers nano
+  tzdata console-setup keyboard-configuration \
+  mesa-vulkan-drivers nano linux-firmware
 
-apt-get install -y gnome-system-monitor gnome-calculator gnome-calendar \
-   gnome-characters gnome-font-viewer gnome-logs gnome-screenshot \
-   gnome-weather gnome-maps gnome-contacts gnome-text-editor eog evince
+apt-get install -y gnome-system-monitor gnome-calculator \
+   gnome-characters gnome-font-viewer gnome-logs gnome-text-editor baobab
 
-EXTRA_APPS="rhythmbox totem file-roller baobab"
-if [[ "${RELEASE}" != "resolute" ]]; then
-    EXTRA_APPS="${EXTRA_APPS} cheese"
-fi
-apt-get install -y libreoffice libreoffice-gtk3 thunderbird simple-scan \
-  ${EXTRA_APPS}
+echo '[+] Installing update, driver and crash-reporting stack...'
+apt-get install -y \
+  snapd \
+  whoopsie apport \
+  update-notifier update-manager \
+  ubuntu-release-upgrader-core ubuntu-release-upgrader-gtk \
+  packagekit software-properties-gtk software-properties-common \
+  ubuntu-drivers-common unattended-upgrades
 
 echo '[+] Ensuring Nautilus supports network and other locations...'
 apt-get clean
@@ -236,10 +243,10 @@ update-initramfs -u -k all
 # =========================
 echo '[+] Enabling system services...'
 systemctl set-default graphical.target
-systemctl enable gdm3 NetworkManager dbus \
+systemctl enable gdm3 NetworkManager systemd-resolved dbus \
   plymouth-start.service plymouth-read-write.service \
   plymouth-quit-wait.service plymouth-quit.service \
-  udisks2 avahi-daemon
+  udisks2 avahi-daemon snapd.socket
 
 mkdir -p /etc/xdg/autostart
 cat > /etc/xdg/autostart/gvfs-daemon.desktop <<'EOF'
@@ -251,8 +258,6 @@ OnlyShowIn=GNOME;
 X-GNOME-Autostart-enabled=true
 EOF
 
-exit
-
 u-boot-update
 "
 
@@ -260,6 +265,10 @@ umount -lf "${ROOTFS_DIR}/proc" || true
 umount -lf "${ROOTFS_DIR}/sys" || true
 umount -lf "${ROOTFS_DIR}/dev" || true
 umount -lf "${ROOTFS_DIR}/run" || true
+
+echo "[+] Restoring resolv.conf for systemd-resolved..."
+rm -f "${ROOTFS_DIR}/etc/resolv.conf"
+ln -sf ../run/systemd/resolve/stub-resolv.conf "${ROOTFS_DIR}/etc/resolv.conf"
 
 # =========================
 # 5. Compress result
