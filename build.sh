@@ -15,7 +15,10 @@ Required arguments:
 
 Optional arguments:
   -h,  --help                 show this help message and exit
-  -c,  --clean                clean the build directory
+  -c,  --clean                clean the entire build directory
+  -rk, --rebuild-kernel       rebuild kernel from source (also forces rootfs + image rebuild)
+  -ru, --rebuild-uboot        rebuild u-boot (also forces image rebuild)
+  -rr, --rebuild-rootfs       rebuild rootfs (also forces image rebuild)
   -kt, --kernel-type=TYPE     kernel type: vendor (default) or mainline
   -ko, --kernel-only          only compile the kernel
   -uo, --uboot-only           only compile uboot
@@ -86,6 +89,18 @@ while [ "$#" -gt 0 ]; do
             ;;
         -c|--clean)
             export CLEAN=Y
+            shift
+            ;;
+        -rk|--rebuild-kernel)
+            export REBUILD_KERNEL=Y
+            shift
+            ;;
+        -ru|--rebuild-uboot)
+            export REBUILD_UBOOT=Y
+            shift
+            ;;
+        -rr|--rebuild-rootfs)
+            export REBUILD_ROOTFS=Y
             shift
             ;;
         -v|--verbose)
@@ -165,14 +180,25 @@ if [ -n "${BOARD}" ]; then
     done
 fi
 
+unmount_rootfs() {
+    if [ -d build ]; then
+        BUILD_ABS="$(readlink -f build)"
+        for mnt_dir in build/rootfs/*/sys build/rootfs/*/dev build/rootfs/*/proc build/rootfs/*/run; do
+            [ -d "${mnt_dir}" ] && umount -R -lf "${mnt_dir}" 2>/dev/null || true
+        done
+        while read -r _ mnt _; do
+            case "${mnt}" in
+                "${BUILD_ABS}/rootfs/"*) umount -lf "${mnt}" 2>/dev/null || true ;;
+            esac
+        done < <(awk '{print $1, $2, $3}' /proc/mounts | sort -rk2)
+    fi
+}
+
 if [ "${CLEAN}" == "Y" ]; then
     if [ -d build ]; then
         BUILD_ABS="$(readlink -f build)"
 
-        # Recursively unmount bind-mount trees (sys has many submounts; -R handles all of them)
-        for mnt_dir in build/rootfs/*/sys build/rootfs/*/dev build/rootfs/*/proc build/rootfs/*/run; do
-            [ -d "${mnt_dir}" ] && umount -R -lf "${mnt_dir}" 2>/dev/null || true
-        done
+        unmount_rootfs
 
         # Catch anything else under build/ by reading /proc/mounts deepest-first
         while read -r _ mnt _; do
@@ -191,15 +217,33 @@ if [ "${CLEAN}" == "Y" ]; then
     rm -rf build
 fi
 
+if [ "${REBUILD_UBOOT}" == "Y" ]; then
+    echo "[+] Clearing u-boot build artifacts..."
+    rm -f build/u-boot/u-boot-rockchip.bin 2>/dev/null || true
+    rm -f images/*.img images/*.img.xz 2>/dev/null || true
+fi
+
+if [ "${REBUILD_KERNEL}" == "Y" ]; then
+    echo "[+] Clearing kernel debs (keeping source tree)..."
+    find build/kernel -maxdepth 1 -name "*.deb" -delete 2>/dev/null || true
+    rm -rf build/kernel/linux-mainline-build build/kernel/linux-vendor-build 2>/dev/null || true
+    # Cascade: rootfs and image must also rebuild
+    REBUILD_ROOTFS=Y
+fi
+
+if [ "${REBUILD_ROOTFS}" == "Y" ]; then
+    echo "[+] Clearing rootfs..."
+    unmount_rootfs
+    rm -rf build/rootfs
+    # Cascade: image must also rebuild
+    rm -f images/*.img images/*.img.xz 2>/dev/null || true
+fi
+
 mkdir -p build/logs
 logfile="build/logs/build-$(date +"%Y%m%d%H%M%S").log"
 exec > >(tee "$logfile") 2>&1
 
 if [ "${KERNEL_ONLY}" == "Y" ]; then
-    if [ -z "${RELEASE}" ]; then
-        usage
-        exit 1
-    fi
     ./scripts/build-kernel.sh
     exit 0
 fi

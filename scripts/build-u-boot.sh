@@ -35,7 +35,12 @@ cd u-boot
 
 # Apply board-specific patches if present
 if [[ "${BOARD}" == "orangepi-5b" ]] && [ -f "${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch" ]; then
-    git apply "${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch" || true
+    if ! git apply --reverse --check "${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch" 2>/dev/null; then
+        echo "[+] Applying Orange Pi 5B u-boot patch..."
+        git apply "${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch"
+    else
+        echo "[+] Orange Pi 5B u-boot patch already applied, skipping."
+    fi
 fi
 
 make clean

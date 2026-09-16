@@ -59,7 +59,7 @@ cd build
 ### Create disk image
 ### =========================
 echo "[+] Creating empty image..."
-IMG="../images/$(basename "${rootfs_tar}" .tar.gz)-rk3588.img"
+IMG="../images/$(basename "${rootfs_tar}" .tar.gz)-${BOARD}.img"
 size="$(( $(wc -c < "${rootfs_tar}" ) / 1024 / 1024 ))"
 truncate -s "$(( size + 4096 ))M" "${IMG}"
 
@@ -171,46 +171,52 @@ fi
 # Configure u-boot defaults (add quiet splash)
 # =========================
 echo "[+] Configuring u-boot defaults..."
-
-KERNEL_TYPE=${KERNEL_TYPE:-vendor}
-
-# Detect the installed kernel version for overlay/FDT path resolution
-KVER=$(chroot "${mount_point}/writable" dpkg -l 'linux-image-*' 2>/dev/null \
-    | awk '/^ii/{print $2}' | grep -v '\-dbg' | head -1 | sed 's/linux-image-//')
-
-if [[ "${KERNEL_TYPE}" == "mainline" ]]; then
-    FDT_PATH="${U_BOOT_FDT_MAINLINE:-${U_BOOT_FDT}}"
-    FDT_DIR_LINE="U_BOOT_FDT_DIR=\"/usr/lib/linux-image-${KVER}/\""
-    OVERLAYS_LINE=""
-    OVERLAYS_DIR_LINE=""
-else
-    FDT_PATH="${U_BOOT_FDT}"
-    FDT_DIR_LINE=""
-    OVERLAYS="${U_BOOT_FDT_OVERLAYS:-}"
-    OVERLAYS_LINE="${OVERLAYS:+U_BOOT_FDT_OVERLAYS=\"${OVERLAYS}\"}"
-    OVERLAYS_DIR_LINE="${KVER:+U_BOOT_FDT_OVERLAYS_DIR=\"/lib/firmware/${KVER}/device-tree/rockchip/overlay\"}"
-fi
-
-chroot "${mount_point}/writable" /bin/bash -c "
+chroot ${mount_point}/writable /bin/bash -c "
 set -e
 # Ensure /etc/default/u-boot exists
 mkdir -p /etc/default
 
 # Remove any previous CMDLINE definition to avoid duplicates
+sed -i '/^U_BOOT_PARAMETERS=/d' /etc/default/u-boot || true
 rm -f /etc/default/u-boot
 
-# Add new parameters (you can append others as needed)
-cat > /etc/default/u-boot <<'UBOOTEOF'
-# /etc/default/u-boot - configuration file for u-boot-update(8)
-UBOOTEOF
+# Resolve the installed kernel's dtb path dynamically instead of hardcoding
+# a kernel version string that goes stale on every rebuild.
+FDT_BASENAME=\$(basename \"${U_BOOT_FDT}\")
+FDT_ABS_PATH=\$(find /lib/linux-image-*/ -name \"\${FDT_BASENAME}\" 2>/dev/null | head -1)
+if [ -z \"\${FDT_ABS_PATH}\" ]; then
+    echo \"ERROR: could not find \${FDT_BASENAME} under /lib/linux-image-*/\" >&2
+    exit 1
+fi
+FDT_OVERLAYS_DIR=\$(dirname \"\${FDT_ABS_PATH}\")
 
-cat >> /etc/default/u-boot <<UBOOTEOF
+# Add new parameters (you can append others as needed)
+cat >> /etc/default/u-boot <<EOF
+# /etc/default/u-boot - configuration file for u-boot-update(8)
+
+#U_BOOT_UPDATE=\"true\"
+
+#U_BOOT_ALTERNATIVES=\"default recovery\"
+#U_BOOT_DEFAULT=\"l0\"
+#U_BOOT_PROMPT=\"1\"
+#U_BOOT_ENTRIES=\"all\"
+#U_BOOT_MENU_LABEL=\"Debian GNU/Linux\"
 U_BOOT_PARAMETERS=\"console=ttyS2,1500000 console=tty1 root=UUID=${root_uuid,,} rw rootwait quiet splash plymouth.ignore-serial-consoles cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory\"
-U_BOOT_FDT=\"${FDT_PATH}\"
-${FDT_DIR_LINE}
-${OVERLAYS_LINE}
-${OVERLAYS_DIR_LINE}
-UBOOTEOF
+#U_BOOT_ROOT=\"\"
+#U_BOOT_TIMEOUT=\"50\"
+U_BOOT_FDT=\"\${FDT_ABS_PATH}\"
+#U_BOOT_FDT_DIR=\"/lib/firmware/\"
+#U_BOOT_FDT_OVERLAYS=\"\"
+#U_BOOT_FDT_OVERLAYS_DIR=\"\${FDT_OVERLAYS_DIR}/\"
+#U_BOOT_SYNC_DTBS=\"false\"
+EOF
+
+# cat /etc/default/u-boot
+
+# # Add new parameters (you can append others as needed)
+# cat >> /etc/default/u-boot <<EOF
+# U_BOOT_PARAMETERS=\"console=ttyS2,1500000 console=tty1 root=UUID=${root_uuid,,} rw rootwait quiet splash plymouth.ignore-serial-consoles cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory\"
+# EOF
 "
 
 chroot ${mount_point}/writable/ u-boot-update
@@ -237,7 +243,7 @@ losetup -d "${loop}"
 # Exit trap is no longer needed
 trap '' EXIT
 
-echo "[+] Compressing image..."
-xz -T0 -v -z -f "$IMG"
+# echo "[+] Compressing image..."
+# xz -T0 -v -z -f "$IMG"
 
-echo "[✓] Image built and compressed: ${IMG}.xz"
+# echo "[✓] Image built and compressed: ${IMG}.xz"
