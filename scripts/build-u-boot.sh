@@ -25,7 +25,7 @@ cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ..
 mkdir -p build/u-boot && cd build/u-boot
 
 if [ ! -d u-boot ]; then
-    git clone --depth=1 --progress -b v2026.04 https://github.com/u-boot/u-boot.git
+    git clone --depth=1 --progress -b v2026.07 https://github.com/u-boot/u-boot.git
 fi
 if [ ! -d rkbin ]; then
     git clone --depth=1 --progress https://github.com/rockchip-linux/rkbin.git
@@ -45,8 +45,8 @@ fi
 
 make clean
 make CROSS_COMPILE=aarch64-linux-gnu- \
-     ROCKCHIP_TPL=../rkbin/bin/rk35/rk3588_ddr_lp4_2112MHz_lp5_2400MHz_v1.19.bin \
-     BL31=../rkbin/bin/rk35/rk3588_bl31_v1.51.elf \
+     ROCKCHIP_TPL=../rkbin/bin/rk35/rk3588_ddr_lp4_2112MHz_lp5_2400MHz_v1.24.bin \
+     BL31=../rkbin/bin/rk35/rk3588_bl31_v1.56.elf \
      "${UBOOT_RULES_TARGET}" all -j"$(nproc)"
 
 cp u-boot-rockchip.bin ..
