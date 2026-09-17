@@ -243,7 +243,10 @@ losetup -d "${loop}"
 # Exit trap is no longer needed
 trap '' EXIT
 
-# echo "[+] Compressing image..."
-# xz -T0 -v -z -f "$IMG"
-
-# echo "[✓] Image built and compressed: ${IMG}.xz"
+if [[ "${COMPRESS:-Y}" == "Y" ]]; then
+    echo "[+] Compressing image..."
+    xz -T0 -v -z -f "$IMG"
+    echo "[✓] Image built and compressed: ${IMG}.xz"
+else
+    echo "[✓] Image built: ${IMG}"
+fi
