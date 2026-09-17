@@ -6,7 +6,7 @@ cd "$(dirname -- "$(readlink -f -- "$0")")"
 
 usage() {
 cat << HEREDOC
-Usage: $0 --board=[orangepi-5|rock-5b-plus] --release=[questing] --flavor=[server|desktop]
+Usage: $0 --board=[orangepi-5|rock-5b-plus] --release=[questing|resolute|stonking] --flavor=[server|desktop]
 
 Required arguments:
   -b, --board=BOARD           target board
@@ -22,7 +22,9 @@ Optional arguments:
   -kt, --kernel-type=TYPE     kernel type: vendor (default) or mainline
   -ko, --kernel-only          only compile the kernel
   -uo, --uboot-only           only compile uboot
-  -ro, --rootfs-only          only build rootfs
+  -ro, --rootfs-only          only extract Ubuntu's official aarch64 ISO into a rootfs
+       --compress             xz-compress the output image (default)
+       --no-compress          leave the output image uncompressed
   -v,  --verbose              increase the verbosity of the bash script
 HEREDOC
 }
@@ -103,6 +105,25 @@ while [ "$#" -gt 0 ]; do
             export REBUILD_ROOTFS=Y
             shift
             ;;
+        --compress)
+            export COMPRESS=Y
+            shift
+            ;;
+        --compress=*)
+            case "${1#*=}" in
+                Y|y|yes|true|1) export COMPRESS=Y ;;
+                N|n|no|false|0) export COMPRESS=N ;;
+                *)
+                    echo "Error: --compress expects true or false"
+                    exit 1
+                    ;;
+            esac
+            shift
+            ;;
+        --no-compress)
+            export COMPRESS=N
+            shift
+            ;;
         -v|--verbose)
             set -x
             shift
@@ -116,6 +137,8 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+export COMPRESS="${COMPRESS:-Y}"
 
 if [ "${RELEASE}" == "help" ]; then
     for file in configs/releases/*; do
