@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Device tree overlay for the IMX708 camera (CAM0) on the Radxa ROCK 5B+,
+ * routed through the rkisp2 ISP for use with libcamera.
+ *
+ * Mutually exclusive with rk3588-rock-5b-plus-imx708-cam0.dtso (VICAP).
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/clock/rockchip,rk3588-cru.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pinctrl/rockchip.h>
+
+&{/} {
+	cam0_regulator: cam0_regulator {
+		compatible = "regulator-fixed";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-name = "cam0_regulator";
+		vin-supply = <&vcc_3v3_s3>;
+	};
+};
+
+&i2c3 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+
+	imx708: camera-sensor@1a {
+		compatible = "sony,imx708";
+		reg = <0x1a>;
+		assigned-clocks = <&cru CLK_MIPI_CAMARAOUT_M3>;
+		assigned-clock-rates = <24000000>;
+		clocks = <&cru CLK_MIPI_CAMARAOUT_M3>;
+
+		vdig-supply = <&cam0_regulator>;
+		vana1-supply = <&cam0_regulator>;
+		vana2-supply = <&cam0_regulator>;
+		vddl-supply = <&cam0_regulator>;
+
+		orientation = <2>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam0_rstn &mipim0_camera3_clk>;
+		reset-gpios = <&gpio4 RK_PA0 GPIO_ACTIVE_LOW>;
+
+		port {
+			imx708_output: endpoint {
+				data-lanes = <1 2>;
+				clock-noncontinuous;
+				link-frequencies = /bits/ 64 <450000000>;
+				remote-endpoint = <&csi2_input>;
+			};
+		};
+	};
+};
+
+&pinctrl {
+	cam0 {
+		cam0_rstn: cam0-rstn-pinctrl {
+			rockchip,pins = <4 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+};
+
+&csi2 {
+	status = "okay";
+};
+
+&csi2_in {
+	csi2_input: endpoint {
+		data-lanes = <1 2>;
+		clock-noncontinuous;
+		link-frequencies = /bits/ 64 <450000000>;
+		remote-endpoint = <&imx708_output>;
+	};
+};
+
+&csi2_output {
+	remote-endpoint = <&isp0_in_ep>;
+};
+
+&isp0_in {
+	isp0_in_ep: endpoint@0 {
+		reg = <0>;
+		remote-endpoint = <&csi2_output>;
+	};
+};
+
+&csi_dphy0 {
+	status = "okay";
+};
+
+&isp0 {
+	status = "okay";
+};
+
+&isp0_mmu {
+	status = "okay";
+};

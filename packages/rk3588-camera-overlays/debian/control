@@ -1,0 +1,15 @@
+Source: rk3588-camera-overlays
+Section: admin
+Priority: optional
+Maintainer: Peyton Howe <peyton@localhost>
+Build-Depends: debhelper-compat (= 13), device-tree-compiler
+Standards-Version: 4.6.2
+Homepage: https://github.com/peyton-howe/ubuntu-image-builder
+
+Package: rk3588-camera-overlays
+Architecture: all
+Depends: ${misc:Depends}, u-boot-menu | u-boot-tools
+Description: Device-tree overlays for RK3588 IMX708 cameras
+ Prebuilt .dtbo overlays for Orange Pi 5/5B and ROCK 5B+ camera
+ connectors. Installs under /usr/share/rk3588-camera/overlays and
+ provides /etc/rk3588-camera/overlays.conf for u-boot-menu selection.

@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+
+DTS := $(wildcard dts/*.dtso)
+DTBOS := $(patsubst dts/%.dtso,build/%.dtbo,$(DTS))
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	rm -rf build
+
+override_dh_auto_build:
+	mkdir -p build
+	@for src in $(DTS); do \
+		base=$$(basename "$$src" .dtso); \
+		echo "dtc $$src -> build/$$base.dtbo"; \
+		dtc -@ -I dts -O dtb -o "build/$$base.dtbo" "$$src"; \
+	done
+
+override_dh_auto_install:
+	install -d debian/rk3588-camera-overlays/usr/share/rk3588-camera/overlays
+	install -m 0644 build/*.dtbo \
+		debian/rk3588-camera-overlays/usr/share/rk3588-camera/overlays/
+	install -d debian/rk3588-camera-overlays/etc/rk3588-camera
+	install -m 0644 overlays.conf \
+		debian/rk3588-camera-overlays/etc/rk3588-camera/overlays.conf
+	install -d debian/rk3588-camera-overlays/usr/lib/rk3588-camera
+	install -m 0755 scripts/apply-overlays.sh \
+		debian/rk3588-camera-overlays/usr/lib/rk3588-camera/apply-overlays.sh

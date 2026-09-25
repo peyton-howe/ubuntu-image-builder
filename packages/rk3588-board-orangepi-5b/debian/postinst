@@ -1,0 +1,30 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = configure ]; then
+    frag=/usr/share/rk3588-board-orangepi-5b/u-boot.default
+    target=/etc/default/u-boot
+    if [ -f "$frag" ]; then
+        mkdir -p /etc/default
+        touch "$target"
+        # Merge known keys from our fragment
+        while IFS= read -r line; do
+            case "$line" in
+                ''|\#*) continue ;;
+            esac
+            key=${line%%=*}
+            if grep -q "^$key=" "$target"; then
+                sed -i "s|^$key=.*|$line|" "$target"
+            else
+                printf '%s\n' "$line" >> "$target"
+            fi
+        done < "$frag"
+        if command -v u-boot-update >/dev/null; then
+            u-boot-update || true
+        fi
+    fi
+fi
+
+#DEBHELPER#
+
+exit 0

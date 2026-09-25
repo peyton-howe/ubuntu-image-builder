@@ -1,0 +1,5 @@
+rk3588-board-orangepi-5 (0.1.0-1) UNRELEASED; urgency=medium
+
+  * Initial scaffolding for stock-ISO board support package.
+
+ -- Peyton Howe <peyton@localhost>  Thu, 25 Sep 2026 00:00:00 +0000
