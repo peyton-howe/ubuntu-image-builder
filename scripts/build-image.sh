@@ -258,7 +258,10 @@ U_BOOT_FDT_OVERLAYS=\"\${BOARD_OVERLAYS_ABS}\"
 #U_BOOT_SYNC_DTBS=\"false\"
 EOF
 
-if [ -x /usr/lib/rk3588-camera/apply-overlays.sh ]; then
+# Only run when the user has selected camera overlays; empty default is fine.
+if [ -x /usr/lib/rk3588-camera/apply-overlays.sh ] \\
+    && [ -f /etc/rk3588-camera/overlays.conf ] \\
+    && grep -q '^RK3588_CAMERA_OVERLAYS=\"[^[:space:]]' /etc/rk3588-camera/overlays.conf; then
     /usr/lib/rk3588-camera/apply-overlays.sh || true
 fi
 "
