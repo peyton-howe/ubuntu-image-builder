@@ -2,13 +2,17 @@
 set -eE
 trap 'echo Error: in $0 on line $LINENO' ERR
 
-if [ "$(id -u)" -ne 0 ]; then 
-    echo "Please run as root"
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Please run ./build.sh (it uses a user namespace) or sudo $0"
     exit 1
 fi
 
 cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ..
-mkdir -p build/rootfs && cd build/rootfs
+# shellcheck source=/dev/null
+source scripts/common.sh
+mkdir -p build/rootfs
+ROOT_DIR="$(pwd)"
+cd build/rootfs
 
 if [[ -z ${RELEASE} ]]; then
     echo "Error: RELEASE is not set"
@@ -16,7 +20,7 @@ if [[ -z ${RELEASE} ]]; then
 fi
 
 # shellcheck source=/dev/null
-source "../../configs/releases/${RELEASE}.sh"
+source "${ROOT_DIR}/configs/releases/${RELEASE}.sh"
 
 if [[ -z ${FLAVOR} ]]; then
     echo "Error: FLAVOR is not set"
@@ -24,46 +28,137 @@ if [[ -z ${FLAVOR} ]]; then
 fi
 
 # shellcheck source=/dev/null
-source "../../configs/flavors/${FLAVOR}.sh"
+source "${ROOT_DIR}/configs/flavors/${FLAVOR}.sh"
 
-if [[ -f ubuntu-${RELASE_VERSION}-preinstalled-${FLAVOR}-arm64.rootfs.tar.xz ]]; then
+TARBALL="ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64.tar.gz"
+if [[ -f ${TARBALL} ]]; then
+    echo "[+] Rootfs tarball already exists: ${TARBALL}"
     exit 0
 fi
 
-pushd .
-
-# Variables
-ARCH=arm64
-ROOTFS_DIR=${RELEASE}-desktop
-KERNEL_DIR=../kernel  # Folder containing your built .deb files
-PACKAGES_DIR=packages
-MIRROR=http://ports.ubuntu.com/ubuntu-ports
-
-# Install mmdebstrap + qemu
-apt install -y mmdebstrap qemu-user-static binfmt-support
-
-if [[ -f ${ROOTFS_DIR} ]]; then
-  rm -r ${ROOTFS_DIR}
+if [[ "${FLAVOR}" == "desktop" ]]; then
+    ISO_URL="${UBUNTU_DESKTOP_ISO_URL:?Set UBUNTU_DESKTOP_ISO_URL in configs/releases/${RELEASE}.sh}"
+    SHA256SUMS_URL="${UBUNTU_DESKTOP_SHA256SUMS_URL:-${UBUNTU_SHA256SUMS_URL:-}}"
+else
+    ISO_URL="${UBUNTU_SERVER_ISO_URL:?Set UBUNTU_SERVER_ISO_URL in configs/releases/${RELEASE}.sh}"
+    SHA256SUMS_URL="${UBUNTU_SERVER_SHA256SUMS_URL:-${UBUNTU_SHA256SUMS_URL:-}}"
 fi
 
-# =========================
-# 1. Build base rootfs
-# =========================
-mmdebstrap --arch=${ARCH} ${RELEASE} ${ROOTFS_DIR} \
-  --include=ubuntu-desktop-minimal,ca-certificates,netplan.io,network-manager,sudo,ssh,dbus-user-session \
-  --components=main,universe,multiverse \
-  ${MIRROR}
+ISO_NAME="$(basename "${ISO_URL}")"
+ISO_PATH="$(pwd)/${ISO_NAME}"
+ROOTFS_DIR="${RELEASE}-${FLAVOR}"
+ISO_MNT="$(pwd)/iso-mnt"
+KERNEL_DIR="${ROOT_DIR}/build/kernel"
 
-# Copy QEMU binary so we can chroot
-cp /usr/bin/qemu-aarch64-static ${ROOTFS_DIR}/usr/bin/
+cleanup_iso() {
+    if mountpoint -q "${ISO_MNT}" 2>/dev/null; then
+        umount "${ISO_MNT}" || true
+    fi
+}
+trap 'cleanup_iso; echo Error: in $0 on line $LINENO' ERR
+
+require_cmds unsquashfs sha256sum
+if ! command -v wget >/dev/null && ! command -v curl >/dev/null; then
+    echo "Error: need wget or curl"
+    exit 1
+fi
+
+echo "[+] Downloading ${ISO_NAME}..."
+if command -v wget >/dev/null; then
+    wget -c --progress=dot:giga -O "${ISO_PATH}" "${ISO_URL}"
+else
+    curl -L --continue-at - -o "${ISO_PATH}" "${ISO_URL}"
+fi
+
+if [[ -n "${SHA256SUMS_URL}" ]]; then
+    echo "[+] Verifying SHA256..."
+    wget -q -O SHA256SUMS "${SHA256SUMS_URL}"
+    grep " ${ISO_NAME}$\| \*${ISO_NAME}$" SHA256SUMS | sha256sum -c -
+fi
+
+mkdir -p "${ISO_MNT}"
+ISO_LOOP_MOUNTED=0
+if mount -o loop,ro "${ISO_PATH}" "${ISO_MNT}" 2>/dev/null; then
+    ISO_LOOP_MOUNTED=1
+else
+    echo "[+] Could not loop-mount ISO; extracting with bsdtar..."
+    require_cmds bsdtar
+    bsdtar -xf "${ISO_PATH}" -C "${ISO_MNT}"
+fi
+
+if [[ -d ${ROOTFS_DIR} ]]; then
+    rm -rf "${ROOTFS_DIR}"
+fi
+
+CASPER="${ISO_MNT}/casper"
+layers=()
+if [[ "${FLAVOR}" == "desktop" ]]; then
+    # Installed desktop = minimal + standard (+ English langpack). Skip *.live.*
+    for name in minimal.squashfs minimal.standard.squashfs minimal.standard.en.squashfs minimal.en.squashfs; do
+        [[ -f "${CASPER}/${name}" ]] && layers+=("${CASPER}/${name}")
+    done
+else
+    for name in ubuntu-server-minimal.squashfs ubuntu-server-minimal.ubuntu-server.squashfs; do
+        [[ -f "${CASPER}/${name}" ]] && layers+=("${CASPER}/${name}")
+    done
+fi
+if [[ ${#layers[@]} -eq 0 && -f "${CASPER}/filesystem.squashfs" ]]; then
+    layers+=("${CASPER}/filesystem.squashfs")
+fi
+if [[ ${#layers[@]} -eq 0 ]]; then
+    echo "Error: no squashfs layers found in ${CASPER}"
+    ls -la "${CASPER}" || true
+    exit 1
+fi
+
+# Device nodes in the squashfs (console, null, ...) need CAP_MKNOD in the
+# initial namespace. In a user namespace that fails; udev/devtmpfs recreates
+# them on the board and we bind-mount /dev for chroot.
+unsquashfs_flags=(-d "${ROOTFS_DIR}")
+if unsquashfs -help 2>&1 | grep -q -- '-ignore-errors'; then
+    unsquashfs_flags+=(-ignore-errors -no-exit-code)
+fi
+
+unsquashfs_layer() {
+    local extra=("${unsquashfs_flags[@]}")
+    extra+=("$@")
+    if unsquashfs "${extra[@]}"; then
+        return 0
+    fi
+    local rc=$?
+    if [[ -e "${ROOTFS_DIR}/etc/os-release" || -e "${ROOTFS_DIR}/usr/lib/os-release" ]]; then
+        echo "[!] unsquashfs exited ${rc} (character devices in user namespace); continuing"
+        return 0
+    fi
+    echo "Error: unsquashfs failed (${rc}) and rootfs looks empty"
+    return "${rc}"
+}
+
+first=1
+for sq in "${layers[@]}"; do
+    echo "[+] Extracting $(basename "${sq}")..."
+    if [[ ${first} -eq 1 ]]; then
+        unsquashfs_layer "${sq}"
+        first=0
+    else
+        unsquashfs_layer -f "${sq}"
+    fi
+done
+
+cleanup_iso
+trap 'echo Error: in $0 on line $LINENO' ERR
+
+if [[ "$(uname -m)" != "aarch64" ]]; then
+    cp /usr/bin/qemu-aarch64-static "${ROOTFS_DIR}/usr/bin/"
+fi
 
 # =========================
 # 2. Setup chroot environment
 # =========================
 echo "[+] Preparing chroot networking..."
 
-rm -f ${ROOTFS_DIR}/etc/resolv.conf
-tee ${ROOTFS_DIR}/etc/resolv.conf > /dev/null <<EOF
+rm -f "${ROOTFS_DIR}/etc/resolv.conf"
+tee "${ROOTFS_DIR}/etc/resolv.conf" >/dev/null <<EOF
 nameserver 8.8.8.8
 nameserver 1.1.1.1
 EOF
@@ -71,207 +166,103 @@ EOF
 # =========================
 # 3. Copy kernel DEBs into rootfs
 # =========================
-mkdir -p ${ROOTFS_DIR}/tmp/kernel-debs
-cp ${KERNEL_DIR}/*.deb ${ROOTFS_DIR}/tmp/kernel-debs/ || true
-#cp ${PACKAGES_DIR}/*.deb ${ROOTFS_DIR}/tmp/kernel-debs/ || true
+mkdir -p "${ROOTFS_DIR}/tmp/kernel-debs"
+if compgen -G "${KERNEL_DIR}/*.deb" > /dev/null; then
+    cp "${KERNEL_DIR}"/*.deb "${ROOTFS_DIR}/tmp/kernel-debs/"
+fi
 
-mount -t proc /proc "${ROOTFS_DIR}/proc"
-mount --rbind /sys "${ROOTFS_DIR}/sys"
-mount --rbind /dev "${ROOTFS_DIR}/dev"
-mount --make-rslave "${ROOTFS_DIR}/sys"
-mount --make-rslave "${ROOTFS_DIR}/dev"
-mount --rbind /run "${ROOTFS_DIR}/run"
-mount --make-rslave "${ROOTFS_DIR}/run"
+prepare_chroot_mounts "${ROOTFS_DIR}"
 
 # =========================
 # 4. Install kernel inside chroot
 # =========================
-chroot ${ROOTFS_DIR} /bin/bash -c "
+chroot "${ROOTFS_DIR}" /bin/bash -c "
 set -e
 export DEBIAN_FRONTEND=noninteractive
 export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 
+# The live image ships a cdrom source (installer normally drops this
+# post-install); there's no /cdrom mount here so apt-get update fails on it.
+rm -f /etc/apt/sources.list.d/cdrom.sources
+
+# u-boot-menu's postinst (u-boot-update) hard-fails without /etc/fstab, but
+# the real one (with the board's root UUID) isn't written until build-image.sh
+# partitions the image. Stub it so the package configures; it gets overwritten.
+if [[ ! -e /etc/fstab ]]; then
+    echo '# placeholder, replaced by build-image.sh' > /etc/fstab
+fi
+
+# DMA-BUF heap drivers (system_heap, cma_heap) are built as modules, not
+# built-in, and nothing hot-plug-triggers them since they're not tied to any
+# discoverable device -- without this they never load, so /dev/dma_heap/*
+# never appears and userspace DMA-BUF allocators (libcamera, gstreamer, GPU
+# stacks) fail with 'Could not open any dma-buf provider'.
+mkdir -p /etc/modules-load.d
+cat > /etc/modules-load.d/dma-heaps.conf <<'EOF2'
+system_heap
+cma_heap
+EOF2
+
+# The dma-heap driver's devnode() callback only sets the device path, not a
+# mode, so /dev/dma_heap/* nodes get the kernel's own restrictive default
+# (root-only) instead of a udev-assigned one -- and unlike video4linux/sound/
+# drm, there's no packaged udev rule granting group or uaccess permission on
+# them at all (only /dev/udmabuf, a different node, has one).
+mkdir -p /etc/udev/rules.d
+cat > /etc/udev/rules.d/99-dma-heap.rules <<'EOF2'
+SUBSYSTEM==\"dma_heap\", GROUP=\"video\", MODE=\"0660\"
+SUBSYSTEM==\"dma_heap\", TAG+=\"uaccess\"
+EOF2
+
 echo '[+] Updating apt sources...'
 apt-get update
+apt-get install -y u-boot-menu u-boot-tools initramfs-tools linux-base
 
-echo '[+] Installing base packages...'
-echo '[+] Installing base Ubuntu Desktop packages...'
+if compgen -G '/tmp/kernel-debs/*.deb' > /dev/null; then
+    echo '[+] Installing custom kernel debs...'
+    dpkg -i /tmp/kernel-debs/*.deb || apt-get -f install -y
+    rm -rf /tmp/kernel-debs
+fi
 
-apt-get install -y locales
-locale-gen en_US.UTF-8
+if [[ -d /etc/gdm3 ]]; then
+    echo '[+] Preparing GNOME Initial Setup...'
+    rm -rf /var/lib/AccountsService/users/*
+    rm -rf /var/lib/gnome-initial-setup
+    mkdir -p /var/lib/gnome-initial-setup
+    touch /var/lib/gnome-initial-setup/force-new-user
+    sed -i '/AutomaticLogin/d' /etc/gdm3/custom.conf || true
+    sed -i '/AutomaticLoginEnable/d' /etc/gdm3/custom.conf || true
+fi
 
-apt-get install -y \
-  initramfs-tools linux-base u-boot-menu u-boot-tools \
-  plymouth plymouth-theme-spinner plymouth-theme-ubuntu-text \
-  gdm3 \
-  gnome-initial-setup gnome-control-center gnome-disk-utility \
-  gnome-session gnome-keyring gnome-software \
-  ptyxis gsettings-desktop-schemas gnome-online-accounts \
-  gnome-shell-extension-appindicator gnome-shell-extension-desktop-icons-ng \
-  gnome-shell-extension-ubuntu-dock gnome-shell-extension-ubuntu-tiling-assistant \
-  gnome-bluetooth-3-common bluez bluez-obexd rfkill \
-  yaru-theme-gtk yaru-theme-icon adwaita-icon-theme ubuntu-wallpapers \
-  ubuntu-settings shared-mime-info fastfetch \
-  tzdata console-setup keyboard-configuration \
-  mesa-vulkan-drivers nano linux-firmware
+: > /etc/machine-id
+mkdir -p /var/lib/dbus
+rm -f /var/lib/dbus/machine-id
+ln -sf /etc/machine-id /var/lib/dbus/machine-id
 
-apt-get install -y gnome-system-monitor gnome-calculator \
-   gnome-characters gnome-font-viewer gnome-logs gnome-text-editor baobab
-
-echo '[+] Installing update, driver and crash-reporting stack...'
-apt-get install -y \
-  snapd \
-  whoopsie apport \
-  update-notifier update-manager \
-  ubuntu-release-upgrader-core ubuntu-release-upgrader-gtk \
-  packagekit software-properties-gtk software-properties-common \
-  ubuntu-drivers-common unattended-upgrades
-
-echo '[+] Ensuring Nautilus supports network and other locations...'
-apt-get clean
-apt-get install -y \
-  gvfs gvfs-daemons gvfs-fuse gvfs-backends gvfs-libs \
-  gvfs-common udisks2 dbus-x11 avahi-daemon \
-  samba samba-common-bin nautilus-share
-
-echo '[+] Installing firefox...'
-add-apt-repository -y ppa:mozillateam/ppa
-
-# Force apt to prefer the .deb package over the snap
-cat > /etc/apt/preferences.d/mozilla-firefox <<EOF
-Package: firefox*
-Pin: release o=LP-PPA-mozillateam
-Pin-Priority: 501
-EOF
-
-# Install Firefox .deb
-apt-get update
-apt-get install -y firefox
-
-echo '[+] Installing kernel DEBs...'
-dpkg -i /tmp/kernel-debs/*.deb || apt-get -f install -y
-
-#echo '[+] Regenerating initramfs...'
-#update-initramfs -u -k all
-
-echo '[+] Cleaning up kernel DEBs...'
-rm -rf /tmp/kernel-debs
-
-echo '[+] Kernel installation complete in rootfs.'
-
-# # =========================
-# # Create ubuntu user
-# # =========================
-# echo '[+] Creating default ubuntu user...'
-# useradd -m -s /bin/bash ubuntu
-# echo 'ubuntu:ubuntu' | chpasswd
-# usermod -aG sudo,adm,video,audio,plugdev,render ubuntu
-
-# # =========================
-# # Enable GDM Auto-login (KEY FIX)
-# # =========================
-# mkdir -p /var/lib/AccountsService/users
-# cat > /var/lib/AccountsService/users/ubuntu <<EOF
-# [User]
-# Language=
-# XSession=ubuntu
-# SystemAccount=false
-# EOF
-
-# mkdir -p /etc/gdm3
-# cat > /etc/gdm3/custom.conf <<EOF
-# [daemon]
-# AutomaticLoginEnable = true
-# AutomaticLogin = ubuntu
-# EOF
-
-# # =========================
-# # Trigger GNOME Initial Setup on first boot
-# # =========================
-# echo '[+] Triggering GNOME Initial Setup...'
-# rm -rf /var/lib/gnome-initial-setup/*  # Clears all 'seen' markers to force run
-# mkdir -p /var/lib/gnome-initial-setup # Recreate empty dir
-# touch /var/lib/gnome-initial-setup/force-new-user
-
-# # Clear locale/time/keyboard to re-prompt
-# rm -f /etc/default/locale
-# rm -f /etc/localtime
-# sed -i '/XKBLAYOUT/d' /etc/default/keyboard || true
-
-# =========================
-# First-boot GNOME Initial Setup (no pre-created users)
-# =========================
-echo '[+] Preparing GNOME Initial Setup environment...'
-
-# Remove any pre-existing AccountsService users
-rm -rf /var/lib/AccountsService/users/*
-
-# Force gnome-initial-setup to run
-rm -rf /var/lib/gnome-initial-setup
-mkdir -p /var/lib/gnome-initial-setup
-touch /var/lib/gnome-initial-setup/force-new-user
-
-# Remove any auto-login configuration so setup runs properly
-sed -i '/AutomaticLogin/d' /etc/gdm3/custom.conf || true
-sed -i '/AutomaticLoginEnable/d' /etc/gdm3/custom.conf || true
-
-# Clear locale/time/keyboard so the wizard re-asks
-rm -f /etc/default/locale
-rm -f /etc/localtime
-sed -i '/XKBLAYOUT/d' /etc/default/keyboard || true
-
-# =========================
-# Plymouth splash & kernel overlay
-# =========================
-echo '[+] Configuring Plymouth...'
-
-
-# Use Ubuntu's default plymouth theme and enable quiet splash
-#update-alternatives --install /usr/share/plymouth/themes/default.plymouth default.plymouth /usr/share/plymouth/themes/ubuntu-gnome-logo/ubuntu-gnome-logo.plymouth 100
-#update-alternatives --set default.plymouth /usr/share/plymouth/themes/ubuntu-gnome-logo/ubuntu-gnome-logo.plymouth
-
-# Expand rootfs on first boot
-echo 'ext4' >> /etc/initramfs-tools/modules
-echo 'resize' >> /etc/initramfs-tools/modules || true
-
-echo '[+] Regenerating initramfs...'
-update-initramfs -u -k all
-
-# =========================
-# Enable services
-# =========================
-echo '[+] Enabling system services...'
-systemctl set-default graphical.target
-systemctl enable gdm3 NetworkManager systemd-resolved dbus \
-  plymouth-start.service plymouth-read-write.service \
-  plymouth-quit-wait.service plymouth-quit.service \
-  udisks2 avahi-daemon snapd.socket
-
-mkdir -p /etc/xdg/autostart
-cat > /etc/xdg/autostart/gvfs-daemon.desktop <<'EOF'
-[Desktop Entry]
-Type=Application
-Name=GVFS Daemon
-Exec=/usr/libexec/gvfsd
-OnlyShowIn=GNOME;
-X-GNOME-Autostart-enabled=true
-EOF
-
-u-boot-update
+update-initramfs -u -k all || true
 "
 
-umount -lf "${ROOTFS_DIR}/proc" || true
-umount -lf "${ROOTFS_DIR}/sys" || true
-umount -lf "${ROOTFS_DIR}/dev" || true
-umount -lf "${ROOTFS_DIR}/run" || true
+teardown_chroot_mounts "${ROOTFS_DIR}"
 
 echo "[+] Restoring resolv.conf for systemd-resolved..."
 rm -f "${ROOTFS_DIR}/etc/resolv.conf"
-ln -sf ../run/systemd/resolve/stub-resolv.conf "${ROOTFS_DIR}/etc/resolv.conf"
+if [[ -e "${ROOTFS_DIR}/run/systemd/resolve/stub-resolv.conf" ]] || [[ -d "${ROOTFS_DIR}/lib/systemd" ]]; then
+    ln -sf ../run/systemd/resolve/stub-resolv.conf "${ROOTFS_DIR}/etc/resolv.conf"
+fi
+
+if [[ "$(uname -m)" != "aarch64" ]]; then
+    rm -f "${ROOTFS_DIR}/usr/bin/qemu-aarch64-static"
+fi
 
 # =========================
 # 5. Compress result
 # =========================
-echo '[+] Compressing to tar...'
-tar czf ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64.tar.gz -C ${ROOTFS_DIR} .
+echo "[+] Compressing to tar..."
+# --one-file-system: teardown_chroot_mounts only unmounts the top-level
+# proc/sys/dev/run binds, not everything --rbind recursively dragged in under
+# them (e.g. the host's cgroup2/debugfs/tracefs, or OrbStack's /dev/.lxc
+# proc+sysfs snapshot). Those are on a different device than the rootfs, so
+# -one-file-system skips them instead of archiving unreadable pseudo-files.
+tar --one-file-system -czf "${TARBALL}" -C "${ROOTFS_DIR}" .
+echo "[✓] Rootfs: ${TARBALL}"

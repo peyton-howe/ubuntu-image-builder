@@ -3,6 +3,8 @@ set -eE
 trap 'echo "Error in $0 on line $LINENO"' ERR
 
 cd "$(dirname -- "$(readlink -f -- "$0")")"
+# shellcheck source=/dev/null
+source scripts/common.sh
 
 usage() {
 cat << HEREDOC
@@ -29,13 +31,16 @@ Optional arguments:
 HEREDOC
 }
 
-### =========================
-### Must be run as root
-### =========================
-if [ "$(id -u)" -ne 0 ]; then 
-    echo "Please run as root"
-    exit 1
-fi
+for _arg in "$@"; do
+    case "${_arg}" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+    esac
+done
+
+reexec_as_userns_root "$@"
 
 cd "$(dirname -- "$(readlink -f -- "$0")")"
 

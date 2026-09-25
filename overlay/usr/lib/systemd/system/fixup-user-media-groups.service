@@ -1,0 +1,10 @@
+[Unit]
+Description=Ensure human users are in video/audio/render groups
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/scripts/fixup-user-media-groups.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -4,7 +4,7 @@ set -eE
 trap 'echo Error: in $0 on line $LINENO' ERR
 
 if [ "$(id -u)" -ne 0 ]; then
-    echo "Please run as root"
+    echo "Please run ./build.sh (it uses a user namespace) or sudo $0"
     exit 1
 fi
 
@@ -22,6 +22,9 @@ if [[ -z ${UBOOT_RULES_TARGET} ]]; then
 fi
 
 cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ..
+# shellcheck source=/dev/null
+source scripts/common.sh
+require_cmds make git aarch64-linux-gnu-gcc
 mkdir -p build/u-boot && cd build/u-boot
 
 if [ ! -d u-boot ]; then

@@ -1,0 +1,16 @@
+[Unit]
+Description=Grow root partition to fill the disk
+Documentation=man:growpart(8)
+DefaultDependencies=no
+After=systemd-remount-fs.service
+Before=systemd-growfs-root.service
+ConditionPathExists=/usr/bin/growpart
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/scripts/growpart-root.sh
+TimeoutSec=60
+
+[Install]
+WantedBy=systemd-growfs-root.service

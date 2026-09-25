@@ -35,10 +35,15 @@ wait_loopdev() {
 ### =========================
 ### Check preconditions
 ### =========================
-if [ "$(id -u)" -ne 0 ]; then 
-    echo "Please run as root"
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Please run ./build.sh (it uses a user namespace) or sudo $0"
     exit 1
 fi
+
+cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ..
+# shellcheck source=/dev/null
+source scripts/common.sh
+require_cmds parted mkfs.ext4 dd tar xz
 
 ROOT_DIR=$(pwd)
 KERNEL_DIR="${ROOT_DIR}/build/kernel"
@@ -60,62 +65,60 @@ cd build
 ### =========================
 echo "[+] Creating empty image..."
 IMG="../images/$(basename "${rootfs_tar}" .tar.gz)-${BOARD}.img"
-size="$(( $(wc -c < "${rootfs_tar}" ) / 1024 / 1024 ))"
-truncate -s "$(( size + 4096 ))M" "${IMG}"
+# Size off the *uncompressed* rootfs, not the gzip'd tarball -- a desktop
+# rootfs commonly gzips down to ~1/2 its real size, so sizing off the
+# compressed number left the partition smaller than the data going into it
+# ("No space left on device" partway through extraction). The extracted
+# directory build-rootfs.sh made the tarball from is still on disk; fall
+# back to a generous multiple of the compressed size if it isn't.
+rootfs_dir="$(dirname "${rootfs_tar}")/${RELEASE}-${FLAVOR}"
+if [[ -d "${rootfs_dir}" ]]; then
+    size="$(du -sm "${rootfs_dir}" | cut -f1)"
+else
+    size="$(( $(wc -c < "${rootfs_tar}") * 3 / 1024 / 1024 ))"
+fi
+truncate -s "$(( size + 1024 ))M" "${IMG}"
 
-echo "[+] Creating loop device..."
-loop="$(losetup -f)"
-losetup -P "${loop}" "${IMG}"
-disk="${loop}"
-
-# Cleanup on exit
-trap 'cleanup_loopdev "$loop"' EXIT
-
-# Ensure disk is not mounted
 mount_point=/tmp/mnt
-umount "${disk}"* 2> /dev/null || true
-umount ${mount_point}/* 2> /dev/null || true
 mkdir -p ${mount_point}
+ROOTFS_OFFSET=$((16 * 1024 * 1024))
+DISK_MODE=loop
+loop=""
 
-### =========================
-### Partition image (Josh’s logic)
-### =========================
-dd if=/dev/zero of="${disk}" count=4096 bs=512
-parted --script "${disk}" \
+echo "[+] Partitioning image..."
+parted --script "${IMG}" \
     mklabel gpt \
     mkpart primary ext4 16MiB 100%
 
-# Create partitions
-{
-    echo "t"
-    echo "1"
-    echo "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
-    echo "w"
-} | fdisk "${disk}" &> /dev/null || true
-
-partprobe "${disk}"
-partition_char="$(if [[ ${loop: -1} =~ [0-9] ]]; then echo p; fi)"
-
-sleep 1
-
-wait_loopdev "${disk}${partition_char}1" 60 || {
-        echo "Failure to create ${disk}${partition_char}1 in time"
-        exit 1
-}
-
-sleep 1
-
-# Generate random uuid for rootfs
 root_uuid=$(cat /proc/sys/kernel/random/uuid)
 
-echo "[+] Creating filesystems..."
-# Create filesystems on partitions
-dd if=/dev/zero of="${disk}${partition_char}1" bs=1KB count=10 > /dev/null
-mkfs.ext4 -U "${root_uuid}" -L desktop-rootfs "${disk}${partition_char}1"
-
-# Mount partitions
-mkdir -p ${mount_point}/writable
-mount "${disk}${partition_char}1" ${mount_point}/writable
+if loop="$(losetup -f --show -P "${IMG}" 2>/dev/null)"; then
+    echo "[+] Using loop device ${loop}"
+    disk="${loop}"
+    trap 'cleanup_loopdev "$loop"' EXIT
+    partition_char="$(if [[ ${loop: -1} =~ [0-9] ]]; then echo p; fi)"
+    wait_loopdev "${disk}${partition_char}1" 60 || {
+        echo "Failure to create ${disk}${partition_char}1 in time"
+        exit 1
+    }
+    echo "[+] Creating filesystems..."
+    # Create filesystems on partitions
+    mkfs.ext4 -U "${root_uuid}" -L desktop-rootfs "${disk}${partition_char}1"
+    
+    # Mount partitions
+    mkdir -p ${mount_point}/writable
+    mount "${disk}${partition_char}1" ${mount_point}/writable
+else
+    echo "[+] Loop devices unavailable; using fuse2fs at 16MiB offset"
+    require_cmds fuse2fs
+    DISK_MODE=fuse
+    disk=""
+    echo "[+] Creating filesystems..."
+    mkfs.ext4 -F -U "${root_uuid}" -L desktop-rootfs -E "offset=${ROOTFS_OFFSET}" "${IMG}"
+    mkdir -p ${mount_point}/writable
+    fuse2fs -o "fakeroot,rw+,offset=${ROOTFS_OFFSET}" "${IMG}" ${mount_point}/writable
+    trap 'fusermount -u ${mount_point}/writable 2>/dev/null || umount ${mount_point}/writable 2>/dev/null || true' EXIT
+fi
 
 ### =========================
 ### Extract rootfs
@@ -144,15 +147,26 @@ echo "[+] Writing bootloader..."
 #     dd if="${BLOBS_DIR}/u-boot.itb" of="$loop" seek=16384 conv=notrunc
 # fi
 
-dd if="${BLOBS_DIR}/u-boot-rockchip.bin" of="$loop" bs=32k seek=1 conv=notrunc status=none
+dd if="${BLOBS_DIR}/u-boot-rockchip.bin" of="${IMG}" bs=32k seek=1 conv=notrunc status=none
 
-mount -t proc /proc "${mount_point}/writable/proc"
-mount --rbind /sys "${mount_point}/writable/sys"
-mount --rbind /dev "${mount_point}/writable/dev"
-mount --make-rslave "${mount_point}/writable/sys"
-mount --make-rslave "${mount_point}/writable/dev"
-mount --rbind /run "${mount_point}/writable/run"
-mount --make-rslave "${mount_point}/writable/run"
+prepare_chroot_mounts "${mount_point}/writable"
+
+# Grow the root partition to fill whatever disk it's flashed to on first boot
+# (the image is only sized to fit the rootfs) -- x-systemd.growfs in fstab
+# already grows the filesystem to match once the partition itself is bigger.
+echo "[+] Enabling first-boot partition auto-resize..."
+mkdir -p "${mount_point}/writable/usr/lib/scripts"
+cp "${ROOT_DIR}/overlay/usr/lib/scripts/growpart-root.sh" "${mount_point}/writable/usr/lib/scripts/growpart-root.sh"
+cp "${ROOT_DIR}/overlay/usr/lib/systemd/system/growpart-root.service" "${mount_point}/writable/usr/lib/systemd/system/growpart-root.service"
+chroot "${mount_point}/writable" systemctl enable growpart-root.service
+
+# gnome-initial-setup's first-run user only gets accountsservice's "admin"
+# group set, not video/audio/render -- fine for local GNOME sessions (udev's
+# uaccess tags already grant those over the active seat) but not SSH access.
+echo "[+] Enabling first-boot user media-group fixup..."
+cp "${ROOT_DIR}/overlay/usr/lib/scripts/fixup-user-media-groups.sh" "${mount_point}/writable/usr/lib/scripts/fixup-user-media-groups.sh"
+cp "${ROOT_DIR}/overlay/usr/lib/systemd/system/fixup-user-media-groups.service" "${mount_point}/writable/usr/lib/systemd/system/fixup-user-media-groups.service"
+chroot "${mount_point}/writable" systemctl enable fixup-user-media-groups.service
 
 # Source board-specific configuration
 if [[ -f "${ROOT_DIR}/configs/boards/${BOARD}.sh" ]]; then
@@ -171,6 +185,11 @@ fi
 # Configure u-boot defaults (add quiet splash)
 # =========================
 echo "[+] Configuring u-boot defaults..."
+if [[ "${KERNEL_TYPE:-vendor}" == "mainline" && -n "${U_BOOT_FDT_MAINLINE}" ]]; then
+    FDT_REL="${U_BOOT_FDT_MAINLINE}"
+else
+    FDT_REL="${U_BOOT_FDT}"
+fi
 chroot ${mount_point}/writable /bin/bash -c "
 set -e
 # Ensure /etc/default/u-boot exists
@@ -182,10 +201,15 @@ rm -f /etc/default/u-boot
 
 # Resolve the installed kernel's dtb path dynamically instead of hardcoding
 # a kernel version string that goes stale on every rebuild.
-FDT_BASENAME=\$(basename \"${U_BOOT_FDT}\")
-FDT_ABS_PATH=\$(find /lib/linux-image-*/ -name \"\${FDT_BASENAME}\" 2>/dev/null | head -1)
+FDT_BASENAME=\$(basename \"${FDT_REL}\")
+FDT_ABS_PATH=\$(find /usr/lib/linux-image-*/ /lib/linux-image-*/ /lib/firmware/*/device-tree/ \\
+    -name \"\${FDT_BASENAME}\" 2>/dev/null | grep -E 'mainline-rk3588|rockchip' | head -1 || true)
 if [ -z \"\${FDT_ABS_PATH}\" ]; then
-    echo \"ERROR: could not find \${FDT_BASENAME} under /lib/linux-image-*/\" >&2
+    FDT_ABS_PATH=\$(find /usr/lib/linux-image-*/ /lib/linux-image-*/ /lib/firmware/*/device-tree/ \\
+        -name \"\${FDT_BASENAME}\" 2>/dev/null | head -1 || true)
+fi
+if [ -z \"\${FDT_ABS_PATH}\" ]; then
+    echo \"ERROR: could not find \${FDT_BASENAME} under linux-image or firmware dtb dirs\" >&2
     exit 1
 fi
 FDT_OVERLAYS_DIR=\$(dirname \"\${FDT_ABS_PATH}\")
@@ -221,10 +245,7 @@ EOF
 
 chroot ${mount_point}/writable/ u-boot-update
 
-umount -lf "${mount_point}/writable/proc" || true
-umount -lf "${mount_point}/writable/sys" || true
-umount -lf "${mount_point}/writable/dev" || true
-umount -lf "${mount_point}/writable/run" || true
+teardown_chroot_mounts "${mount_point}/writable"
 
 sync --file-system
 sync
@@ -234,11 +255,15 @@ sync
 ### =========================
 
 # Umount partitions
-umount "${disk}${partition_char}1"
-umount "${disk}${partition_char}2" 2> /dev/null || true
-
-# Remove loop device
-losetup -d "${loop}"
+if [[ "${DISK_MODE}" == "loop" ]]; then
+    umount "${disk}${partition_char}1"
+    umount "${disk}${partition_char}2" 2>/dev/null || true
+    
+    # Remove loop device
+    losetup -d "${loop}"
+else
+    fusermount -u ${mount_point}/writable 2>/dev/null || umount ${mount_point}/writable
+fi
 
 # Exit trap is no longer needed
 trap '' EXIT

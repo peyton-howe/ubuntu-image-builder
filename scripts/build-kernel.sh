@@ -4,11 +4,14 @@ set -eE
 trap 'echo Error: in $0 on line $LINENO' ERR
 
 if [ "$(id -u)" -ne 0 ]; then
-    echo "Please run as root"
+    echo "Please run ./build.sh (it uses a user namespace) or sudo $0"
     exit 1
 fi
 
 cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ..
+# shellcheck source=/dev/null
+source scripts/common.sh
+REPO_ROOT="$(pwd)"
 mkdir -p build/kernel && cd build/kernel
 
 if compgen -G "linux-image-*.deb" > /dev/null; then
@@ -27,33 +30,72 @@ export CROSS_COMPILE=aarch64-linux-gnu-
 export LANG=C
 
 KERNEL_TYPE=${KERNEL_TYPE:-vendor}
+require_cmds make git gcc aarch64-linux-gnu-gcc
 
 if [[ "${KERNEL_TYPE}" == "mainline" ]]; then
-    MAINLINE_KERNEL_REPO=${MAINLINE_KERNEL_REPO:-https://git.ideasonboard.com/epaul/linux}
-    MAINLINE_KERNEL_BRANCH=${MAINLINE_KERNEL_BRANCH:-epaul/v7.0/rk3588/rkisp2/upstream}
+    MAINLINE_KERNEL_REPO=${MAINLINE_KERNEL_REPO:-https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git}
 
-    # Host build dependencies required by dpkg-buildpackage (called by bindeb-pkg)
-    apt-get install -y \
-        bc bison flex \
-        libdw-dev libelf-dev libssl-dev \
-        dwarves rsync swig python3-dev \
-        gnutls-dev python3-pyelftools cpio
+    latest_linux_stable_tag() {
+        git ls-remote --tags --refs "${1}" 'v*' \
+            | awk '{print $2}' \
+            | sed 's#refs/tags/##' \
+            | grep -E '^v[0-9]+\.[0-9]+(\.[0-9]+)?$' \
+            | sort -V \
+            | tail -1
+    }
+
+    if [[ -z ${MAINLINE_KERNEL_BRANCH} ]]; then
+        echo "[+] Resolving latest linux-stable tag (no -rc)..."
+        MAINLINE_KERNEL_BRANCH="$(latest_linux_stable_tag "${MAINLINE_KERNEL_REPO}")"
+        if [[ -z ${MAINLINE_KERNEL_BRANCH} ]]; then
+            echo "Error: could not determine latest linux-stable tag from ${MAINLINE_KERNEL_REPO}"
+            exit 1
+        fi
+    fi
+    echo "[+] Mainline kernel: ${MAINLINE_KERNEL_BRANCH} from ${MAINLINE_KERNEL_REPO}"
+
+    require_cmds make git bc bison flex gcc rsync python3 \
+        aarch64-linux-gnu-gcc dpkg-buildpackage
 
     SRC_DIR="$(pwd)/linux-mainline"
     BUILD_DIR="$(pwd)/linux-mainline-build"
 
-    if [ -d "${SRC_DIR}" ]; then
-        git -C "${SRC_DIR}" pull || true
-    else
-        git clone --progress --depth=1 -b "${MAINLINE_KERNEL_BRANCH}" "${MAINLINE_KERNEL_REPO}" "${SRC_DIR}"
+    if [ -d "${SRC_DIR}/.git" ]; then
+        origin_url="$(git -C "${SRC_DIR}" remote get-url origin 2>/dev/null || true)"
+        if [[ "${origin_url}" != "${MAINLINE_KERNEL_REPO}" ]]; then
+            echo "[+] Kernel tree origin changed (${origin_url} -> ${MAINLINE_KERNEL_REPO}), recloning..."
+            rm -rf "${SRC_DIR}"
+        fi
     fi
 
-    # rkisp2 Kconfig is missing 'select V4L2_ISP' — modpost fails without it
-    # (rkisp1 has this select; rkisp2 doesn't — V4L2_ISP is a hidden tristate
-    #  so olddefconfig resets it to n unless something selects it)
-    RKISP2_KCONFIG="${SRC_DIR}/drivers/media/platform/rockchip/rkisp2/Kconfig"
-    if ! grep -q "select V4L2_ISP" "${RKISP2_KCONFIG}"; then
-        sed -i '/select GENERIC_PHY_MIPI_DPHY/a \\tselect V4L2_ISP' "${RKISP2_KCONFIG}"
+    if [ -d "${SRC_DIR}/.git" ]; then
+        git -C "${SRC_DIR}" fetch --depth=1 origin tag "${MAINLINE_KERNEL_BRANCH}"
+        git -C "${SRC_DIR}" checkout -f "${MAINLINE_KERNEL_BRANCH}"
+        # checkout -f only resets tracked files; it leaves untracked ones (like
+        # new files a previous patch run created via git apply) in place. Without
+        # this, reapplying a patch that adds a file fails with "already exists in
+        # working directory" even though it's really just stale debris from last
+        # time, not an upstream conflict.
+        git -C "${SRC_DIR}" clean -fdx
+    else
+        rm -rf "${SRC_DIR}"
+        git clone --progress --depth=1 -b "${MAINLINE_KERNEL_BRANCH}" \
+            "${MAINLINE_KERNEL_REPO}" "${SRC_DIR}"
+    fi
+
+    SERIES="${REPO_ROOT}/patches/kernel/mainline/series"
+    if [[ -f "${SERIES}" ]]; then
+        echo "[+] Applying mainline camera patches from ${SERIES}"
+        while IFS= read -r line || [[ -n ${line} ]]; do
+            [[ -z ${line} || ${line} == \#* ]] && continue
+            patch="${REPO_ROOT}/patches/kernel/mainline/${line}"
+            if [[ ! -f ${patch} ]]; then
+                echo "Error: missing patch ${patch}"
+                exit 1
+            fi
+            echo "[+] Applying ${line}..."
+            git -C "${SRC_DIR}" apply --whitespace=nowarn "${patch}"
+        done < "${SERIES}"
     fi
 
     mkdir -p "${BUILD_DIR}"
@@ -120,11 +162,12 @@ if [[ "${KERNEL_TYPE}" == "mainline" ]]; then
     # Rockchip media platform — MIPI PHY, CIF capture, ISP2, RGA 2D engine
     "${SRC_DIR}/scripts/config" --file "${BUILD_DIR}/.config" \
         --enable CONFIG_PHY_ROCKCHIP_INNO_CSIDPHY \
+        --module CONFIG_PHY_ROCKCHIP_SAMSUNG_DCPHY \
         --enable CONFIG_VIDEO_DW_MIPI_CSI2RX \
         --enable CONFIG_GENERIC_PHY_MIPI_DPHY \
         --enable CONFIG_UDMABUF \
         --module CONFIG_VIDEO_ROCKCHIP_CIF \
-        --module CONFIG_VIDEO_ROCKCHIP_ISP2 \
+        --module VIDEO_ROCKCHIP_ISP2 \
         --module CONFIG_VIDEO_ROCKCHIP_RGA
 
     # Camera sensors
