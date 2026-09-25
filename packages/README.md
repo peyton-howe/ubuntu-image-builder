@@ -42,3 +42,13 @@ Driver / overlay sources were extracted from `patches/kernel/mainline/`. Re-extr
 ```bash
 ./scripts/extract-oot-from-patches.sh
 ```
+
+### Optional Wi‑Fi / BT firmware
+
+`overlay/firmware/` is **not** vendored in git (Armbian’s firmware tree is huge).
+Board packages skip packaging blobs when it is absent. To include AP6275P etc.:
+
+```bash
+git clone --depth 1 https://github.com/armbian/firmware.git overlay/firmware
+./scripts/build-debs.sh rk3588-board-orangepi-5b
+```
