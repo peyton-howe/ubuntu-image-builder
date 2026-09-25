@@ -35,7 +35,11 @@ EOF
 
     if [[ "${KERNEL_TYPE}" == "vendor" ]]; then
         echo "[+] Copying Rockchip firmware"
-        cp -r "${overlay}/firmware/" "${mount_point}/lib/"
+        if [[ -d "${overlay}/firmware" ]]; then
+            cp -r "${overlay}/firmware/" "${mount_point}/lib/"
+        else
+            echo "[!] overlay/firmware missing — skip vendor firmware copy"
+        fi
 
         echo "[+] Enabling Radxa A8 Bluetooth service"
         mkdir -p "${mount_point}/usr/lib/scripts"

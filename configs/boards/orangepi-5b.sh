@@ -61,7 +61,11 @@ EOF
 
         # Copy firmware
         echo "[+] Enabling Rockchip Firmware"
-        cp -r "${overlay}/firmware/" "${mount_point}/lib/"
+        if [[ -d "${overlay}/firmware" ]]; then
+            cp -r "${overlay}/firmware/" "${mount_point}/lib/"
+        else
+            echo "[!] overlay/firmware missing — skip vendor firmware copy"
+        fi
 
         echo '[+] Regenerating initramfs...'
         chroot "${mount_point}" update-initramfs -u -k all
@@ -77,19 +81,23 @@ EOF
         # clm_bcm43752a2_pcie_ag.blob -- say "pcie" too), so use the matching
         # brcmfmac43752-pcie files, with this module's own calibrated nvram
         # (nvram_AP6275P.txt) in place of the generic reference one.
-        echo "[+] Copying AP6275P WiFi firmware (brcmfmac43752-pcie)"
-        mkdir -p "${mount_point}/lib/firmware/brcm"
-        cp "${overlay}/firmware/brcm/brcmfmac43752-pcie.bin" "${mount_point}/lib/firmware/brcm/"
-        cp "${overlay}/firmware/brcm/brcmfmac43752-pcie.clm_blob" "${mount_point}/lib/firmware/brcm/"
-        cp "${overlay}/firmware/ap6275p/nvram_AP6275P.txt" "${mount_point}/lib/firmware/brcm/brcmfmac43752-pcie.txt"
+        if [[ -d "${overlay}/firmware" ]]; then
+            echo "[+] Copying AP6275P WiFi firmware (brcmfmac43752-pcie)"
+            mkdir -p "${mount_point}/lib/firmware/brcm"
+            cp "${overlay}/firmware/brcm/brcmfmac43752-pcie.bin" "${mount_point}/lib/firmware/brcm/"
+            cp "${overlay}/firmware/brcm/brcmfmac43752-pcie.clm_blob" "${mount_point}/lib/firmware/brcm/"
+            cp "${overlay}/firmware/ap6275p/nvram_AP6275P.txt" "${mount_point}/lib/firmware/brcm/brcmfmac43752-pcie.txt"
 
-        # Bluetooth already works on mainline without any of the vendor
-        # ap6275p-bluetooth.sh machinery (confirmed on-device) -- the mainline
-        # devicetree evidently wires it up via the standard hci_uart/btbcm
-        # serdev path, so nothing more to do here.
-        echo "[+] Copying AP6275P firmware"
-        mkdir -p "${mount_point}/lib/firmware/ap6275p"
-        cp -r "${overlay}/firmware/ap6275p/." "${mount_point}/lib/firmware/ap6275p/"
+            # Bluetooth already works on mainline without any of the vendor
+            # ap6275p-bluetooth.sh machinery (confirmed on-device) -- the mainline
+            # devicetree evidently wires it up via the standard hci_uart/btbcm
+            # serdev path, so nothing more to do here.
+            echo "[+] Copying AP6275P firmware"
+            mkdir -p "${mount_point}/lib/firmware/ap6275p"
+            cp -r "${overlay}/firmware/ap6275p/." "${mount_point}/lib/firmware/ap6275p/"
+        else
+            echo "[!] overlay/firmware missing — skip AP6275P firmware copy"
+        fi
 
         echo '[+] Regenerating initramfs...'
         chroot "${mount_point}" update-initramfs -u -k all

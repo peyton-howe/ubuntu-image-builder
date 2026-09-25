@@ -56,7 +56,11 @@ EOF
 
         # Copy firmware
         echo "[+] Enabling Rockchip Firmware"
-        cp -r "${overlay}/firmware/" "${mount_point}/lib/"
+        if [[ -d "${overlay}/firmware" ]]; then
+            cp -r "${overlay}/firmware/" "${mount_point}/lib/"
+        else
+            echo "[!] overlay/firmware missing — skip vendor firmware copy"
+        fi
 
         echo '[+] Regenerating initramfs...'
         chroot "${mount_point}" update-initramfs -u -k all
