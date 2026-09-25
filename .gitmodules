@@ -1,3 +1,0 @@
-[submodule "overlay/firmware"]
-	path = overlay/firmware
-	url = https://github.com/armbian/firmware.git
