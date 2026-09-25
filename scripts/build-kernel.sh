@@ -115,9 +115,16 @@ if [[ "${KERNEL_TYPE}" == "mainline" ]]; then
         --enable CONFIG_FW_LOADER_COMPRESS_ZSTD
 
     # Filesystems
+    # LZO and XATTR support are needed for snapd's own squashfs-backed snaps
+    # (ships by default on Ubuntu desktop) -- without them the kernel can't
+    # decompress LZO-compressed snaps or read their xattrs, and snapd retries
+    # the failed mount on a timer forever ("Filesystem uses lzo compression.
+    # This is not supported" / "Xattrs in filesystem, these will be ignored").
     "${SRC_DIR}/scripts/config" --file "${BUILD_DIR}/.config" \
         --enable CONFIG_SQUASHFS \
         --enable CONFIG_SQUASHFS_XZ \
+        --enable CONFIG_SQUASHFS_LZO \
+        --enable CONFIG_SQUASHFS_XATTR \
         --enable CONFIG_OVERLAY_FS \
         --module CONFIG_XFS_FS \
         --module CONFIG_EROFS_FS \
