@@ -8,7 +8,15 @@ export UBOOT_PACKAGE="u-boot"
 export UBOOT_RULES_TARGET="orangepi-5-rk3588s_defconfig"
 export U_BOOT_FDT="device-tree/rockchip/rk3588s-orangepi-5.dtb"
 export U_BOOT_FDT_MAINLINE="rockchip/rk3588s-orangepi-5.dtb"
-export U_BOOT_FDT_OVERLAYS="rockchip-rk3588-panthor-gpu.dtbo"
+# Mainline/stock board DT already has &gpu { status = "okay"; mali-supply = ... }
+# for panthor. rockchip-rk3588-panthor-gpu.dtbo is an Armbian/vendor-kernel
+# overlay (switch mali kbase → panthor) and is not shipped on Ubuntu's
+# linux-image DTBs.
+if [[ "${KERNEL_TYPE:-stock}" == "vendor" ]]; then
+    export U_BOOT_FDT_OVERLAYS="rockchip-rk3588-panthor-gpu.dtbo"
+else
+    export U_BOOT_FDT_OVERLAYS=""
+fi
 export COMPATIBLE_SUITES=("questing" "resolute" "stonking")
 export COMPATIBLE_FLAVORS=("server" "desktop")
 
