@@ -77,3 +77,18 @@ require_cmds() {
         exit 1
     fi
 }
+
+# Map BOARD → rk3588-board-* package name (empty if unknown).
+board_support_package() {
+    case "${1:-}" in
+        orangepi-5) echo "rk3588-board-orangepi-5" ;;
+        orangepi-5b) echo "rk3588-board-orangepi-5b" ;;
+        rock-5b-plus) echo "rk3588-board-rock-5b-plus" ;;
+        *) echo "" ;;
+    esac
+}
+
+# True when we keep the ISO's kernel and install our board/camera debs.
+is_stock_kernel() {
+    [[ "${KERNEL_TYPE:-stock}" == "stock" ]]
+}

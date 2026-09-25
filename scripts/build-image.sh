@@ -185,11 +185,16 @@ fi
 # Configure u-boot defaults (add quiet splash)
 # =========================
 echo "[+] Configuring u-boot defaults..."
-if [[ "${KERNEL_TYPE:-vendor}" == "mainline" && -n "${U_BOOT_FDT_MAINLINE}" ]]; then
+KERNEL_TYPE="${KERNEL_TYPE:-stock}"
+if [[ "${KERNEL_TYPE}" == "mainline" && -n "${U_BOOT_FDT_MAINLINE}" ]]; then
+    FDT_REL="${U_BOOT_FDT_MAINLINE}"
+elif [[ "${KERNEL_TYPE}" == "stock" && -n "${U_BOOT_FDT_MAINLINE}" ]]; then
+    # Stock Ubuntu ships mainline-style rockchip DTBs under linux-image-*.
     FDT_REL="${U_BOOT_FDT_MAINLINE}"
 else
     FDT_REL="${U_BOOT_FDT}"
 fi
+BOARD_OVERLAYS="${U_BOOT_FDT_OVERLAYS:-}"
 chroot ${mount_point}/writable /bin/bash -c "
 set -e
 # Ensure /etc/default/u-boot exists
@@ -202,17 +207,35 @@ rm -f /etc/default/u-boot
 # Resolve the installed kernel's dtb path dynamically instead of hardcoding
 # a kernel version string that goes stale on every rebuild.
 FDT_BASENAME=\$(basename \"${FDT_REL}\")
-FDT_ABS_PATH=\$(find /usr/lib/linux-image-*/ /lib/linux-image-*/ /lib/firmware/*/device-tree/ \\
-    -name \"\${FDT_BASENAME}\" 2>/dev/null | grep -E 'mainline-rk3588|rockchip' | head -1 || true)
+FDT_ABS_PATH=\$(find /usr/lib/linux-image-*/ /lib/linux-image-*/ /lib/firmware/*/device-tree/ /boot/dtbs/*/ \\
+    -name \"\${FDT_BASENAME}\" 2>/dev/null | grep -E 'mainline-rk3588|rockchip|linux-image' | head -1 || true)
 if [ -z \"\${FDT_ABS_PATH}\" ]; then
-    FDT_ABS_PATH=\$(find /usr/lib/linux-image-*/ /lib/linux-image-*/ /lib/firmware/*/device-tree/ \\
+    FDT_ABS_PATH=\$(find /usr/lib/linux-image-*/ /lib/linux-image-*/ /lib/firmware/*/device-tree/ /boot/dtbs/*/ \\
         -name \"\${FDT_BASENAME}\" 2>/dev/null | head -1 || true)
 fi
 if [ -z \"\${FDT_ABS_PATH}\" ]; then
     echo \"ERROR: could not find \${FDT_BASENAME} under linux-image or firmware dtb dirs\" >&2
+    echo \"Installed linux-image packages:\" >&2
+    dpkg -l 'linux-image-*' 2>/dev/null >&2 || true
+    find /usr/lib/linux-image-* /lib/linux-image-* -name '*.dtb' 2>/dev/null | head -20 >&2 || true
     exit 1
 fi
 FDT_OVERLAYS_DIR=\$(dirname \"\${FDT_ABS_PATH}\")
+
+# Seed board overlays from board config (panthor etc.); camera overlays
+# package may append more via apply-overlays.sh below.
+BOARD_OVERLAYS_ABS=\"\"
+for ov in ${BOARD_OVERLAYS}; do
+    [[ -z \$ov ]] && continue
+    base=\$(basename \"\$ov\")
+    found=\$(find \"\${FDT_OVERLAYS_DIR}\" /usr/share/rk3588-camera/overlays /lib/firmware -name \"\${base}\" 2>/dev/null | head -1 || true)
+    if [ -n \"\${found}\" ]; then
+        BOARD_OVERLAYS_ABS=\"\${BOARD_OVERLAYS_ABS} \${found}\"
+    else
+        echo \"WARNING: board overlay \${base} not found on rootfs\" >&2
+    fi
+done
+BOARD_OVERLAYS_ABS=\$(echo \"\${BOARD_OVERLAYS_ABS}\" | xargs)
 
 # Add new parameters (you can append others as needed)
 cat >> /etc/default/u-boot <<EOF
@@ -230,17 +253,14 @@ U_BOOT_PARAMETERS=\"console=ttyS2,1500000 console=tty1 root=UUID=${root_uuid,,} 
 #U_BOOT_TIMEOUT=\"50\"
 U_BOOT_FDT=\"\${FDT_ABS_PATH}\"
 #U_BOOT_FDT_DIR=\"/lib/firmware/\"
-#U_BOOT_FDT_OVERLAYS=\"\"
+U_BOOT_FDT_OVERLAYS=\"\${BOARD_OVERLAYS_ABS}\"
 #U_BOOT_FDT_OVERLAYS_DIR=\"\${FDT_OVERLAYS_DIR}/\"
 #U_BOOT_SYNC_DTBS=\"false\"
 EOF
 
-# cat /etc/default/u-boot
-
-# # Add new parameters (you can append others as needed)
-# cat >> /etc/default/u-boot <<EOF
-# U_BOOT_PARAMETERS=\"console=ttyS2,1500000 console=tty1 root=UUID=${root_uuid,,} rw rootwait quiet splash plymouth.ignore-serial-consoles cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory\"
-# EOF
+if [ -x /usr/lib/rk3588-camera/apply-overlays.sh ]; then
+    /usr/lib/rk3588-camera/apply-overlays.sh || true
+fi
 "
 
 chroot ${mount_point}/writable/ u-boot-update

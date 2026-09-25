@@ -18,11 +18,15 @@ Required arguments:
 Optional arguments:
   -h,  --help                 show this help message and exit
   -c,  --clean                clean the entire build directory
-  -rk, --rebuild-kernel       rebuild kernel from source (also forces rootfs + image rebuild)
+  -rk, --rebuild-kernel       rebuild custom kernel from source (vendor/mainline; forces rootfs + image rebuild)
+  -rd, --rebuild-debs         rebuild board/camera .debs (forces rootfs + image rebuild)
   -ru, --rebuild-uboot        rebuild u-boot (also forces image rebuild)
   -rr, --rebuild-rootfs       rebuild rootfs (also forces image rebuild)
-  -kt, --kernel-type=TYPE     kernel type: vendor (default) or mainline
-  -ko, --kernel-only          only compile the kernel
+  -kt, --kernel-type=TYPE     kernel type: stock (default), vendor, or mainline
+                              stock = official ISO kernel + our .debs
+                              vendor/mainline = build and install a custom linux-image
+  -ko, --kernel-only          only compile the kernel (vendor/mainline)
+  -do, --debs-only            only build board/camera .debs into build/debs/
   -uo, --uboot-only           only compile uboot
   -ro, --rootfs-only          only extract Ubuntu's official aarch64 ISO into a rootfs
        --compress             xz-compress the output image (default)
@@ -86,6 +90,10 @@ while [ "$#" -gt 0 ]; do
             export KERNEL_ONLY=Y
             shift
             ;;
+        -do|--debs-only)
+            export DEBS_ONLY=Y
+            shift
+            ;;
         -uo|--uboot-only)
             export UBOOT_ONLY=Y
             shift
@@ -100,6 +108,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         -rk|--rebuild-kernel)
             export REBUILD_KERNEL=Y
+            shift
+            ;;
+        -rd|--rebuild-debs)
+            export REBUILD_DEBS=Y
             shift
             ;;
         -ru|--rebuild-uboot)
@@ -144,6 +156,15 @@ while [ "$#" -gt 0 ]; do
 done
 
 export COMPRESS="${COMPRESS:-Y}"
+export KERNEL_TYPE="${KERNEL_TYPE:-stock}"
+
+case "${KERNEL_TYPE}" in
+    stock|vendor|mainline) ;;
+    *)
+        echo "Error: unsupported --kernel-type=${KERNEL_TYPE} (use stock, vendor, or mainline)"
+        exit 1
+        ;;
+esac
 
 if [ "${RELEASE}" == "help" ]; then
     for file in configs/releases/*; do
@@ -259,6 +280,12 @@ if [ "${REBUILD_KERNEL}" == "Y" ]; then
     REBUILD_ROOTFS=Y
 fi
 
+if [ "${REBUILD_DEBS}" == "Y" ]; then
+    echo "[+] Clearing board/camera debs..."
+    rm -rf build/debs
+    REBUILD_ROOTFS=Y
+fi
+
 if [ "${REBUILD_ROOTFS}" == "Y" ]; then
     echo "[+] Clearing rootfs..."
     unmount_rootfs
@@ -271,8 +298,19 @@ mkdir -p build/logs
 logfile="build/logs/build-$(date +"%Y%m%d%H%M%S").log"
 exec > >(tee "$logfile") 2>&1
 
+echo "[+] Kernel type: ${KERNEL_TYPE}"
+
 if [ "${KERNEL_ONLY}" == "Y" ]; then
+    if is_stock_kernel; then
+        echo "Error: --kernel-only requires --kernel-type=vendor or mainline"
+        exit 1
+    fi
     ./scripts/build-kernel.sh
+    exit 0
+fi
+
+if [ "${DEBS_ONLY}" == "Y" ]; then
+    ./scripts/build-debs.sh
     exit 0
 fi
 
@@ -280,6 +318,9 @@ if [ "${ROOTFS_ONLY}" == "Y" ]; then
     if [ -z "${RELEASE}" ] || [ -z "${FLAVOR}" ]; then
         usage
         exit 1
+    fi
+    if is_stock_kernel; then
+        ./scripts/build-debs.sh
     fi
     ./scripts/build-rootfs.sh
     exit 0
@@ -300,18 +341,36 @@ if [ -z "${BOARD}" ] || [ -z "${RELEASE}" ] || [ -z "${FLAVOR}" ]; then
     exit 1
 fi
 
-# Build the Linux kernel if not found
-if [[ ! -e "$(find build/kernel/linux-image-*.deb | sort | tail -n1)" || ! -e "$(find build/kernel/linux-headers-*.deb | sort | tail -n1)" ]]; then
-    ./scripts/build-kernel.sh
+if is_stock_kernel; then
+    # Board/camera packages for the stock ISO path
+    need_debs=0
+    if ! compgen -G "build/debs/rk3588-camera-overlays_*.deb" > /dev/null; then
+        need_debs=1
+    elif ! compgen -G "build/debs/rk3588-camera-dkms_*.deb" > /dev/null; then
+        need_debs=1
+    else
+        board_pkg="$(board_support_package "${BOARD}")"
+        if [[ -n ${board_pkg} ]] && ! compgen -G "build/debs/${board_pkg}_*.deb" > /dev/null; then
+            need_debs=1
+        fi
+    fi
+    if [[ ${need_debs} -eq 1 ]]; then
+        ./scripts/build-debs.sh
+    fi
+else
+    # Build the custom Linux kernel if not found
+    if [[ ! -e "$(find build/kernel/linux-image-*.deb 2>/dev/null | sort | tail -n1)" || ! -e "$(find build/kernel/linux-headers-*.deb 2>/dev/null | sort | tail -n1)" ]]; then
+        ./scripts/build-kernel.sh
+    fi
 fi
 
 # Build U-Boot if not found
-if [[ ! -e "$(find build/u-boot/u-boot-rockchip.bin | sort | tail -n1)" ]]; then
+if [[ ! -e "$(find build/u-boot/u-boot-rockchip.bin 2>/dev/null | sort | tail -n1)" ]]; then
     ./scripts/build-u-boot.sh
 fi
 
 # Create the root filesystem
-if [[ ! -e "$(find build/rootfs/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64.tar.gz | sort | tail -n1)" ]]; then
+if [[ ! -e "$(find build/rootfs/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64.tar.gz 2>/dev/null | sort | tail -n1)" ]]; then
     ./scripts/build-rootfs.sh
 fi
 

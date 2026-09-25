@@ -183,7 +183,13 @@ scripts/
 
 Keep `patches/kernel/mainline/` as the source of truth for upstreaming; the DKMS tree is a **packaging extract**, refreshed with `extract-oot-from-patches.sh`.
 
-Next: wire `build-rootfs.sh` / `build-image.sh` to install these `.deb`s into the stock ISO rootfs instead of `linux-image-*-mainline-rk3588*.deb`.
+### Builder wiring (done on this branch)
+
+- Default `--kernel-type=stock` in `build.sh`
+- `scripts/build-debs.sh` runs before rootfs when debs are missing
+- `scripts/build-rootfs.sh` installs board + camera debs (keeps ISO kernel)
+- `scripts/build-image.sh` resolves stock `linux-image-*` DTBs and merges overlays
+- Escape hatch: `--kernel-type=mainline|vendor` still builds/installs a custom kernel
 
 ---
 

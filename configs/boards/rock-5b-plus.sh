@@ -28,7 +28,12 @@ Machine: Radxa ROCK 5B+
 Method: generic
 EOF
 
-    if [[ "${KERNEL_TYPE:-vendor}" == "vendor" ]]; then
+    if [[ "${KERNEL_TYPE:-stock}" == "stock" ]]; then
+        echo "[+] Stock ISO path: firmware/flash-kernel come from rk3588-board-rock-5b-plus"
+        return 0
+    fi
+
+    if [[ "${KERNEL_TYPE}" == "vendor" ]]; then
         echo "[+] Copying Rockchip firmware"
         cp -r "${overlay}/firmware/" "${mount_point}/lib/"
 

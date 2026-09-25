@@ -49,6 +49,9 @@ ISO_PATH="$(pwd)/${ISO_NAME}"
 ROOTFS_DIR="${RELEASE}-${FLAVOR}"
 ISO_MNT="$(pwd)/iso-mnt"
 KERNEL_DIR="${ROOT_DIR}/build/kernel"
+DEBS_DIR="${ROOT_DIR}/build/debs"
+KERNEL_TYPE="${KERNEL_TYPE:-stock}"
+BOARD_PKG="$(board_support_package "${BOARD:-}")"
 
 cleanup_iso() {
     if mountpoint -q "${ISO_MNT}" 2>/dev/null; then
@@ -164,23 +167,46 @@ nameserver 1.1.1.1
 EOF
 
 # =========================
-# 3. Copy kernel DEBs into rootfs
+# 3. Stage .debs for chroot install
 # =========================
-mkdir -p "${ROOTFS_DIR}/tmp/kernel-debs"
-if compgen -G "${KERNEL_DIR}/*.deb" > /dev/null; then
-    cp "${KERNEL_DIR}"/*.deb "${ROOTFS_DIR}/tmp/kernel-debs/"
+mkdir -p "${ROOTFS_DIR}/tmp/kernel-debs" "${ROOTFS_DIR}/tmp/rk3588-debs"
+
+if is_stock_kernel; then
+    echo "[+] Stock kernel path: staging board/camera packages from ${DEBS_DIR}"
+    if ! compgen -G "${DEBS_DIR}/rk3588-camera-overlays_*.deb" > /dev/null \
+        || ! compgen -G "${DEBS_DIR}/rk3588-camera-dkms_*.deb" > /dev/null; then
+        echo "Error: missing camera .debs in ${DEBS_DIR}; run ./scripts/build-debs.sh first"
+        exit 1
+    fi
+    cp -v "${DEBS_DIR}/rk3588-camera-overlays_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    cp -v "${DEBS_DIR}/rk3588-camera-dkms_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    if [[ -n ${BOARD_PKG} ]]; then
+        if ! compgen -G "${DEBS_DIR}/${BOARD_PKG}_*.deb" > /dev/null; then
+            echo "Error: missing ${BOARD_PKG} .deb in ${DEBS_DIR}"
+            exit 1
+        fi
+        cp -v "${DEBS_DIR}/${BOARD_PKG}_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    else
+        echo "Warning: no board support package mapping for BOARD=${BOARD:-unset}"
+    fi
+else
+    echo "[+] Custom kernel path (${KERNEL_TYPE}): staging kernel debs from ${KERNEL_DIR}"
+    if compgen -G "${KERNEL_DIR}/*.deb" > /dev/null; then
+        cp "${KERNEL_DIR}"/*.deb "${ROOTFS_DIR}/tmp/kernel-debs/"
+    fi
 fi
 
 prepare_chroot_mounts "${ROOTFS_DIR}"
 
 # =========================
-# 4. Install kernel inside chroot
+# 4. Configure rootfs inside chroot
 # =========================
 chroot "${ROOTFS_DIR}" /bin/bash -c "
 set -e
 export DEBIAN_FRONTEND=noninteractive
 export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
+KERNEL_TYPE='${KERNEL_TYPE}'
 
 # The live image ships a cdrom source (installer normally drops this
 # post-install); there's no /cdrom mount here so apt-get update fails on it.
@@ -219,10 +245,23 @@ echo '[+] Updating apt sources...'
 apt-get update
 apt-get install -y u-boot-menu u-boot-tools initramfs-tools linux-base
 
-if compgen -G '/tmp/kernel-debs/*.deb' > /dev/null; then
-    echo '[+] Installing custom kernel debs...'
-    dpkg -i /tmp/kernel-debs/*.deb || apt-get -f install -y
-    rm -rf /tmp/kernel-debs
+if [[ \"\${KERNEL_TYPE}\" == stock ]]; then
+    echo '[+] Installing headers for DKMS (stock ISO kernel)...'
+    apt-get install -y dkms linux-headers-generic || apt-get install -y dkms linux-headers-arm64 || true
+
+    if compgen -G '/tmp/rk3588-debs/*.deb' > /dev/null; then
+        echo '[+] Installing RK3588 board/camera packages...'
+        # DKMS may fail to build under qemu/foreign chroot; sources still
+        # register and AUTOINSTALL on first boot with real headers.
+        dpkg -i /tmp/rk3588-debs/*.deb || apt-get -f install -y || true
+        rm -rf /tmp/rk3588-debs
+    fi
+else
+    if compgen -G '/tmp/kernel-debs/*.deb' > /dev/null; then
+        echo '[+] Installing custom kernel debs...'
+        dpkg -i /tmp/kernel-debs/*.deb || apt-get -f install -y
+        rm -rf /tmp/kernel-debs
+    fi
 fi
 
 if [[ -d /etc/gdm3 ]]; then

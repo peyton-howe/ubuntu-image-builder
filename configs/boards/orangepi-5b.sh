@@ -34,7 +34,12 @@ Machine: Xunlong Orange Pi 5B
 Method: generic
 EOF
 
-    if [[ "${KERNEL_TYPE:-vendor}" == "vendor" ]]; then
+    if [[ "${KERNEL_TYPE:-stock}" == "stock" ]]; then
+        echo "[+] Stock ISO path: firmware/flash-kernel come from rk3588-board-orangepi-5b"
+        return 0
+    fi
+
+    if [[ "${KERNEL_TYPE}" == "vendor" ]]; then
         # Enable bluetooth for AP6275P
         echo "[+] Enabling AP6275P"
         mkdir -p "${mount_point}/usr/lib/scripts"
