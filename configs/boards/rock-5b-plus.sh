@@ -9,7 +9,7 @@ export UBOOT_RULES_TARGET="rock5b-rk3588_defconfig"
 export U_BOOT_FDT="rockchip/rk3588-rock-5b-plus.dtb"
 export U_BOOT_FDT_MAINLINE="rockchip/rk3588-rock-5b-plus.dtb"
 export U_BOOT_FDT_OVERLAYS=""
-export COMPATIBLE_SUITES=("questing" "resolute")
+export COMPATIBLE_SUITES=("questing" "resolute" "stonking")
 export COMPATIBLE_FLAVORS=("server" "desktop")
 
 function build_image_hook__rock-5b-plus() {
@@ -17,6 +17,16 @@ function build_image_hook__rock-5b-plus() {
     local mount_point="$2"
     local suite="$3"
     local root_id="$4"
+
+    # flash-kernel's bundled database doesn't have this board either (see
+    # orangepi-5b.sh for the full explanation); without a matching "Machine:"
+    # entry, apt upgrades touching the kernel package fail on-device.
+    echo "[+] Registering board with flash-kernel"
+    mkdir -p "${mount_point}/etc/flash-kernel"
+    cat > "${mount_point}/etc/flash-kernel/db" <<'EOF'
+Machine: Radxa ROCK 5B+
+Method: generic
+EOF
 
     if [[ "${KERNEL_TYPE:-vendor}" == "vendor" ]]; then
         echo "[+] Copying Rockchip firmware"
