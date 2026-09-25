@@ -287,9 +287,13 @@ if [ "${REBUILD_DEBS}" == "Y" ]; then
 fi
 
 if [ "${REBUILD_ROOTFS}" == "Y" ]; then
-    echo "[+] Clearing rootfs..."
+    echo "[+] Clearing rootfs tarball/extract (keeping downloaded ISOs)..."
     unmount_rootfs
-    rm -rf build/rootfs
+    # Keep *.iso / SHA256SUMS so a rebuild does not re-download multi-GB images.
+    if [ -d build/rootfs ]; then
+        find build/rootfs -mindepth 1 -maxdepth 1 ! -name '*.iso' ! -name 'SHA256SUMS' \
+            -exec rm -rf {} +
+    fi
     # Cascade: image must also rebuild
     rm -f images/*.img images/*.img.xz 2>/dev/null || true
 fi
