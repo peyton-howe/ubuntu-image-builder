@@ -16,7 +16,8 @@ fi
 source "${CONF}"
 
 if [[ -z ${RK3588_CAMERA_OVERLAYS:-} ]]; then
-    echo "RK3588_CAMERA_OVERLAYS empty; overlays installed but not enabled"
+    # Default: overlays are on disk but none are selected in u-boot-menu.
+    # Set names in /etc/rk3588-camera/overlays.conf when enabling a camera.
     exit 0
 fi
 
