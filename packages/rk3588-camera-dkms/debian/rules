@@ -1,0 +1,26 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+
+VERSION := $(shell dpkg-parsechangelog -S Version | cut -d- -f1)
+NAME := rk3588-camera
+DEST := debian/rk3588-camera-dkms/usr/src/$(NAME)-$(VERSION)
+
+%:
+	dh $@ --with dkms
+
+override_dh_auto_build:
+	:
+
+override_dh_auto_install:
+	install -d $(DEST)
+	cp -a Makefile $(DEST)/
+	cp -a src/imx708 $(DEST)/imx708
+	cp -a src/rkisp2 $(DEST)/rkisp2
+	cp -a src/dcphy $(DEST)/dcphy
+	# Working copy of dkms.conf next to sources (dh_dkms also installs one)
+	cp -a debian/rk3588-camera-dkms.dkms $(DEST)/dkms.conf
+	sed -i 's/#MODULE_VERSION#/$(VERSION)/' $(DEST)/dkms.conf
+
+override_dh_dkms:
+	dh_dkms -V $(VERSION)

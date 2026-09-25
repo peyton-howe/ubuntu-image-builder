@@ -1,0 +1,16 @@
+Source: rk3588-board-rock-5b-plus
+Section: admin
+Priority: optional
+Maintainer: Peyton Howe <peyton@localhost>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Homepage: https://github.com/peyton-howe/ubuntu-image-builder
+
+Package: rk3588-board-rock-5b-plus
+Architecture: all
+Depends: ${misc:Depends}, u-boot-menu, flash-kernel
+Recommends: rk3588-camera-overlays, rk3588-camera-dkms
+Description: Board support for Radxa ROCK 5B+
+ Firmware, flash-kernel registration, and u-boot-menu defaults for
+ Radxa ROCK 5B+ on stock Ubuntu arm64. Meant to be installed into an
+ official Ubuntu ISO rootfs alongside our U-Boot image write.

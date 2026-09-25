@@ -1,0 +1,3 @@
+# Fragment merged into /etc/default/u-boot by rk3588-board-orangepi-5
+U_BOOT_FDT="rockchip/rk3588s-orangepi-5.dtb"
+U_BOOT_FDT_OVERLAYS="rockchip-rk3588-panthor-gpu.dtbo"

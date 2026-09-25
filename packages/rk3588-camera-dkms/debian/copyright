@@ -1,0 +1,19 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: rk3588-camera-dkms
+Source: https://github.com/peyton-howe/ubuntu-image-builder
+
+Files: src/imx708/*
+Copyright: 2020-2022 Raspberry Pi Ltd
+License: GPL-2.0-only
+
+Files: src/rkisp2/*
+Copyright: Ideas on Board Oy / Paul Elder and contributors
+License: GPL-2.0-only
+
+Files: src/dcphy/*
+Copyright: Rockchip Electronics Co. Ltd and contributors
+License: GPL-2.0-or-later
+
+Files: debian/*
+Copyright: 2026 Peyton Howe
+License: GPL-2.0-only

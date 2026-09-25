@@ -1,0 +1,21 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+
+REPO_OVERLAY := $(CURDIR)/../../overlay
+PKG := rk3588-board-orangepi-5b
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	:
+
+override_dh_auto_install:
+	install -d debian/$(PKG)/etc/flash-kernel
+	install -m 0644 files/flash-kernel.db debian/$(PKG)/etc/flash-kernel/db
+	install -d debian/$(PKG)/usr/share/$(PKG)
+	install -m 0644 files/u-boot.default debian/$(PKG)/usr/share/$(PKG)/u-boot.default
+	install -d debian/$(PKG)/usr/lib/$(PKG)
+	install -m 0755 files/install-firmware.sh debian/$(PKG)/usr/lib/$(PKG)/install-firmware.sh
+	# Firmware is copied from the repo overlay/ tree at package build time.
+	$(CURDIR)/files/install-firmware.sh "$(REPO_OVERLAY)" "debian/$(PKG)"

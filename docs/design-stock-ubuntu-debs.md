@@ -164,24 +164,26 @@ First milestone should **probe a real stock image**: `zcat /proc/config.gz` / `/
 
 ---
 
-## Repo layout (proposed)
+## Repo layout (scaffolded on `stock-iso-packages`)
 
 ```text
 packages/
-  rk3588-camera-dkms/          # debian/ + src/ (oot drivers)
-  rk3588-camera-overlays/      # debian/ + dts/*.dtso
-  rk3588-board-orangepi-5/
+  README.md
+  rk3588-camera-dkms/          # debian/ + src/{imx708,rkisp2,dcphy}
+  rk3588-camera-overlays/      # debian/ + dts/*.dtso + apply-overlays.sh
+  rk3588-board-orangepi-5/     # flash-kernel, u-boot fragment, AP6275P fw
   rk3588-board-orangepi-5b/
   rk3588-board-rock-5b-plus/
-  rk3588-uboot-orangepi-5/     # optional
 scripts/
-  build-debs.sh                # dpkg-buildpackage wrapper → build/debs/
-  extract-oot-from-patches.sh  # optional: regenerate oot trees from series
+  build-debs.sh                # dpkg-buildpackage → build/debs/
+  extract-oot-from-patches.sh  # refresh oot trees from patches/kernel/mainline
 ```
 
-Keep `patches/kernel/mainline/` as the source of truth for upstreaming; the DKMS tree is a **packaging extract**, refreshed when the series moves.
+`rk3588-uboot-*` not scaffolded yet (U-Boot remains via `build-u-boot.sh` + raw `dd`).
 
-`scripts/build-image.sh` gains a mode: install these `.deb`s into a stock rootfs instead of `linux-image-*-mainline-rk3588*.deb`.
+Keep `patches/kernel/mainline/` as the source of truth for upstreaming; the DKMS tree is a **packaging extract**, refreshed with `extract-oot-from-patches.sh`.
+
+Next: wire `build-rootfs.sh` / `build-image.sh` to install these `.deb`s into the stock ISO rootfs instead of `linux-image-*-mainline-rk3588*.deb`.
 
 ---
 

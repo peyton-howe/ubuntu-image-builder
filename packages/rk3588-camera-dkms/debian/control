@@ -1,0 +1,16 @@
+Source: rk3588-camera-dkms
+Section: kernel
+Priority: optional
+Maintainer: Peyton Howe <peyton@localhost>
+Build-Depends: debhelper-compat (= 13), dh-dkms, dkms
+Standards-Version: 4.6.2
+Homepage: https://github.com/peyton-howe/ubuntu-image-builder
+
+Package: rk3588-camera-dkms
+Architecture: all
+Depends: ${misc:Depends}, dkms, linux-headers-generic | linux-headers-virtual | linux-headers-arm64
+Description: DKMS drivers for RK3588 cameras (IMX708, rkisp2, DCPHY)
+ Out-of-tree modules extracted from the ubuntu-image-builder mainline
+ camera patch series. IMX708 is wired for AUTOINSTALL. rkisp2 and the
+ Samsung DCPHY CSI-RX replacement are staged in the source tree and
+ enabled as their out-of-tree Makefiles stabilize.
