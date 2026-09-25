@@ -8,7 +8,13 @@ export UBOOT_PACKAGE="u-boot"
 export UBOOT_RULES_TARGET="orangepi-5b-rk3588s_defconfig"
 export U_BOOT_FDT="device-tree/rockchip/rk3588s-orangepi-5b.dtb"
 export U_BOOT_FDT_MAINLINE="rockchip/rk3588s-orangepi-5b.dtb"
-export U_BOOT_FDT_OVERLAYS="rockchip-rk3588-panthor-gpu.dtbo"
+# Mainline/stock board DT already enables &gpu for panthor (see
+# rk3588s-orangepi-5.dtsi). The Armbian panthor-gpu.dtbo is vendor-kernel only.
+if [[ "${KERNEL_TYPE:-stock}" == "vendor" ]]; then
+    export U_BOOT_FDT_OVERLAYS="rockchip-rk3588-panthor-gpu.dtbo"
+else
+    export U_BOOT_FDT_OVERLAYS=""
+fi
 export COMPATIBLE_SUITES=("questing" "resolute" "stonking")
 export COMPATIBLE_FLAVORS=("server" "desktop")
 
