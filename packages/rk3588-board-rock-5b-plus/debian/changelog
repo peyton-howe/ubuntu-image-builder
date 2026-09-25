@@ -1,3 +1,9 @@
+rk3588-board-rock-5b-plus (0.1.1-1) UNRELEASED; urgency=medium
+
+  * Add initramfs hook so stock Ubuntu can mount root from RK3588 SD/eMMC.
+
+ -- Peyton Howe <peyton@localhost>  Thu, 25 Sep 2026 12:00:00 +0000
+
 rk3588-board-rock-5b-plus (0.1.0-1) UNRELEASED; urgency=medium
 
   * Initial scaffolding for stock-ISO board support package.

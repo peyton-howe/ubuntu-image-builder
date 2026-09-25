@@ -23,6 +23,9 @@ if [ "$1" = configure ]; then
             u-boot-update || true
         fi
     fi
+    if command -v update-initramfs >/dev/null; then
+        update-initramfs -u -k all || true
+    fi
 fi
 
 #DEBHELPER#
