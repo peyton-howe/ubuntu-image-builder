@@ -3,7 +3,9 @@
 export DH_VERBOSE = 1
 
 DTS := $(wildcard dts/*.dtso)
-DTBOS := $(patsubst dts/%.dtso,build/%.dtbo,$(DTS))
+CPP ?= cpp
+DTC ?= dtc
+CPPFLAGS_DTS := -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I$(CURDIR)/include
 
 %:
 	dh $@
@@ -13,10 +15,11 @@ override_dh_auto_clean:
 
 override_dh_auto_build:
 	mkdir -p build
-	@for src in $(DTS); do \
+	@set -e; for src in $(DTS); do \
 		base=$$(basename "$$src" .dtso); \
-		echo "dtc $$src -> build/$$base.dtbo"; \
-		dtc -@ -I dts -O dtb -o "build/$$base.dtbo" "$$src"; \
+		echo "cpp+dtc $$src -> build/$$base.dtbo"; \
+		$(CPP) $(CPPFLAGS_DTS) "$$src" \
+			| $(DTC) -@ -I dts -O dtb -o "build/$$base.dtbo" -; \
 	done
 
 override_dh_auto_install:
