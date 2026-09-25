@@ -291,6 +291,11 @@ trap '' EXIT
 if [[ "${COMPRESS:-Y}" == "Y" ]]; then
     echo "[+] Compressing image..."
     xz -T0 -v -z -f "$IMG"
+    # xz -z without --keep removes the source on success; be explicit in case
+    # a future xz flag change leaves the .img behind.
+    if [[ -f ${IMG}.xz && -f ${IMG} ]]; then
+        rm -f "$IMG"
+    fi
     echo "[✓] Image built and compressed: ${IMG}.xz"
 else
     echo "[✓] Image built: ${IMG}"
