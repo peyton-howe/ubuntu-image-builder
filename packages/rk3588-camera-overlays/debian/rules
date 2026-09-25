@@ -3,9 +3,10 @@
 export DH_VERBOSE = 1
 
 DTS := $(wildcard dts/*.dtso)
-CPP ?= cpp
 DTC ?= dtc
-CPPFLAGS_DTS := -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I$(CURDIR)/include
+# Same approach as the kernel dtc build: gcc -E, then dtc.
+# Plain dtc cannot parse #include; a bare "cpp" on some hosts is not GNU cpp.
+CPP_DTS = gcc -E -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I$(CURDIR)/include
 
 %:
 	dh $@
@@ -17,8 +18,8 @@ override_dh_auto_build:
 	mkdir -p build
 	@set -e; for src in $(DTS); do \
 		base=$$(basename "$$src" .dtso); \
-		echo "cpp+dtc $$src -> build/$$base.dtbo"; \
-		$(CPP) $(CPPFLAGS_DTS) "$$src" \
+		echo "gcc -E | dtc $$src -> build/$$base.dtbo"; \
+		$(CPP_DTS) "$$src" \
 			| $(DTC) -@ -I dts -O dtb -o "build/$$base.dtbo" -; \
 	done
 

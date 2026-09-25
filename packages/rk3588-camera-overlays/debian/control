@@ -2,7 +2,7 @@ Source: rk3588-camera-overlays
 Section: admin
 Priority: optional
 Maintainer: Peyton Howe <peyton@localhost>
-Build-Depends: debhelper-compat (= 13), device-tree-compiler, cpp
+Build-Depends: debhelper-compat (= 13), device-tree-compiler, gcc
 Standards-Version: 4.6.2
 Homepage: https://github.com/peyton-howe/ubuntu-image-builder
 
