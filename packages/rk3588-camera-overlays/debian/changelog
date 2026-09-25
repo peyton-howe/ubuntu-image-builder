@@ -1,5 +1,6 @@
 rk3588-camera-overlays (0.1.0-1) UNRELEASED; urgency=medium
 
   * Initial scaffolding: IMX708 camera overlays from mainline patch series.
+  * Preprocess .dtso with cpp and local dt-bindings before dtc.
 
  -- Peyton Howe <peyton@localhost>  Thu, 25 Sep 2026 00:00:00 +0000
