@@ -28,7 +28,12 @@ Machine: Xunlong Orange Pi 5
 Method: generic
 EOF
 
-    if [[ "${KERNEL_TYPE:-vendor}" == "vendor" ]]; then
+    if [[ "${KERNEL_TYPE:-stock}" == "stock" ]]; then
+        echo "[+] Stock ISO path: firmware/flash-kernel come from rk3588-board-orangepi-5"
+        return 0
+    fi
+
+    if [[ "${KERNEL_TYPE}" == "vendor" ]]; then
         echo "[+] Enabling AP6275P"
         mkdir -p "${mount_point}/usr/lib/scripts"
         cp "${overlay}/usr/lib/systemd/system/ap6275p-bluetooth.service" "${mount_point}/usr/lib/systemd/system/ap6275p-bluetooth.service"
