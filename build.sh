@@ -287,7 +287,7 @@ if [ "${REBUILD_DEBS}" == "Y" ]; then
 fi
 
 if [ "${REBUILD_ROOTFS}" == "Y" ]; then
-    echo "[+] Clearing rootfs tarball/extract (keeping downloaded ISOs)..."
+    echo "[+] Clearing rootfs (keeping downloaded ISOs)..."
     unmount_rootfs
     # Keep *.iso / SHA256SUMS so a rebuild does not re-download multi-GB images.
     if [ -d build/rootfs ]; then
@@ -374,7 +374,7 @@ if [[ ! -e "$(find build/u-boot/u-boot-rockchip.bin 2>/dev/null | sort | tail -n
 fi
 
 # Create the root filesystem
-if [[ ! -e "$(find build/rootfs/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64.tar.gz 2>/dev/null | sort | tail -n1)" ]]; then
+if [[ ! -f build/rootfs/${RELEASE}-${FLAVOR}.done ]]; then
     ./scripts/build-rootfs.sh
 fi
 

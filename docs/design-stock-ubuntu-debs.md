@@ -48,7 +48,7 @@ Board glue already lives outside the kernel (`configs/boards/*.sh`, `overlay/`):
 ## Builder flow (this repo)
 
 ```text
-Ubuntu arm64 ISO  ──build-rootfs.sh──►  rootfs tarball (stock kernel)
+Ubuntu arm64 ISO  ──build-rootfs.sh──►  rootfs dir (stock kernel)
                                               │
 U-Boot build  ──────────────────────────────┐ │
 Our .debs (board / overlays / DKMS) ────────┼─┤

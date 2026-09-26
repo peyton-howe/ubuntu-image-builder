@@ -30,11 +30,15 @@ fi
 # shellcheck source=/dev/null
 source "${ROOT_DIR}/configs/flavors/${FLAVOR}.sh"
 
-TARBALL="ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64.tar.gz"
-if [[ -f ${TARBALL} ]]; then
-    echo "[+] Rootfs tarball already exists: ${TARBALL}"
+# The extracted rootfs directory is the build artifact; build-image.sh copies
+# it straight into the image. The stamp is written last, so an interrupted
+# build leaves no stamp and the next run starts over.
+ROOTFS_STAMP="${RELEASE}-${FLAVOR}.done"
+if [[ -f ${ROOTFS_STAMP} && -d ${RELEASE}-${FLAVOR} ]]; then
+    echo "[+] Rootfs already built: ${RELEASE}-${FLAVOR}"
     exit 0
 fi
+rm -f "${ROOTFS_STAMP}"
 
 if [[ "${FLAVOR}" == "desktop" ]]; then
     ISO_URL="${UBUNTU_DESKTOP_ISO_URL:?Set UBUNTU_DESKTOP_ISO_URL in configs/releases/${RELEASE}.sh}"
@@ -66,17 +70,37 @@ if ! command -v wget >/dev/null && ! command -v curl >/dev/null; then
     exit 1
 fi
 
-echo "[+] Downloading ${ISO_NAME}..."
-if command -v wget >/dev/null; then
-    wget -c --progress=dot:giga -O "${ISO_PATH}" "${ISO_URL}"
-else
-    curl -L --continue-at - -o "${ISO_PATH}" "${ISO_URL}"
-fi
+download_iso() {
+    echo "[+] Downloading ${ISO_NAME}..."
+    if command -v wget >/dev/null; then
+        wget -c --progress=dot:giga -O "${ISO_PATH}" "${ISO_URL}"
+    else
+        curl -L --continue-at - -o "${ISO_PATH}" "${ISO_URL}"
+    fi
+}
+
+verify_iso() {
+    grep " ${ISO_NAME}$\| \*${ISO_NAME}$" SHA256SUMS | sha256sum -c -
+}
 
 if [[ -n "${SHA256SUMS_URL}" ]]; then
-    echo "[+] Verifying SHA256..."
     wget -q -O SHA256SUMS "${SHA256SUMS_URL}"
-    grep " ${ISO_NAME}$\| \*${ISO_NAME}$" SHA256SUMS | sha256sum -c -
+    if [[ -f ${ISO_PATH} ]] && verify_iso >/dev/null 2>&1; then
+        echo "[+] ${ISO_NAME} already downloaded and matches SHA256SUMS"
+    else
+        download_iso
+        echo "[+] Verifying SHA256..."
+        if ! verify_iso; then
+            # Daily ISOs get respun in place; resuming appends the new image
+            # onto the old one. Start over once from scratch.
+            echo "[+] Checksum mismatch (ISO respun upstream?), re-downloading from scratch..."
+            rm -f "${ISO_PATH}"
+            download_iso
+            verify_iso
+        fi
+    fi
+else
+    download_iso
 fi
 
 mkdir -p "${ISO_MNT}"
@@ -302,14 +326,5 @@ if [[ "$(uname -m)" != "aarch64" ]]; then
     rm -f "${ROOTFS_DIR}/usr/bin/qemu-aarch64-static"
 fi
 
-# =========================
-# 5. Compress result
-# =========================
-echo "[+] Compressing to tar..."
-# --one-file-system: teardown_chroot_mounts only unmounts the top-level
-# proc/sys/dev/run binds, not everything --rbind recursively dragged in under
-# them (e.g. the host's cgroup2/debugfs/tracefs, or OrbStack's /dev/.lxc
-# proc+sysfs snapshot). Those are on a different device than the rootfs, so
-# -one-file-system skips them instead of archiving unreadable pseudo-files.
-tar --one-file-system -czf "${TARBALL}" -C "${ROOTFS_DIR}" .
-echo "[✓] Rootfs: ${TARBALL}"
+touch "${ROOTFS_STAMP}"
+echo "[✓] Rootfs: $(pwd)/${ROOTFS_DIR}"

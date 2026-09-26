@@ -49,9 +49,9 @@ ROOT_DIR=$(pwd)
 KERNEL_DIR="${ROOT_DIR}/build/kernel"
 BLOBS_DIR="${ROOT_DIR}/build/u-boot"
 
-rootfs_tar=$(readlink -f build/rootfs/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64.tar.gz)
-if [[ ! -f "$rootfs_tar" ]]; then
-    echo "Rootfs tarball not found: $rootfs_tar"
+rootfs_dir=$(readlink -f build/rootfs/${RELEASE}-${FLAVOR})
+if [[ ! -f "${rootfs_dir}.done" ]]; then
+    echo "Rootfs not built (missing ${rootfs_dir}.done); run ./scripts/build-rootfs.sh"
     exit 1
 fi
 
@@ -64,19 +64,8 @@ cd build
 ### Create disk image
 ### =========================
 echo "[+] Creating empty image..."
-IMG="../images/$(basename "${rootfs_tar}" .tar.gz)-${BOARD}.img"
-# Size off the *uncompressed* rootfs, not the gzip'd tarball -- a desktop
-# rootfs commonly gzips down to ~1/2 its real size, so sizing off the
-# compressed number left the partition smaller than the data going into it
-# ("No space left on device" partway through extraction). The extracted
-# directory build-rootfs.sh made the tarball from is still on disk; fall
-# back to a generous multiple of the compressed size if it isn't.
-rootfs_dir="$(dirname "${rootfs_tar}")/${RELEASE}-${FLAVOR}"
-if [[ -d "${rootfs_dir}" ]]; then
-    size="$(du -sm "${rootfs_dir}" | cut -f1)"
-else
-    size="$(( $(wc -c < "${rootfs_tar}") * 3 / 1024 / 1024 ))"
-fi
+IMG="../images/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64-${BOARD}.img"
+size="$(du -sm --one-file-system "${rootfs_dir}" | cut -f1)"
 truncate -s "$(( size + 1024 ))M" "${IMG}"
 
 mount_point=/tmp/mnt
@@ -123,8 +112,14 @@ fi
 ### =========================
 ### Extract rootfs
 ### =========================
-echo "[+] Extracting rootfs..."
-tar -xpf "$rootfs_tar" -C ${mount_point}/writable
+echo "[+] Copying rootfs..."
+# --one-file-system: teardown_chroot_mounts only unmounts the top-level
+# proc/sys/dev/run binds, not everything --rbind recursively dragged in under
+# them (e.g. the host's cgroup2/debugfs/tracefs, or OrbStack's /dev/.lxc
+# proc+sysfs snapshot). Those are on a different device than the rootfs, so
+# --one-file-system skips them instead of copying unreadable pseudo-files.
+tar --one-file-system -cf - -C "${rootfs_dir}" . | tar -xpf - -C ${mount_point}/writable
+[[ ${PIPESTATUS[0]} -eq 0 && ${PIPESTATUS[1]} -eq 0 ]] || { echo "Error: copying rootfs into image failed" >&2; exit 1; }
 
 # Create fstab entries
 echo "# <file system>     <mount point>  <type>  <options>   <dump>  <fsck>" > ${mount_point}/writable/etc/fstab
