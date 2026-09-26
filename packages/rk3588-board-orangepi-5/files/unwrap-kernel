@@ -1,0 +1,71 @@
+#!/bin/sh
+# Ubuntu arm64 kernels ship /boot/vmlinuz-* as a PE wrapper (stubble, with a
+# .linux section) around an EFI zboot image around a compressed Image.
+# U-Boot's extlinux path uses booti, which needs the raw Image and otherwise
+# fails with "Bad Linux ARM64 Image magic!". Replace vmlinuz in place with
+# the raw Image so the extlinux entries written by u-boot-menu keep working.
+#
+# Called as an /etc/kernel/postinst.d hook: $1 = version, $2 = image path.
+set -e
+
+version="$1"
+image="${2:-/boot/vmlinuz-$version}"
+
+[ -f "$image" ] || exit 0
+
+u32() { od -An -tu4 -j"$2" -N4 "$1" | tr -d ' '; }
+u16() { od -An -tu2 -j"$2" -N2 "$1" | tr -d ' '; }
+str() { dd if="$1" bs=1 skip="$2" count="$3" 2>/dev/null | tr -d '\0'; }
+
+# Raw arm64 Image: "ARM\x64" at 0x38. Nothing to do.
+[ "$(str "$image" 56 4)" = "$(printf 'ARM\144')" ] && exit 0
+[ "$(str "$image" 0 2)" = "MZ" ] || exit 0
+
+# Locate the zboot image: either the file itself or its PE .linux section.
+base=0
+if [ "$(str "$image" 4 4)" != "zimg" ]; then
+    pe=$(u32 "$image" 60)
+    nsec=$(u16 "$image" $((pe + 6)))
+    optsz=$(u16 "$image" $((pe + 20)))
+    sec=$((pe + 24 + optsz))
+    i=0
+    while [ "$i" -lt "$nsec" ]; do
+        if [ "$(str "$image" "$sec" 8)" = ".linux" ]; then
+            base=$(u32 "$image" $((sec + 20)))
+            break
+        fi
+        sec=$((sec + 40))
+        i=$((i + 1))
+    done
+    if [ "$base" -eq 0 ] || [ "$(str "$image" $((base + 4)) 4)" != "zimg" ]; then
+        echo "rk3588: $image is not a zboot/stubble kernel, leaving it alone" >&2
+        exit 0
+    fi
+fi
+
+off=$(u32 "$image" $((base + 8)))
+size=$(u32 "$image" $((base + 12)))
+comp=$(str "$image" $((base + 24)) 32)
+
+case "$comp" in
+zstd*) decomp="zstd -dcq" ;;
+gzip)  decomp="gzip -dc" ;;
+*)
+    echo "rk3588: unsupported zboot compression '$comp' in $image" >&2
+    exit 1
+    ;;
+esac
+
+tmp="$image.rk3588-unwrap.$$"
+trap 'rm -f "$tmp"' EXIT
+tail -c +$((base + off + 1)) "$image" | head -c "$size" | $decomp > "$tmp"
+
+if [ "$(str "$tmp" 56 4)" != "$(printf 'ARM\144')" ]; then
+    echo "rk3588: unpacked $image but result has no arm64 Image magic" >&2
+    exit 1
+fi
+
+chmod --reference="$image" "$tmp"
+mv -f "$tmp" "$image"
+trap - EXIT
+echo "rk3588: unpacked raw arm64 Image into $image for U-Boot booti"

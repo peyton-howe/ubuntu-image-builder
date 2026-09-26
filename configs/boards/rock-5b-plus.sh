@@ -18,6 +18,11 @@ function build_image_hook__rock-5b-plus() {
     local suite="$3"
     local root_id="$4"
 
+    if [[ "${KERNEL_TYPE:-stock}" == "stock" ]]; then
+        echo "[+] Stock ISO path: firmware/flash-kernel come from rk3588-board-rock-5b-plus"
+        return 0
+    fi
+
     # flash-kernel's bundled database doesn't have this board either (see
     # orangepi-5b.sh for the full explanation); without a matching "Machine:"
     # entry, apt upgrades touching the kernel package fail on-device.
@@ -27,11 +32,6 @@ function build_image_hook__rock-5b-plus() {
 Machine: Radxa ROCK 5B+
 Method: generic
 EOF
-
-    if [[ "${KERNEL_TYPE:-stock}" == "stock" ]]; then
-        echo "[+] Stock ISO path: firmware/flash-kernel come from rk3588-board-rock-5b-plus"
-        return 0
-    fi
 
     if [[ "${KERNEL_TYPE}" == "vendor" ]]; then
         echo "[+] Copying Rockchip firmware"

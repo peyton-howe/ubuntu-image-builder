@@ -8,7 +8,7 @@ Homepage: https://github.com/peyton-howe/ubuntu-image-builder
 
 Package: rk3588-board-orangepi-5
 Architecture: all
-Depends: ${misc:Depends}, u-boot-menu, flash-kernel
+Depends: ${misc:Depends}, u-boot-menu, flash-kernel, zstd
 Recommends: rk3588-camera-overlays, rk3588-camera-dkms
 Description: Board support for Orange Pi 5
  Firmware, flash-kernel registration, and u-boot-menu defaults for

@@ -207,6 +207,7 @@ export DEBIAN_FRONTEND=noninteractive
 export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 KERNEL_TYPE='${KERNEL_TYPE}'
+BOARD_PKG='${BOARD_PKG}'
 
 # The live image ships a cdrom source (installer normally drops this
 # post-install); there's no /cdrom mount here so apt-get update fails on it.
@@ -255,6 +256,13 @@ if [[ \"\${KERNEL_TYPE}\" == stock ]]; then
         # register and AUTOINSTALL on first boot with real headers.
         dpkg -i /tmp/rk3588-debs/*.deb || apt-get -f install -y || true
         rm -rf /tmp/rk3588-debs
+        # The board package is what makes the image bootable (kernel unwrap,
+        # initramfs MMC modules, u-boot defaults); don't let the tolerance
+        # above hide it failing to install.
+        if [[ -n \${BOARD_PKG} ]] && ! dpkg-query -W -f='\${Status}' \${BOARD_PKG} 2>/dev/null | grep -q 'install ok installed'; then
+            echo \"Error: \${BOARD_PKG} did not install\" >&2
+            exit 1
+        fi
     fi
 else
     if compgen -G '/tmp/kernel-debs/*.deb' > /dev/null; then

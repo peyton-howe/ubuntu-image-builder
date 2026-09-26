@@ -1,3 +1,12 @@
+rk3588-board-rock-5b-plus (0.1.2-1) UNRELEASED; urgency=medium
+
+  * Unpack Ubuntu's stubble/zboot vmlinuz into a raw Image so U-Boot
+    booti can load it (fixes "Bad Linux ARM64 Image magic!").
+  * Merge the flash-kernel db entry from postinst instead of shipping
+    /etc/flash-kernel/db, which flash-kernel owns (package failed to install).
+
+ -- Peyton Howe <peyton@localhost>  Sat, 26 Sep 2026 12:00:00 +0000
+
 rk3588-board-rock-5b-plus (0.1.1-1) UNRELEASED; urgency=medium
 
   * Add initramfs hook so stock Ubuntu can mount root from RK3588 SD/eMMC.

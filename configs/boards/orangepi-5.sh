@@ -26,6 +26,11 @@ function build_image_hook__orangepi-5() {
     local suite="$3"
     local root_id="$4"
 
+    if [[ "${KERNEL_TYPE:-stock}" == "stock" ]]; then
+        echo "[+] Stock ISO path: firmware/flash-kernel come from rk3588-board-orangepi-5"
+        return 0
+    fi
+
     # flash-kernel's bundled database doesn't have this board either (see
     # orangepi-5b.sh for the full explanation); without a matching "Machine:"
     # entry, apt upgrades touching the kernel package fail on-device.
@@ -35,11 +40,6 @@ function build_image_hook__orangepi-5() {
 Machine: Xunlong Orange Pi 5
 Method: generic
 EOF
-
-    if [[ "${KERNEL_TYPE:-stock}" == "stock" ]]; then
-        echo "[+] Stock ISO path: firmware/flash-kernel come from rk3588-board-orangepi-5"
-        return 0
-    fi
 
     if [[ "${KERNEL_TYPE}" == "vendor" ]]; then
         echo "[+] Enabling AP6275P"

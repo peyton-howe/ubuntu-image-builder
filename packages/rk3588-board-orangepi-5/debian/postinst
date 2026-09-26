@@ -2,6 +2,17 @@
 set -e
 
 if [ "$1" = configure ]; then
+    for k in /boot/vmlinuz-*; do
+        [ -f "$k" ] || continue
+        /etc/kernel/postinst.d/zz-rk3588-unwrap-kernel "${k#/boot/vmlinuz-}" "$k" || true
+    done
+    # /etc/flash-kernel/db belongs to flash-kernel, so merge our entry into
+    # it between markers instead of shipping the file.
+    fkdb=/etc/flash-kernel/db
+    mkdir -p /etc/flash-kernel
+    touch "$fkdb"
+    sed -i '/^# BEGIN rk3588-board-orangepi-5$/,/^# END rk3588-board-orangepi-5$/d' "$fkdb"
+    { echo "# BEGIN rk3588-board-orangepi-5"; cat /usr/share/rk3588-board-orangepi-5/flash-kernel.db; echo "# END rk3588-board-orangepi-5"; } >> "$fkdb"
     frag=/usr/share/rk3588-board-orangepi-5/u-boot.default
     target=/etc/default/u-boot
     if [ -f "$frag" ]; then

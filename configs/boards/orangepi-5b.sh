@@ -24,6 +24,11 @@ function build_image_hook__orangepi-5b() {
     local suite="$3"
     local root_id="$4"
 
+    if [[ "${KERNEL_TYPE:-stock}" == "stock" ]]; then
+        echo "[+] Stock ISO path: firmware/flash-kernel come from rk3588-board-orangepi-5b"
+        return 0
+    fi
+
     # flash-kernel's bundled database (usr/share/flash-kernel/db/all.db) only
     # has old Allwinner-based "Xunlong Orange Pi" boards, not this RK3588S
     # one. Without a matching "Machine:" entry, check_supported() in
@@ -39,11 +44,6 @@ function build_image_hook__orangepi-5b() {
 Machine: Xunlong Orange Pi 5B
 Method: generic
 EOF
-
-    if [[ "${KERNEL_TYPE:-stock}" == "stock" ]]; then
-        echo "[+] Stock ISO path: firmware/flash-kernel come from rk3588-board-orangepi-5b"
-        return 0
-    fi
 
     if [[ "${KERNEL_TYPE}" == "vendor" ]]; then
         # Enable bluetooth for AP6275P
