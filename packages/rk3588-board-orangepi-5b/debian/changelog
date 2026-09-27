@@ -1,3 +1,17 @@
+rk3588-board-orangepi-5b (0.1.3-1) UNRELEASED; urgency=medium
+
+  * Ship our own rk3588s-orangepi-5b.dtb (upstream DTS + the 5B hunk of
+    kernel patch 0006) so stock kernels get AP6275P WiFi and Bluetooth.
+  * Package AP6275P WiFi/BT firmware (incl. BCM4362A2.hcd), fetching it
+    from armbian/firmware when overlay/firmware is absent.
+  * Drop the vendor-kernel panthor-gpu overlay from u-boot defaults; the
+    stock and packaged DTBs already enable the GPU for panthor.
+  * Load ledtrig_heartbeat at boot so the status LED blinks on stock kernels.
+  * Keep the HYM8563 32k LPO on before PCIe link training via a
+    regulator-fixed-clock supply chain, so the AP6275P WiFi enumerates.
+
+ -- Peyton Howe <peyton@localhost>  Sat, 26 Sep 2026 12:00:00 +0000
+
 rk3588-board-orangepi-5b (0.1.2-1) UNRELEASED; urgency=medium
 
   * Unpack Ubuntu's stubble/zboot vmlinuz into a raw Image so U-Boot

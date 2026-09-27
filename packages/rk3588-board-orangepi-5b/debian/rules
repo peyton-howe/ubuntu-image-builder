@@ -2,23 +2,32 @@
 export DH_VERBOSE = 1
 
 REPO_OVERLAY := $(CURDIR)/../../overlay
+BOARD_PATCH := $(CURDIR)/../../patches/kernel/mainline/0006-arm64-dts-rockchip-imx708-camera-overlays.patch
+DTB := rk3588s-orangepi-5b.dtb
 PKG := rk3588-board-orangepi-5b
 
 %:
 	dh $@
 
+override_dh_auto_clean:
+	rm -f build/$(DTB)
+
+# build/ keeps the sparse kernel checkout between builds.
 override_dh_auto_build:
-	:
+	$(CURDIR)/files/build-dtb.sh "$(BOARD_PATCH)" build/$(DTB) build
 
 override_dh_auto_install:
 	install -d debian/$(PKG)/usr/share/$(PKG)
 	install -m 0644 files/flash-kernel.db debian/$(PKG)/usr/share/$(PKG)/flash-kernel.db
 	install -m 0644 files/u-boot.default debian/$(PKG)/usr/share/$(PKG)/u-boot.default
-	install -d debian/$(PKG)/usr/lib/$(PKG)
+	install -d debian/$(PKG)/usr/lib/$(PKG)/dtbs/rockchip
+	install -m 0644 build/$(DTB) debian/$(PKG)/usr/lib/$(PKG)/dtbs/rockchip/$(DTB)
 	install -m 0755 files/install-firmware.sh debian/$(PKG)/usr/lib/$(PKG)/install-firmware.sh
 	install -d debian/$(PKG)/etc/initramfs-tools/hooks
 	install -m 0755 files/initramfs-hook debian/$(PKG)/etc/initramfs-tools/hooks/rk3588-mmc
+	install -d debian/$(PKG)/usr/lib/modules-load.d
+	install -m 0644 files/modules-load.conf debian/$(PKG)/usr/lib/modules-load.d/$(PKG).conf
 	install -d debian/$(PKG)/etc/kernel/postinst.d
 	install -m 0755 files/unwrap-kernel debian/$(PKG)/etc/kernel/postinst.d/zz-rk3588-unwrap-kernel
-	# Firmware is copied from the repo overlay/ tree at package build time.
-	$(CURDIR)/files/install-firmware.sh "$(REPO_OVERLAY)" "debian/$(PKG)"
+	# Firmware comes from overlay/firmware, else a sparse fetch into build/.
+	$(CURDIR)/files/install-firmware.sh "$(REPO_OVERLAY)" "debian/$(PKG)" build

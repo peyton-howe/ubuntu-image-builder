@@ -210,7 +210,10 @@ rm -f /etc/default/u-boot
 # Resolve the installed kernel's dtb path dynamically instead of hardcoding
 # a kernel version string that goes stale on every rebuild.
 FDT_BASENAME=\$(basename \"${FDT_REL}\")
-FDT_ABS_PATH=\$(find /usr/lib/linux-image-*/ /lib/linux-image-*/ /lib/firmware/*/device-tree/ /boot/dtbs/*/ \\
+# A board package may ship its own DTB (e.g. the 5B's WiFi/BT nodes, which
+# the stock kernel's DTB lacks); prefer it over the kernel's copy.
+FDT_ABS_PATH=\$(find /usr/lib/rk3588-board-*/dtbs/ -name \"\${FDT_BASENAME}\" 2>/dev/null | head -1 || true)
+[ -n \"\${FDT_ABS_PATH}\" ] || FDT_ABS_PATH=\$(find /usr/lib/linux-image-*/ /lib/linux-image-*/ /lib/firmware/*/device-tree/ /boot/dtbs/*/ \\
     -name \"\${FDT_BASENAME}\" 2>/dev/null | grep -E 'mainline-rk3588|rockchip|linux-image' | head -1 || true)
 if [ -z \"\${FDT_ABS_PATH}\" ]; then
     FDT_ABS_PATH=\$(find /usr/lib/linux-image-*/ /lib/linux-image-*/ /lib/firmware/*/device-tree/ /boot/dtbs/*/ \\

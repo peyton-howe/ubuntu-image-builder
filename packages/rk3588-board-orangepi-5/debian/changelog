@@ -1,3 +1,11 @@
+rk3588-board-orangepi-5 (0.1.3-1) UNRELEASED; urgency=medium
+
+  * Drop the vendor-kernel panthor-gpu overlay from u-boot defaults; the
+    stock DTB already enables the GPU for panthor.
+  * Load ledtrig_heartbeat at boot so the status LED blinks on stock kernels.
+
+ -- Peyton Howe <peyton@localhost>  Sat, 26 Sep 2026 12:00:00 +0000
+
 rk3588-board-orangepi-5 (0.1.2-1) UNRELEASED; urgency=medium
 
   * Unpack Ubuntu's stubble/zboot vmlinuz into a raw Image so U-Boot
