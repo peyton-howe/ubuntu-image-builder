@@ -118,7 +118,15 @@ echo "[+] Copying rootfs..."
 # them (e.g. the host's cgroup2/debugfs/tracefs, or OrbStack's /dev/.lxc
 # proc+sysfs snapshot). Those are on a different device than the rootfs, so
 # --one-file-system skips them instead of copying unreadable pseudo-files.
-tar --one-file-system -cf - -C "${rootfs_dir}" . | tar -xpf - -C ${mount_point}/writable
+# --numeric-owner: by default tar maps owners by *name* through the build
+# host's passwd/group, and system accounts (messagebus, systemd-journal, ...)
+# have different IDs there than in the image. --xattrs/--acls: file
+# capabilities live in security.capability; without them snap-confine,
+# ping, etc. lose their privileges ("snap-confine is packaged without
+# necessary permissions").
+tar_flags=(--numeric-owner --xattrs --xattrs-include='*' --acls)
+tar --one-file-system "${tar_flags[@]}" -cf - -C "${rootfs_dir}" . \
+    | tar "${tar_flags[@]}" -xpf - -C ${mount_point}/writable
 [[ ${PIPESTATUS[0]} -eq 0 && ${PIPESTATUS[1]} -eq 0 ]] || { echo "Error: copying rootfs into image failed" >&2; exit 1; }
 
 # Create fstab entries
