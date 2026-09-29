@@ -1,6 +1,10 @@
 # Design: Stock Ubuntu ISO + U-Boot + `.deb` packages
 
-**Status:** proposal (branch `stock-iso-packages`)  
+**Status:** implemented as the default `--kernel-type=stock` path. This is the
+original design note; where it differs from the code, the code and the
+[README](../README.md) / [packages/README](../packages/README.md) are current
+(e.g. the 5B ships a whole DTB rather than overlays, because Ubuntu's DTBs
+have no `__symbols__`).  
 **Goal:** Download Ubuntu’s official server/desktop arm64 ISO, use that rootfs as-is (including Ubuntu’s kernel), write our U-Boot to the image, and install our board/camera `.deb` packages. No full custom kernel in the default path.
 
 ---

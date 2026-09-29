@@ -1,54 +1,65 @@
 # RK3588 board / camera packages
 
-Debian packages for the **stock Ubuntu ISO + U-Boot** path (`stock-iso-packages` branch).
+Debian packages installed into the rootfs on the **stock** kernel path
+(`--kernel-type=stock`, the default). See the top-level
+[README](../README.md#how-the-stock-path-works) for how they fit into an image.
 
-| Package | Role |
-|---------|------|
-| `rk3588-camera-overlays` | IMX708 `.dtbo` overlays + enablement config |
-| `rk3588-camera-dkms` | Out-of-tree camera modules (IMX708; rkisp2 + DCPHY staged) |
-| `rk3588-board-orangepi-5` | Orange Pi 5 board glue (firmware, flash-kernel, u-boot-menu) |
-| `rk3588-board-orangepi-5b` | Orange Pi 5B board glue |
-| `rk3588-board-rock-5b-plus` | ROCK 5B+ board glue |
+| Package | Contents |
+|---|---|
+| `rk3588-board-orangepi-5b` | Board glue (below), plus its own DTB (upstream DTS + 5B hunks of kernel patches 0006/0002 + `files/rk3588s-orangepi-5b-*.dtsi`) and the AP6275P WiFi/BT firmware |
+| `rk3588-board-orangepi-5` | Board glue |
+| `rk3588-board-rock-5b-plus` | Board glue |
+| `rk3588-camera-dkms` | DKMS: `imx708` sensor + `rkisp2` ISP (`rockchip-isp2`). DCPHY is staged in `src/dcphy`, not built |
+| `rk3588-camera-overlays` | IMX708 `.dtbo`s, `/etc/rk3588-camera/overlays.conf`, `apply-overlays.sh` |
 
-### Host build deps
+**Board glue**, shared by all three board packages:
 
-```bash
-sudo apt install debhelper dh-dkms device-tree-compiler dpkg-dev dkms
-```
+| File | Purpose |
+|---|---|
+| `files/unwrap-kernel` → `/etc/kernel/postinst.d/zz-rk3588-unwrap-kernel` | Replaces Ubuntu's wrapped `vmlinuz` with a raw ARM64 Image for U-Boot `booti`. Also runs from `postinst` for already-installed kernels |
+| `files/initramfs-hook` → `/etc/initramfs-tools/hooks/rk3588-mmc` | Rockchip MMC drivers in the initramfs |
+| `files/flash-kernel.db` | Merged into `/etc/flash-kernel/db` between `# BEGIN/END <pkg>` markers (`postinst`/`postrm`); flash-kernel owns that file |
+| `files/u-boot.default` | Keys merged into `/etc/default/u-boot` on every install/upgrade, then `u-boot-update` |
+| `files/modules-load.conf` | Loads `ledtrig_heartbeat` for the status LED |
 
-### Build packages
-
-```bash
-./scripts/build-debs.sh
-# or via the image builder:
-./build.sh --debs-only
-# artifacts → build/debs/
-```
-
-### Full stock-ISO image
-
-Default `--kernel-type=stock` keeps the Ubuntu ISO kernel, builds these
-packages, writes U-Boot, and installs the matching board + camera debs:
+## Building
 
 ```bash
-./build.sh --board=orangepi-5b --release=questing --flavor=desktop
-# equivalent: --kernel-type=stock
+sudo apt install debhelper dh-dkms dkms dpkg-dev device-tree-compiler gcc git
+sudo ./scripts/build-debs.sh                          # all packages → build/debs/
+sudo ./scripts/build-debs.sh rk3588-board-orangepi-5b # just one
 ```
 
-Custom kernels remain available: `--kernel-type=mainline` or `vendor`.
+Build with sudo, the same way as the image. Package builds leave root-owned
+files in `packages/*/build/`, so a later build without sudo fails to clean
+them. `build-debs.sh` keeps only the newest `.deb` of each package in
+`build/debs/`. Bump `debian/changelog` when you change a package, then
+rebuild the image with `./build.sh … -rd`.
 
-Driver / overlay sources were extracted from `patches/kernel/mainline/`. Re-extract after series changes:
+To test a change on a running board without reflashing:
+`scp build/debs/<pkg>.deb board:/tmp/ && ssh board sudo dpkg -i /tmp/<pkg>.deb`.
+
+## Rules worth knowing
+
+- **Don't set `U_BOOT_FDT_OVERLAYS` in a `u-boot.default`.** `postinst`
+  merges every key on each upgrade, which would wipe camera overlays that
+  `apply-overlays.sh` enabled.
+- **`U_BOOT_FDT` for Ubuntu's own DTBs is `device-tree/rockchip/<board>.dtb`**,
+  relative to `/lib/firmware/<kernel version>/`, so each kernel boots its
+  own DTB. Only a DTB shipped by the package (the 5B's) uses an absolute path.
+- **Don't ship files another package owns** (e.g. `/etc/flash-kernel/db`).
+  dpkg refuses to unpack the package, and the image then won't boot.
+  `build-rootfs.sh` now fails loudly if the board package doesn't install.
+
+## Regenerating camera sources
+
+`rk3588-camera-dkms/src/` and `rk3588-camera-overlays/dts/` are generated from
+`patches/kernel/mainline/` and committed. After changing the patch series:
 
 ```bash
 ./scripts/extract-oot-from-patches.sh
 ```
 
-### Optional Wi‑Fi / BT firmware
-
-`overlay/firmware/` is **not** vendored in git (Armbian’s firmware tree is huge).
-Board packages skip packaging blobs when it is absent. To include AP6275P etc.:
-
-```bash
-git clone --depth 1 https://github.com/armbian/firmware.git overlay/firmware
-./scripts/build-debs.sh rk3588-board-orangepi-5b
-```
+Kernel API differences for the stock kernel go in patch **0007**
+(`rkisp2-v4l2-compat.h`), feature-tested rather than version-tested, so the
+same source builds for the 7.2-based mainline tree and Ubuntu's 7.3.
