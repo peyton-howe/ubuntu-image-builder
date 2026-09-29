@@ -77,3 +77,30 @@ require_cmds() {
         exit 1
     fi
 }
+
+# Map BOARD → rk3588-board-* package name (empty if unknown).
+board_support_package() {
+    case "${1:-}" in
+        orangepi-5) echo "rk3588-board-orangepi-5" ;;
+        orangepi-5b) echo "rk3588-board-orangepi-5b" ;;
+        rock-5b-plus) echo "rk3588-board-rock-5b-plus" ;;
+        *) echo "" ;;
+    esac
+}
+
+# True when we keep the ISO's kernel and install our board/camera debs.
+is_stock_kernel() {
+    [[ "${KERNEL_TYPE:-stock}" == "stock" ]]
+}
+
+# The rootfs is named <release>-<flavor> but has one board's package (and, on
+# vendor/mainline, one kernel) installed, so its .done stamp records what it
+# was built for; a different BOARD or KERNEL_TYPE means it must be rebuilt.
+rootfs_stamp_id() {
+    echo "board=${BOARD:-} kernel=${KERNEL_TYPE:-stock}"
+}
+
+# True when stamp file $1 exists and matches the current BOARD/KERNEL_TYPE.
+rootfs_is_current() {
+    [[ -f $1 && "$(cat "$1")" == "$(rootfs_stamp_id)" ]]
+}

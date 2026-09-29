@@ -8,7 +8,15 @@ export UBOOT_PACKAGE="u-boot"
 export UBOOT_RULES_TARGET="orangepi-5-rk3588s_defconfig"
 export U_BOOT_FDT="device-tree/rockchip/rk3588s-orangepi-5.dtb"
 export U_BOOT_FDT_MAINLINE="rockchip/rk3588s-orangepi-5.dtb"
-export U_BOOT_FDT_OVERLAYS="rockchip-rk3588-panthor-gpu.dtbo"
+# Mainline/stock board DT already has &gpu { status = "okay"; mali-supply = ... }
+# for panthor. rockchip-rk3588-panthor-gpu.dtbo is an Armbian/vendor-kernel
+# overlay (switch mali kbase → panthor) and is not shipped on Ubuntu's
+# linux-image DTBs.
+if [[ "${KERNEL_TYPE:-stock}" == "vendor" ]]; then
+    export U_BOOT_FDT_OVERLAYS="rockchip-rk3588-panthor-gpu.dtbo"
+else
+    export U_BOOT_FDT_OVERLAYS=""
+fi
 export COMPATIBLE_SUITES=("questing" "resolute" "stonking")
 export COMPATIBLE_FLAVORS=("server" "desktop")
 
@@ -17,6 +25,11 @@ function build_image_hook__orangepi-5() {
     local mount_point="$2"
     local suite="$3"
     local root_id="$4"
+
+    if [[ "${KERNEL_TYPE:-stock}" == "stock" ]]; then
+        echo "[+] Stock ISO path: firmware/flash-kernel come from rk3588-board-orangepi-5"
+        return 0
+    fi
 
     # flash-kernel's bundled database doesn't have this board either (see
     # orangepi-5b.sh for the full explanation); without a matching "Machine:"
@@ -28,7 +41,7 @@ Machine: Xunlong Orange Pi 5
 Method: generic
 EOF
 
-    if [[ "${KERNEL_TYPE:-vendor}" == "vendor" ]]; then
+    if [[ "${KERNEL_TYPE}" == "vendor" ]]; then
         echo "[+] Enabling AP6275P"
         mkdir -p "${mount_point}/usr/lib/scripts"
         cp "${overlay}/usr/lib/systemd/system/ap6275p-bluetooth.service" "${mount_point}/usr/lib/systemd/system/ap6275p-bluetooth.service"
@@ -43,7 +56,11 @@ EOF
 
         # Copy firmware
         echo "[+] Enabling Rockchip Firmware"
-        cp -r "${overlay}/firmware/" "${mount_point}/lib/"
+        if [[ -d "${overlay}/firmware" ]]; then
+            cp -r "${overlay}/firmware/" "${mount_point}/lib/"
+        else
+            echo "[!] overlay/firmware missing — skip vendor firmware copy"
+        fi
 
         echo '[+] Regenerating initramfs...'
         chroot "${mount_point}" update-initramfs -u -k all

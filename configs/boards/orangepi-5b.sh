@@ -8,7 +8,13 @@ export UBOOT_PACKAGE="u-boot"
 export UBOOT_RULES_TARGET="orangepi-5b-rk3588s_defconfig"
 export U_BOOT_FDT="device-tree/rockchip/rk3588s-orangepi-5b.dtb"
 export U_BOOT_FDT_MAINLINE="rockchip/rk3588s-orangepi-5b.dtb"
-export U_BOOT_FDT_OVERLAYS="rockchip-rk3588-panthor-gpu.dtbo"
+# Mainline/stock board DT already enables &gpu for panthor (see
+# rk3588s-orangepi-5.dtsi). The Armbian panthor-gpu.dtbo is vendor-kernel only.
+if [[ "${KERNEL_TYPE:-stock}" == "vendor" ]]; then
+    export U_BOOT_FDT_OVERLAYS="rockchip-rk3588-panthor-gpu.dtbo"
+else
+    export U_BOOT_FDT_OVERLAYS=""
+fi
 export COMPATIBLE_SUITES=("questing" "resolute" "stonking")
 export COMPATIBLE_FLAVORS=("server" "desktop")
 
@@ -17,6 +23,11 @@ function build_image_hook__orangepi-5b() {
     local mount_point="$2"
     local suite="$3"
     local root_id="$4"
+
+    if [[ "${KERNEL_TYPE:-stock}" == "stock" ]]; then
+        echo "[+] Stock ISO path: firmware/flash-kernel come from rk3588-board-orangepi-5b"
+        return 0
+    fi
 
     # flash-kernel's bundled database (usr/share/flash-kernel/db/all.db) only
     # has old Allwinner-based "Xunlong Orange Pi" boards, not this RK3588S
@@ -34,7 +45,7 @@ Machine: Xunlong Orange Pi 5B
 Method: generic
 EOF
 
-    if [[ "${KERNEL_TYPE:-vendor}" == "vendor" ]]; then
+    if [[ "${KERNEL_TYPE}" == "vendor" ]]; then
         # Enable bluetooth for AP6275P
         echo "[+] Enabling AP6275P"
         mkdir -p "${mount_point}/usr/lib/scripts"
@@ -50,7 +61,11 @@ EOF
 
         # Copy firmware
         echo "[+] Enabling Rockchip Firmware"
-        cp -r "${overlay}/firmware/" "${mount_point}/lib/"
+        if [[ -d "${overlay}/firmware" ]]; then
+            cp -r "${overlay}/firmware/" "${mount_point}/lib/"
+        else
+            echo "[!] overlay/firmware missing — skip vendor firmware copy"
+        fi
 
         echo '[+] Regenerating initramfs...'
         chroot "${mount_point}" update-initramfs -u -k all
@@ -66,19 +81,23 @@ EOF
         # clm_bcm43752a2_pcie_ag.blob -- say "pcie" too), so use the matching
         # brcmfmac43752-pcie files, with this module's own calibrated nvram
         # (nvram_AP6275P.txt) in place of the generic reference one.
-        echo "[+] Copying AP6275P WiFi firmware (brcmfmac43752-pcie)"
-        mkdir -p "${mount_point}/lib/firmware/brcm"
-        cp "${overlay}/firmware/brcm/brcmfmac43752-pcie.bin" "${mount_point}/lib/firmware/brcm/"
-        cp "${overlay}/firmware/brcm/brcmfmac43752-pcie.clm_blob" "${mount_point}/lib/firmware/brcm/"
-        cp "${overlay}/firmware/ap6275p/nvram_AP6275P.txt" "${mount_point}/lib/firmware/brcm/brcmfmac43752-pcie.txt"
+        if [[ -d "${overlay}/firmware" ]]; then
+            echo "[+] Copying AP6275P WiFi firmware (brcmfmac43752-pcie)"
+            mkdir -p "${mount_point}/lib/firmware/brcm"
+            cp "${overlay}/firmware/brcm/brcmfmac43752-pcie.bin" "${mount_point}/lib/firmware/brcm/"
+            cp "${overlay}/firmware/brcm/brcmfmac43752-pcie.clm_blob" "${mount_point}/lib/firmware/brcm/"
+            cp "${overlay}/firmware/ap6275p/nvram_AP6275P.txt" "${mount_point}/lib/firmware/brcm/brcmfmac43752-pcie.txt"
 
-        # Bluetooth already works on mainline without any of the vendor
-        # ap6275p-bluetooth.sh machinery (confirmed on-device) -- the mainline
-        # devicetree evidently wires it up via the standard hci_uart/btbcm
-        # serdev path, so nothing more to do here.
-        echo "[+] Copying AP6275P firmware"
-        mkdir -p "${mount_point}/lib/firmware/ap6275p"
-        cp -r "${overlay}/firmware/ap6275p/." "${mount_point}/lib/firmware/ap6275p/"
+            # Bluetooth already works on mainline without any of the vendor
+            # ap6275p-bluetooth.sh machinery (confirmed on-device) -- the mainline
+            # devicetree evidently wires it up via the standard hci_uart/btbcm
+            # serdev path, so nothing more to do here.
+            echo "[+] Copying AP6275P firmware"
+            mkdir -p "${mount_point}/lib/firmware/ap6275p"
+            cp -r "${overlay}/firmware/ap6275p/." "${mount_point}/lib/firmware/ap6275p/"
+        else
+            echo "[!] overlay/firmware missing — skip AP6275P firmware copy"
+        fi
 
         echo '[+] Regenerating initramfs...'
         chroot "${mount_point}" update-initramfs -u -k all

@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * IMX708 on Orange Pi 5 / 5B CAM2 (Samsung DCPHY0 CSI RX + CSI0).
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/clock/rockchip,rk3588-cru.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pinctrl/rockchip.h>
+
+&{/} {
+	cam2_regulator: cam2_regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "cam2_regulator";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		vin-supply = <&vcc_3v3_s3>;
+	};
+};
+
+&i2c7 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	clock-frequency = <400000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c7m0_xfer>;
+	status = "okay";
+
+	imx708: camera-sensor@1a {
+		compatible = "sony,imx708";
+		reg = <0x1a>;
+		assigned-clocks = <&cru CLK_MIPI_CAMARAOUT_M4>;
+		assigned-clock-rates = <24000000>;
+		clocks = <&cru CLK_MIPI_CAMARAOUT_M4>;
+		vdig-supply = <&cam2_regulator>;
+		vana1-supply = <&cam2_regulator>;
+		vana2-supply = <&cam2_regulator>;
+		vddl-supply = <&cam2_regulator>;
+		orientation = <2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam2_rstn &mipim0_camera4_clk>;
+		reset-gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
+		port {
+			imx708_output: endpoint {
+				data-lanes = <1 2>;
+				clock-noncontinuous;
+				link-frequencies = /bits/ 64 <450000000>;
+				remote-endpoint = <&csi0_input>;
+			};
+		};
+	};
+};
+
+&pinctrl {
+	cam2 {
+		cam2_rstn: cam2-rstn-pinctrl {
+			rockchip,pins = <1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+};
+
+&csi0 {
+	status = "okay";
+};
+
+&csi0_in {
+	csi0_input: endpoint {
+		data-lanes = <1 2>;
+		clock-noncontinuous;
+		link-frequencies = /bits/ 64 <450000000>;
+		remote-endpoint = <&imx708_output>;
+	};
+};
+
+&vicap {
+	status = "okay";
+};
+
+&vicap_mmu {
+	status = "okay";
+};
+
+&isp0 {
+	status = "okay";
+};
+
+&isp0_mmu {
+	status = "okay";
+};

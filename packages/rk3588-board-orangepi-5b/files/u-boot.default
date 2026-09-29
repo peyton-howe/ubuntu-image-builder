@@ -1,0 +1,2 @@
+# Fragment merged into /etc/default/u-boot by rk3588-board-orangepi-5b
+U_BOOT_FDT="/usr/lib/rk3588-board-orangepi-5b/dtbs/rockchip/rk3588s-orangepi-5b.dtb"

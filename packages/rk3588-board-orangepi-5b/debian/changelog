@@ -1,0 +1,48 @@
+rk3588-board-orangepi-5b (0.1.5-1) UNRELEASED; urgency=medium
+
+  * Vendor the AP6275P WiFi/BT firmware in the package instead of fetching
+    it from armbian/firmware at build time.
+
+ -- Peyton Howe <peyton@localhost>  Tue, 29 Sep 2026 12:00:00 +0000
+
+rk3588-board-orangepi-5b (0.1.4-1) UNRELEASED; urgency=medium
+
+  * Add the ISP nodes from kernel patch 0002 to the packaged DTB (disabled;
+    the camera overlays enable them) so the IMX708 overlays can apply.
+
+ -- Peyton Howe <peyton@localhost>  Sun, 27 Sep 2026 12:00:00 +0000
+
+rk3588-board-orangepi-5b (0.1.3-1) UNRELEASED; urgency=medium
+
+  * Ship our own rk3588s-orangepi-5b.dtb (upstream DTS + the 5B hunk of
+    kernel patch 0006) so stock kernels get AP6275P WiFi and Bluetooth.
+  * Package AP6275P WiFi/BT firmware (incl. BCM4362A2.hcd), fetching it
+    from armbian/firmware when overlay/firmware is absent.
+  * Drop the vendor-kernel panthor-gpu overlay from u-boot defaults; the
+    stock and packaged DTBs already enable the GPU for panthor.
+  * Load ledtrig_heartbeat at boot so the status LED blinks on stock kernels.
+  * Keep the HYM8563 32k LPO on before PCIe link training via a
+    regulator-fixed-clock supply chain, so the AP6275P WiFi enumerates.
+
+ -- Peyton Howe <peyton@localhost>  Sat, 26 Sep 2026 12:00:00 +0000
+
+rk3588-board-orangepi-5b (0.1.2-1) UNRELEASED; urgency=medium
+
+  * Unpack Ubuntu's stubble/zboot vmlinuz into a raw Image so U-Boot
+    booti can load it (fixes "Bad Linux ARM64 Image magic!").
+  * Merge the flash-kernel db entry from postinst instead of shipping
+    /etc/flash-kernel/db, which flash-kernel owns (package failed to install).
+
+ -- Peyton Howe <peyton@localhost>  Sat, 26 Sep 2026 12:00:00 +0000
+
+rk3588-board-orangepi-5b (0.1.1-1) UNRELEASED; urgency=medium
+
+  * Add initramfs hook so stock Ubuntu can mount root from RK3588 SD/eMMC.
+
+ -- Peyton Howe <peyton@localhost>  Thu, 25 Sep 2026 12:00:00 +0000
+
+rk3588-board-orangepi-5b (0.1.0-1) UNRELEASED; urgency=medium
+
+  * Initial scaffolding for stock-ISO board support package.
+
+ -- Peyton Howe <peyton@localhost>  Thu, 25 Sep 2026 00:00:00 +0000

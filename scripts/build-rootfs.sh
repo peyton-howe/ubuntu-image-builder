@@ -30,11 +30,20 @@ fi
 # shellcheck source=/dev/null
 source "${ROOT_DIR}/configs/flavors/${FLAVOR}.sh"
 
-TARBALL="ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64.tar.gz"
-if [[ -f ${TARBALL} ]]; then
-    echo "[+] Rootfs tarball already exists: ${TARBALL}"
+# The extracted rootfs directory is the build artifact; build-image.sh copies
+# it straight into the image. The stamp is written last, so an interrupted
+# build leaves no stamp and the next run starts over. It records the board and
+# kernel type (see rootfs_stamp_id) so another board rebuilds instead of
+# reusing this board's packages.
+ROOTFS_STAMP="${RELEASE}-${FLAVOR}.done"
+if rootfs_is_current "${ROOTFS_STAMP}" && [[ -d ${RELEASE}-${FLAVOR} ]]; then
+    echo "[+] Rootfs already built for $(rootfs_stamp_id): ${RELEASE}-${FLAVOR}"
     exit 0
 fi
+if [[ -f ${ROOTFS_STAMP} ]]; then
+    echo "[+] Rootfs was built for $(cat "${ROOTFS_STAMP}"), need $(rootfs_stamp_id); rebuilding"
+fi
+rm -f "${ROOTFS_STAMP}"
 
 if [[ "${FLAVOR}" == "desktop" ]]; then
     ISO_URL="${UBUNTU_DESKTOP_ISO_URL:?Set UBUNTU_DESKTOP_ISO_URL in configs/releases/${RELEASE}.sh}"
@@ -49,6 +58,9 @@ ISO_PATH="$(pwd)/${ISO_NAME}"
 ROOTFS_DIR="${RELEASE}-${FLAVOR}"
 ISO_MNT="$(pwd)/iso-mnt"
 KERNEL_DIR="${ROOT_DIR}/build/kernel"
+DEBS_DIR="${ROOT_DIR}/build/debs"
+KERNEL_TYPE="${KERNEL_TYPE:-stock}"
+BOARD_PKG="$(board_support_package "${BOARD:-}")"
 
 cleanup_iso() {
     if mountpoint -q "${ISO_MNT}" 2>/dev/null; then
@@ -63,17 +75,37 @@ if ! command -v wget >/dev/null && ! command -v curl >/dev/null; then
     exit 1
 fi
 
-echo "[+] Downloading ${ISO_NAME}..."
-if command -v wget >/dev/null; then
-    wget -c --progress=dot:giga -O "${ISO_PATH}" "${ISO_URL}"
-else
-    curl -L --continue-at - -o "${ISO_PATH}" "${ISO_URL}"
-fi
+download_iso() {
+    echo "[+] Downloading ${ISO_NAME}..."
+    if command -v wget >/dev/null; then
+        wget -c --progress=dot:giga -O "${ISO_PATH}" "${ISO_URL}"
+    else
+        curl -L --continue-at - -o "${ISO_PATH}" "${ISO_URL}"
+    fi
+}
+
+verify_iso() {
+    grep " ${ISO_NAME}$\| \*${ISO_NAME}$" SHA256SUMS | sha256sum -c -
+}
 
 if [[ -n "${SHA256SUMS_URL}" ]]; then
-    echo "[+] Verifying SHA256..."
     wget -q -O SHA256SUMS "${SHA256SUMS_URL}"
-    grep " ${ISO_NAME}$\| \*${ISO_NAME}$" SHA256SUMS | sha256sum -c -
+    if [[ -f ${ISO_PATH} ]] && verify_iso >/dev/null 2>&1; then
+        echo "[+] ${ISO_NAME} already downloaded and matches SHA256SUMS"
+    else
+        download_iso
+        echo "[+] Verifying SHA256..."
+        if ! verify_iso; then
+            # Daily ISOs get respun in place; resuming appends the new image
+            # onto the old one. Start over once from scratch.
+            echo "[+] Checksum mismatch (ISO respun upstream?), re-downloading from scratch..."
+            rm -f "${ISO_PATH}"
+            download_iso
+            verify_iso
+        fi
+    fi
+else
+    download_iso
 fi
 
 mkdir -p "${ISO_MNT}"
@@ -164,23 +196,47 @@ nameserver 1.1.1.1
 EOF
 
 # =========================
-# 3. Copy kernel DEBs into rootfs
+# 3. Stage .debs for chroot install
 # =========================
-mkdir -p "${ROOTFS_DIR}/tmp/kernel-debs"
-if compgen -G "${KERNEL_DIR}/*.deb" > /dev/null; then
-    cp "${KERNEL_DIR}"/*.deb "${ROOTFS_DIR}/tmp/kernel-debs/"
+mkdir -p "${ROOTFS_DIR}/tmp/kernel-debs" "${ROOTFS_DIR}/tmp/rk3588-debs"
+
+if is_stock_kernel; then
+    echo "[+] Stock kernel path: staging board/camera packages from ${DEBS_DIR}"
+    if ! compgen -G "${DEBS_DIR}/rk3588-camera-overlays_*.deb" > /dev/null \
+        || ! compgen -G "${DEBS_DIR}/rk3588-camera-dkms_*.deb" > /dev/null; then
+        echo "Error: missing camera .debs in ${DEBS_DIR}; run ./scripts/build-debs.sh first"
+        exit 1
+    fi
+    cp -v "${DEBS_DIR}/rk3588-camera-overlays_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    cp -v "${DEBS_DIR}/rk3588-camera-dkms_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    if [[ -n ${BOARD_PKG} ]]; then
+        if ! compgen -G "${DEBS_DIR}/${BOARD_PKG}_*.deb" > /dev/null; then
+            echo "Error: missing ${BOARD_PKG} .deb in ${DEBS_DIR}"
+            exit 1
+        fi
+        cp -v "${DEBS_DIR}/${BOARD_PKG}_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    else
+        echo "Warning: no board support package mapping for BOARD=${BOARD:-unset}"
+    fi
+else
+    echo "[+] Custom kernel path (${KERNEL_TYPE}): staging kernel debs from ${KERNEL_DIR}"
+    if compgen -G "${KERNEL_DIR}/*.deb" > /dev/null; then
+        cp "${KERNEL_DIR}"/*.deb "${ROOTFS_DIR}/tmp/kernel-debs/"
+    fi
 fi
 
 prepare_chroot_mounts "${ROOTFS_DIR}"
 
 # =========================
-# 4. Install kernel inside chroot
+# 4. Configure rootfs inside chroot
 # =========================
 chroot "${ROOTFS_DIR}" /bin/bash -c "
 set -e
 export DEBIAN_FRONTEND=noninteractive
 export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
+KERNEL_TYPE='${KERNEL_TYPE}'
+BOARD_PKG='${BOARD_PKG}'
 
 # The live image ships a cdrom source (installer normally drops this
 # post-install); there's no /cdrom mount here so apt-get update fails on it.
@@ -219,10 +275,37 @@ echo '[+] Updating apt sources...'
 apt-get update
 apt-get install -y u-boot-menu u-boot-tools initramfs-tools linux-base
 
-if compgen -G '/tmp/kernel-debs/*.deb' > /dev/null; then
-    echo '[+] Installing custom kernel debs...'
-    dpkg -i /tmp/kernel-debs/*.deb || apt-get -f install -y
-    rm -rf /tmp/kernel-debs
+if [[ \"\${KERNEL_TYPE}\" == stock ]]; then
+    echo '[+] Installing headers for DKMS (stock ISO kernel)...'
+    apt-get install -y dkms
+    # Headers must match the ISO's kernel, not the archive's newest one
+    # (linux-headers-generic), or DKMS has nothing to build against when a
+    # daily ISO lags the archive.
+    for kver in \$(ls /lib/modules); do
+        apt-get install -y linux-headers-\${kver} \\
+            || echo \"Warning: no linux-headers-\${kver} in the archive; DKMS modules won't build for it\" >&2
+    done
+
+    if compgen -G '/tmp/rk3588-debs/*.deb' > /dev/null; then
+        echo '[+] Installing RK3588 board/camera packages...'
+        # DKMS may fail to build under qemu/foreign chroot; sources still
+        # register and AUTOINSTALL on first boot with real headers.
+        dpkg -i /tmp/rk3588-debs/*.deb || apt-get -f install -y || true
+        rm -rf /tmp/rk3588-debs
+        # The board package is what makes the image bootable (kernel unwrap,
+        # initramfs MMC modules, u-boot defaults); don't let the tolerance
+        # above hide it failing to install.
+        if [[ -n \${BOARD_PKG} ]] && ! dpkg-query -W -f='\${Status}' \${BOARD_PKG} 2>/dev/null | grep -q 'install ok installed'; then
+            echo \"Error: \${BOARD_PKG} did not install\" >&2
+            exit 1
+        fi
+    fi
+else
+    if compgen -G '/tmp/kernel-debs/*.deb' > /dev/null; then
+        echo '[+] Installing custom kernel debs...'
+        dpkg -i /tmp/kernel-debs/*.deb || apt-get -f install -y
+        rm -rf /tmp/kernel-debs
+    fi
 fi
 
 if [[ -d /etc/gdm3 ]]; then
@@ -255,14 +338,5 @@ if [[ "$(uname -m)" != "aarch64" ]]; then
     rm -f "${ROOTFS_DIR}/usr/bin/qemu-aarch64-static"
 fi
 
-# =========================
-# 5. Compress result
-# =========================
-echo "[+] Compressing to tar..."
-# --one-file-system: teardown_chroot_mounts only unmounts the top-level
-# proc/sys/dev/run binds, not everything --rbind recursively dragged in under
-# them (e.g. the host's cgroup2/debugfs/tracefs, or OrbStack's /dev/.lxc
-# proc+sysfs snapshot). Those are on a different device than the rootfs, so
-# -one-file-system skips them instead of archiving unreadable pseudo-files.
-tar --one-file-system -czf "${TARBALL}" -C "${ROOTFS_DIR}" .
-echo "[✓] Rootfs: ${TARBALL}"
+rootfs_stamp_id > "${ROOTFS_STAMP}"
+echo "[✓] Rootfs: $(pwd)/${ROOTFS_DIR}"

@@ -1,0 +1,11 @@
+*.deb
+*.buildinfo
+*.changes
+*.dsc
+*.tar.*
+*/debian/*.debhelper.log
+*/debian/*.substvars
+*/debian/.debhelper/
+*/debian/files
+*/debian/rk3588-*/
+*/build/

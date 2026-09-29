@@ -1,0 +1,7 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: rk3588-board-orangepi-5b
+Source: https://github.com/peyton-howe/ubuntu-image-builder
+
+Files: *
+Copyright: 2025-2026 Peyton Howe
+License: GPL-2.0-only

@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = configure ]; then
+    if [ -x /usr/lib/rk3588-camera/apply-overlays.sh ]; then
+        /usr/lib/rk3588-camera/apply-overlays.sh || true
+    fi
+fi
+
+#DEBHELPER#
+
+exit 0

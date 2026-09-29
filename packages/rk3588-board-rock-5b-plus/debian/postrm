@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+    if [ -f /etc/flash-kernel/db ]; then
+        sed -i '/^# BEGIN rk3588-board-rock-5b-plus$/,/^# END rk3588-board-rock-5b-plus$/d' /etc/flash-kernel/db
+    fi
+fi
+
+#DEBHELPER#
+
+exit 0
