@@ -1,2 +1,3 @@
 # Fragment merged into /etc/default/u-boot by rk3588-board-orangepi-5
-U_BOOT_FDT="rockchip/rk3588s-orangepi-5.dtb"
+# Relative to /lib/firmware/<kernel version>/, so each kernel gets its own DTB.
+U_BOOT_FDT="device-tree/rockchip/rk3588s-orangepi-5.dtb"

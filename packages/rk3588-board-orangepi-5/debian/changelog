@@ -1,3 +1,10 @@
+rk3588-board-orangepi-5 (0.1.5-1) UNRELEASED; urgency=medium
+
+  * Set U_BOOT_FDT relative to /lib/firmware/<kernel version>/ so each
+    kernel boots its own DTB; the old rockchip/... path never resolved.
+
+ -- Peyton Howe <peyton@localhost>  Tue, 29 Sep 2026 12:00:00 +0000
+
 rk3588-board-orangepi-5 (0.1.4-1) UNRELEASED; urgency=medium
 
   * Drop install-firmware.sh: the board has no onboard WiFi/BT, and the

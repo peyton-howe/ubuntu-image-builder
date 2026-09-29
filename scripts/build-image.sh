@@ -228,6 +228,15 @@ if [ -z \"\${FDT_ABS_PATH}\" ]; then
 fi
 FDT_OVERLAYS_DIR=\$(dirname \"\${FDT_ABS_PATH}\")
 
+# Stock kernels keep DTBs in /lib/firmware/<ver>/device-tree/. Pointing
+# U_BOOT_FDT at one version's copy would give every kernel's boot entry that
+# DTB and break once that kernel is removed; the device-tree/... form is
+# resolved by u-boot-update against /lib/firmware/<ver>/ for each kernel.
+U_BOOT_FDT_VALUE=\"\${FDT_ABS_PATH}\"
+case \"\${FDT_ABS_PATH}\" in
+    /lib/firmware/*/device-tree/*) U_BOOT_FDT_VALUE=\"device-tree/\${FDT_ABS_PATH#/lib/firmware/*/device-tree/}\" ;;
+esac
+
 # Seed board overlays from board config (panthor etc.); camera overlays
 # package may append more via apply-overlays.sh below.
 BOARD_OVERLAYS_ABS=\"\"
@@ -257,7 +266,7 @@ cat >> /etc/default/u-boot <<EOF
 U_BOOT_PARAMETERS=\"console=ttyS2,1500000 console=tty1 root=UUID=${root_uuid,,} rw rootwait quiet splash plymouth.ignore-serial-consoles cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory\"
 #U_BOOT_ROOT=\"\"
 #U_BOOT_TIMEOUT=\"50\"
-U_BOOT_FDT=\"\${FDT_ABS_PATH}\"
+U_BOOT_FDT=\"\${U_BOOT_FDT_VALUE}\"
 #U_BOOT_FDT_DIR=\"/lib/firmware/\"
 U_BOOT_FDT_OVERLAYS=\"\${BOARD_OVERLAYS_ABS}\"
 #U_BOOT_FDT_OVERLAYS_DIR=\"\${FDT_OVERLAYS_DIR}/\"
