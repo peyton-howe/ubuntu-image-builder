@@ -1,3 +1,11 @@
+rk3588-board-orangepi-5 (0.1.6-1) UNRELEASED; urgency=medium
+
+  * Ship our own rk3588s-orangepi-5.dtb (upstream DTS, built with -@) so
+    camera overlays can apply; Ubuntu's DTB has no __symbols__.
+    Breaks rk3588-camera-overlays << 0.1.1-1, which lacks rk3588-isp.dtbo.
+
+ -- Peyton Howe <peyton@localhost>  Tue, 29 Sep 2026 12:00:00 +0000
+
 rk3588-board-orangepi-5 (0.1.5-1) UNRELEASED; urgency=medium
 
   * Set U_BOOT_FDT relative to /lib/firmware/<kernel version>/ so each

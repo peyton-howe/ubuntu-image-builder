@@ -10,9 +10,9 @@ are still available for development.
 
 | Board | `--board` | Status (stock kernel) |
 |---|---|---|
-| Orange Pi 5B | `orangepi-5b` | Tested: boot, eMMC/SD, WiFi, Bluetooth, status LED, IMX708 camera on cam1 |
+| Orange Pi 5B | `orangepi-5b` | Tested: boot, eMMC/SD, WiFi/BT out of the box, status LED, IMX708 camera on cam1 |
 | Orange Pi 5 | `orangepi-5` | Builds; not tested on hardware |
-| Radxa ROCK 5B+ | `rock-5b-plus` | Builds; not tested on hardware |
+| Radxa ROCK 5B+ | `rock-5b-plus` | Tested: boot, WiFi/BT out of the box, status LED, IMX708 on cam0 and cam1 |
 
 Releases (`--release`): `questing` (25.10), `resolute` (26.04), `stonking`
 (26.10 daily). Flavors (`--flavor`): `desktop`, `server`.
@@ -112,9 +112,10 @@ its **own DTB**, built by `packages/rk3588-board-orangepi-5b/files/build-dtb.sh`
 - It sparse-fetches the upstream rockchip DTS at `DTS_KERNEL_REF`
   (default `v7.3-rc4`, matching Ubuntu's 7.3 kernel). The fetch uses the
   GitHub mirror, because git.kernel.org ignores partial-clone filters.
-- It applies only the device-tree hunks of kernel patches **0006** (the 5B's
-  WiFi on `pcie2x1l2` and Bluetooth on `uart9`) and **0002** (the ISP nodes,
-  disabled until a camera overlay enables them).
+- It applies only the `rk3588s-orangepi-5b.dts` hunk of kernel patch
+  **0006** (the 5B's WiFi on `pcie2x1l2` and Bluetooth on `uart9`). The ISP
+  nodes come from `rk3588-isp.dtbo` at boot, as on every board (see
+  [Cameras](#cameras-imx708)).
 - It adds `rk3588s-orangepi-5b-wifi-lpo.dtsi`. The WiFi chip needs the
   HYM8563 RTC's 32 kHz clock, and `rtc-hym8563` switches that clock off when
   it probes. On Ubuntu that driver loads from the initramfs just before PCIe
@@ -125,17 +126,23 @@ its **own DTB**, built by `packages/rk3588-board-orangepi-5b/files/build-dtb.sh`
 
 The AP6275P firmware is vendored in
 [`packages/rk3588-board-orangepi-5b/firmware/`](packages/rk3588-board-orangepi-5b/firmware/README.md).
-When Ubuntu moves to a newer kernel, bump `DTS_KERNEL_REF`.
+WiFi and Bluetooth work on a fresh install of the built image. When Ubuntu
+moves to a newer kernel, bump `DTS_KERNEL_REF`.
 
 ### Orange Pi 5
 
-No onboard WiFi or Bluetooth. Uses Ubuntu's DTB.
+No onboard WiFi or Bluetooth. Ubuntu's DTB is compiled without overlay
+symbols, so the board package ships its **own DTB**, built by
+`packages/rk3588-board-orangepi-5/files/build-dtb.sh` from the same upstream
+ref as the 5B, with `-@` and no board-specific DTS patches. ISP nodes come
+from `rk3588-isp.dtbo` at boot.
 
 ### ROCK 5B+
 
 The onboard Radxa A8 module is an RTL8852BE (WiFi over PCIe, Bluetooth over
 USB). Its drivers and firmware are already in Ubuntu's kernel and
-`linux-firmware`. Uses Ubuntu's DTB.
+`linux-firmware`, so WiFi and Bluetooth work on a fresh install. Uses
+Ubuntu's DTB (which has `__symbols__`).
 
 ## Cameras (IMX708)
 
@@ -150,17 +157,39 @@ sudo /usr/lib/rk3588-camera/apply-overlays.sh
 sudo reboot
 ```
 
+`apply-overlays.sh` treats `overlays.conf` as the full list of camera
+overlays: it replaces any previously managed camera/ISP entries in
+`U_BOOT_FDT_OVERLAYS` and keeps unrelated overlays. To switch cameras, edit
+the conf and re-run the script; to disable them, set
+`RK3588_CAMERA_OVERLAYS=""` and re-run.
+
 After reboot, `cat /proc/device-tree/isp@fdcb0000/status` should print
 `okay`. The pipeline uses two media devices: `rockchip-cif` captures from the
 sensor into memory, and `rkisp2` reads the frames back through
 `rkisp2_rawrd0` for processing. Processed images need a libcamera build with
 the rkisp2 pipeline handler, which Ubuntu's libcamera doesn't have yet. Build
-it yourself for now.
+it yourself for now. The upstream rkisp2 branch
+(`git.ideasonboard.com/epaul/libcamera`, `epaul/dev/rkisp2/upstream-v3`) only
+matches cameras on the csi2 port, so ROCK 5B+ cam1 (csi4) needs a libcamera
+patch until that's fixed upstream; it also creates one camera per pipeline
+handler, so two cameras at once isn't supported there yet. That patch is not
+shipped in this repo.
 
-Only **cam1** on the Orange Pi 5B has been tested. cam2/cam3 use the DCPHY,
-which needs a patched `phy-rockchip-samsung-dcphy` (kernel patch 0001). That
-isn't packaged for the stock kernel yet. The camera overlays also need the
-0002 ISP nodes in the base DTB, which today only the 5B's packaged DTB has.
+Stock kernels' DTBs don't have the ISP nodes the camera overlays reference
+(they come from kernel patch 0002), so `apply-overlays.sh` always puts
+`rk3588-isp.dtbo` first; U-Boot applies overlays in order and merges each
+one's labels into the base DTB. Overlays also need the base DTB to have
+`__symbols__`:
+
+| Board | Base DTB | Camera overlays |
+|---|---|---|
+| Orange Pi 5B | Packaged (built with `-@`) | cam1 tested on hardware |
+| ROCK 5B+ | Ubuntu's (has `__symbols__`, since upstream ships overlays for it) | cam0 (isp0) and cam1 (isp1), both at once; tested on hardware. Use the plain overlays, not `-isp` (those need the unapplied patch 0003) |
+| Orange Pi 5 | Packaged (built with `-@`) | cam1/cam2/cam3 can apply; not tested on hardware |
+
+cam2/cam3 on the Orange Pi 5/5B use the DCPHY, which needs a patched
+`phy-rockchip-samsung-dcphy` (kernel patch 0001). That isn't packaged for the
+stock kernel yet.
 
 ## Custom kernels (vendor / mainline)
 
@@ -186,9 +215,10 @@ to regenerate the DKMS sources and overlays in `packages/`.
   `build-rootfs.sh` installs `initramfs-tools`, which removes dracut. The
   board packages' MMC hook is an initramfs-tools hook. If Ubuntu stops
   shipping initramfs-tools, that hook needs a dracut equivalent.
-- **GitHub rate limits.** The 5B package build fetches device-tree sources
-  from GitHub. The fetch is cached in `packages/rk3588-board-orangepi-5b/build/`,
-  but fresh clones and CI fetch every time and can hit HTTP 429.
+- **GitHub rate limits.** The Orange Pi 5 and 5B package builds fetch
+  device-tree sources from GitHub. The fetch is cached under each package's
+  `build/` directory, but fresh clones and CI fetch every time and can hit
+  HTTP 429.
 - **Cosmetic.** `build-image.sh` passes `${SUITE}` to board hooks, but nothing
   sets it (the hooks don't use it). The release configs export misspelled
   `RELASE_NAME`/`RELASE_VERSION`, which nothing reads.

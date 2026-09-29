@@ -2,7 +2,7 @@ Source: rk3588-board-orangepi-5
 Section: admin
 Priority: optional
 Maintainer: Peyton Howe <peyton@localhost>
-Build-Depends: debhelper-compat (= 13)
+Build-Depends: debhelper-compat (= 13), device-tree-compiler, gcc, git
 Standards-Version: 4.6.2
 Homepage: https://github.com/peyton-howe/ubuntu-image-builder
 
@@ -10,7 +10,9 @@ Package: rk3588-board-orangepi-5
 Architecture: all
 Depends: ${misc:Depends}, u-boot-menu, flash-kernel, zstd
 Recommends: rk3588-camera-overlays, rk3588-camera-dkms
+Breaks: rk3588-camera-overlays (<< 0.1.1-1)
 Description: Board support for Orange Pi 5
- Firmware, flash-kernel registration, and u-boot-menu defaults for
- Orange Pi 5 on stock Ubuntu arm64. Meant to be installed into an
- official Ubuntu ISO rootfs alongside our U-Boot image write.
+ Firmware, flash-kernel registration, packaged DTB with overlay symbols,
+ and u-boot-menu defaults for Orange Pi 5 on stock Ubuntu arm64. Meant to
+ be installed into an official Ubuntu ISO rootfs alongside our U-Boot
+ image write.

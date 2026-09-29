@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Build rk3588s-orangepi-5b.dtb with our board changes for stock Ubuntu
-# kernels, whose own 5B DTB lacks them:
-#   0006: rk3588s-orangepi-5b.dts hunk (AP6275P WiFi on pcie2x1l2, BT on uart9)
-#   0002: rk3588-base.dtsi hunk (disabled ISP nodes the camera overlays enable)
-# They edit base DTS files rather than add overlays, and Ubuntu's DTBs carry
-# no __symbols__, so ship a whole DTB (built with -@ so overlays can apply).
+# kernels, whose own 5B DTB lacks them: the rk3588s-orangepi-5b.dts hunk of
+# kernel patch 0006 (AP6275P WiFi on pcie2x1l2, BT on uart9). It edits the
+# base DTS rather than adding an overlay, and Ubuntu's 5B DTB carries no
+# __symbols__, so ship a whole DTB, built with -@ so overlays can apply.
+# The ISP nodes are not added here: rk3588-camera-overlays' rk3588-isp.dtbo
+# supplies them on every board.
 #
 # Only the rockchip DTS and dt-bindings headers are fetched (sparse clone).
 set -euo pipefail
@@ -32,18 +33,19 @@ if [[ ! -d ${src}/.git ]]; then
     git -C "${src}" checkout -q "${DTS_KERNEL_REF}"
 fi
 ROCKCHIP=arch/arm64/boot/dts/rockchip
+# The checkout is cached in WORK, so undo every earlier edit (including hunks
+# a previous version of this script applied) before patching again.
+git -C "${src}" checkout -q -- "${ROCKCHIP}"
 # patch -> the one file whose hunk we take from it
 declare -A HUNKS=(
     [0006-arm64-dts-rockchip-imx708-camera-overlays.patch]="${DTS}"
-    [0002-media-rockchip-rkisp2.patch]="${ROCKCHIP}/rk3588-base.dtsi"
 )
 for patch in "${!HUNKS[@]}"; do
-    git -C "${src}" checkout -q -- "${HUNKS[$patch]}"
     git -C "${src}" apply --include="${HUNKS[$patch]}" "${PATCH_DIR}/${patch}"
 done
 # Board-package-only fixups layered on top of the 0006 hunk.
 for frag in "$(dirname "$0")"/rk3588s-orangepi-5b-*.dtsi; do
-    cp "${frag}" "${src}/arch/arm64/boot/dts/rockchip/"
+    cp "${frag}" "${src}/${ROCKCHIP}/"
     echo "#include \"$(basename "${frag}")\"" >> "${src}/${DTS}"
 done
 

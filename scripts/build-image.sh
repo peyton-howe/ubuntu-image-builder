@@ -210,8 +210,8 @@ rm -f /etc/default/u-boot
 # Resolve the installed kernel's dtb path dynamically instead of hardcoding
 # a kernel version string that goes stale on every rebuild.
 FDT_BASENAME=\$(basename \"${FDT_REL}\")
-# A board package may ship its own DTB (e.g. the 5B's WiFi/BT nodes, which
-# the stock kernel's DTB lacks); prefer it over the kernel's copy.
+# A board package may ship its own DTB (Orange Pi 5/5B: symbols and/or
+# WiFi/BT nodes the stock kernel's DTB lacks); prefer it over the kernel's.
 FDT_ABS_PATH=\$(find /usr/lib/rk3588-board-*/dtbs/ -name \"\${FDT_BASENAME}\" 2>/dev/null | head -1 || true)
 [ -n \"\${FDT_ABS_PATH}\" ] || FDT_ABS_PATH=\$(find /usr/lib/linux-image-*/ /lib/linux-image-*/ /lib/firmware/*/device-tree/ /boot/dtbs/*/ \\
     -name \"\${FDT_BASENAME}\" 2>/dev/null | grep -E 'mainline-rk3588|rockchip|linux-image' | head -1 || true)

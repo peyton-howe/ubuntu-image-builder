@@ -87,3 +87,12 @@
 &vicap_mmu {
 	status = "okay";
 };
+
+/* rkisp2 processes the captured frames; cam0 uses isp0, so cam1 gets isp1. */
+&isp1 {
+	status = "okay";
+};
+
+&isp1_mmu {
+	status = "okay";
+};

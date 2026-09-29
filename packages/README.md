@@ -6,11 +6,11 @@ Debian packages installed into the rootfs on the **stock** kernel path
 
 | Package | Contents |
 |---|---|
-| `rk3588-board-orangepi-5b` | Board glue (below), plus its own DTB (upstream DTS + 5B hunks of kernel patches 0006/0002 + `files/rk3588s-orangepi-5b-*.dtsi`) and the AP6275P WiFi/BT firmware |
-| `rk3588-board-orangepi-5` | Board glue |
+| `rk3588-board-orangepi-5b` | Board glue (below), plus its own DTB (upstream DTS + the 5B hunk of kernel patch 0006 + `files/rk3588s-orangepi-5b-*.dtsi`) and the AP6275P WiFi/BT firmware |
+| `rk3588-board-orangepi-5` | Board glue, plus its own DTB (upstream DTS built with `-@` so camera overlays can apply) |
 | `rk3588-board-rock-5b-plus` | Board glue |
 | `rk3588-camera-dkms` | DKMS: `imx708` sensor + `rkisp2` ISP (`rockchip-isp2`). DCPHY is staged in `src/dcphy`, not built |
-| `rk3588-camera-overlays` | IMX708 `.dtbo`s, `/etc/rk3588-camera/overlays.conf`, `apply-overlays.sh` |
+| `rk3588-camera-overlays` | IMX708 `.dtbo`s, `rk3588-isp.dtbo` (ISP nodes from patch 0002, applied first by `apply-overlays.sh`), `/etc/rk3588-camera/overlays.conf`, `apply-overlays.sh` (treats the conf as the full camera-overlay list) |
 
 **Board glue**, shared by all three board packages:
 
@@ -43,18 +43,22 @@ To test a change on a running board without reflashing:
 
 - **Don't set `U_BOOT_FDT_OVERLAYS` in a `u-boot.default`.** `postinst`
   merges every key on each upgrade, which would wipe camera overlays that
-  `apply-overlays.sh` enabled.
+  `apply-overlays.sh` enabled. Camera selection belongs in
+  `/etc/rk3588-camera/overlays.conf`; `apply-overlays.sh` replaces managed
+  camera/ISP entries and keeps unrelated overlays.
 - **`U_BOOT_FDT` for Ubuntu's own DTBs is `device-tree/rockchip/<board>.dtb`**,
   relative to `/lib/firmware/<kernel version>/`, so each kernel boots its
-  own DTB. Only a DTB shipped by the package (the 5B's) uses an absolute path.
+  own DTB. A DTB shipped by the board package (Orange Pi 5 / 5B) uses an
+  absolute path under `/usr/lib/rk3588-board-*/dtbs/`.
 - **Don't ship files another package owns** (e.g. `/etc/flash-kernel/db`).
   dpkg refuses to unpack the package, and the image then won't boot.
   `build-rootfs.sh` now fails loudly if the board package doesn't install.
 
 ## Regenerating camera sources
 
-`rk3588-camera-dkms/src/` and `rk3588-camera-overlays/dts/` are generated from
-`patches/kernel/mainline/` and committed. After changing the patch series:
+`rk3588-camera-dkms/src/` and `rk3588-camera-overlays/dts/` (including
+`rk3588-isp.dtso`) are generated from `patches/kernel/mainline/` and committed;
+edit the patches, not the generated files. After changing the patch series:
 
 ```bash
 ./scripts/extract-oot-from-patches.sh
