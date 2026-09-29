@@ -227,6 +227,14 @@ fi
 
 prepare_chroot_mounts "${ROOTFS_DIR}"
 
+# Ubuntu 25.10+ → dracut; older → initramfs-tools (board packages support both).
+if release_uses_dracut; then
+    INITRAMFS_PKG=dracut
+else
+    INITRAMFS_PKG=initramfs-tools
+fi
+echo "[+] Initramfs generator for ${RELEASE} (${RELASE_VERSION:-unknown}): ${INITRAMFS_PKG}"
+
 # =========================
 # 4. Configure rootfs inside chroot
 # =========================
@@ -237,6 +245,7 @@ export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 KERNEL_TYPE='${KERNEL_TYPE}'
 BOARD_PKG='${BOARD_PKG}'
+INITRAMFS_PKG='${INITRAMFS_PKG}'
 
 # The live image ships a cdrom source (installer normally drops this
 # post-install); there's no /cdrom mount here so apt-get update fails on it.
@@ -273,7 +282,9 @@ EOF2
 
 echo '[+] Updating apt sources...'
 apt-get update
-apt-get install -y u-boot-menu u-boot-tools initramfs-tools linux-base
+# Ubuntu 25.10+ defaults to dracut (Conflicts: initramfs-tools). Older
+# releases keep initramfs-tools. Board packages ship hooks for both.
+apt-get install -y u-boot-menu u-boot-tools linux-base ${INITRAMFS_PKG}
 
 if [[ \"\${KERNEL_TYPE}\" == stock ]]; then
     echo '[+] Installing headers for DKMS (stock ISO kernel)...'

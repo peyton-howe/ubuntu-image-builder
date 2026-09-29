@@ -47,7 +47,12 @@ require_cmds parted mkfs.ext4 dd tar xz
 
 ROOT_DIR=$(pwd)
 KERNEL_DIR="${ROOT_DIR}/build/kernel"
-BLOBS_DIR="${ROOT_DIR}/build/u-boot"
+BLOBS_DIR="${ROOT_DIR}/build/u-boot/${BOARD}"
+UBOOT_BIN="${BLOBS_DIR}/u-boot-rockchip.bin"
+if [[ ! -f ${UBOOT_BIN} ]]; then
+    echo "Error: missing ${UBOOT_BIN}; run ./scripts/build-u-boot.sh for BOARD=${BOARD}"
+    exit 1
+fi
 
 rootfs_dir=$(readlink -f build/rootfs/${RELEASE}-${FLAVOR})
 if ! rootfs_is_current "${rootfs_dir}.done"; then
@@ -150,7 +155,7 @@ echo "[+] Writing bootloader..."
 #     dd if="${BLOBS_DIR}/u-boot.itb" of="$loop" seek=16384 conv=notrunc
 # fi
 
-dd if="${BLOBS_DIR}/u-boot-rockchip.bin" of="${IMG}" bs=32k seek=1 conv=notrunc status=none
+dd if="${UBOOT_BIN}" of="${IMG}" bs=32k seek=1 conv=notrunc status=none
 
 prepare_chroot_mounts "${mount_point}/writable"
 

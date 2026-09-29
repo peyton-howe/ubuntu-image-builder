@@ -268,6 +268,12 @@ fi
 
 if [ "${REBUILD_UBOOT}" == "Y" ]; then
     echo "[+] Clearing u-boot build artifacts..."
+    if [ -n "${BOARD}" ]; then
+        rm -f "$(uboot_bin_path "${BOARD}")" 2>/dev/null || true
+    else
+        rm -f build/u-boot/*/u-boot-rockchip.bin 2>/dev/null || true
+    fi
+    # Legacy flat path from before per-board output.
     rm -f build/u-boot/u-boot-rockchip.bin 2>/dev/null || true
     rm -f images/*.img images/*.img.xz 2>/dev/null || true
 fi
@@ -368,8 +374,9 @@ else
     fi
 fi
 
-# Build U-Boot if not found
-if [[ ! -e "$(find build/u-boot/u-boot-rockchip.bin 2>/dev/null | sort | tail -n1)" ]]; then
+# Build U-Boot if this board's binary is missing (per-board path; do not
+# reuse another board's blob).
+if [[ ! -f $(uboot_bin_path "${BOARD}") ]]; then
     ./scripts/build-u-boot.sh
 fi
 
