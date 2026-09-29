@@ -8,9 +8,14 @@ Homepage: https://github.com/peyton-howe/ubuntu-image-builder
 
 Package: rk3588-camera-dkms
 Architecture: all
-Depends: ${misc:Depends}, dkms, linux-headers-generic | linux-headers-virtual | linux-headers-arm64
-Description: DKMS drivers for RK3588 cameras (IMX708, rkisp2, DCPHY)
+Depends: ${misc:Depends}, dkms
+Recommends: linux-headers-generic | linux-headers-virtual | linux-headers-arm64
+Description: DKMS drivers for RK3588 cameras (IMX708, rkisp2)
  Out-of-tree modules extracted from the ubuntu-image-builder mainline
- camera patch series. IMX708 is wired for AUTOINSTALL. rkisp2 and the
- Samsung DCPHY CSI-RX replacement are staged in the source tree and
- enabled as their out-of-tree Makefiles stabilize.
+ camera patch series: the IMX708 sensor driver and the rkisp2 ISP driver.
+ The Samsung DCPHY CSI-RX replacement is staged in the source tree but not
+ built yet.
+ .
+ Headers are only recommended: the image build installs headers matching
+ each installed kernel, and requiring the linux-headers-generic
+ metapackage made apt pull in the archive's newest kernel as well.

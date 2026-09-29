@@ -1,3 +1,11 @@
+rk3588-camera-dkms (0.1.2-1) UNRELEASED; urgency=medium
+
+  * Only recommend linux-headers-generic. Depending on it made
+    apt-get -f install pull in the archive's newest kernel alongside the
+    ISO's; the image build now installs headers for each installed kernel.
+
+ -- Peyton Howe <peyton@localhost>  Tue, 29 Sep 2026 12:00:00 +0000
+
 rk3588-camera-dkms (0.1.1-1) UNRELEASED; urgency=medium
 
   * Build the rkisp2 ISP driver (rockchip-isp2) alongside imx708; builds

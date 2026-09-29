@@ -277,7 +277,14 @@ apt-get install -y u-boot-menu u-boot-tools initramfs-tools linux-base
 
 if [[ \"\${KERNEL_TYPE}\" == stock ]]; then
     echo '[+] Installing headers for DKMS (stock ISO kernel)...'
-    apt-get install -y dkms linux-headers-generic || apt-get install -y dkms linux-headers-arm64 || true
+    apt-get install -y dkms
+    # Headers must match the ISO's kernel, not the archive's newest one
+    # (linux-headers-generic), or DKMS has nothing to build against when a
+    # daily ISO lags the archive.
+    for kver in \$(ls /lib/modules); do
+        apt-get install -y linux-headers-\${kver} \\
+            || echo \"Warning: no linux-headers-\${kver} in the archive; DKMS modules won't build for it\" >&2
+    done
 
     if compgen -G '/tmp/rk3588-debs/*.deb' > /dev/null; then
         echo '[+] Installing RK3588 board/camera packages...'
