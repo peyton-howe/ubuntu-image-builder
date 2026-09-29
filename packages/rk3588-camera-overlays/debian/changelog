@@ -1,3 +1,11 @@
+rk3588-camera-overlays (0.1.2-1) UNRELEASED; urgency=medium
+
+  * apply-overlays.sh treats overlays.conf as the full camera-overlay list:
+    it replaces previously managed camera/ISP entries in U_BOOT_FDT_OVERLAYS
+    and keeps unrelated overlays. Clearing the conf removes camera overlays.
+
+ -- Peyton Howe <peyton@localhost>  Tue, 29 Sep 2026 12:00:00 +0000
+
 rk3588-camera-overlays (0.1.1-1) UNRELEASED; urgency=medium
 
   * Add rk3588-isp.dtbo (ISP nodes from kernel patch 0002) and have
