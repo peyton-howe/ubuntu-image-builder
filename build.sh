@@ -374,7 +374,7 @@ if [[ ! -e "$(find build/u-boot/u-boot-rockchip.bin 2>/dev/null | sort | tail -n
 fi
 
 # Create the root filesystem
-if [[ ! -f build/rootfs/${RELEASE}-${FLAVOR}.done ]]; then
+if ! rootfs_is_current "build/rootfs/${RELEASE}-${FLAVOR}.done"; then
     ./scripts/build-rootfs.sh
 fi
 

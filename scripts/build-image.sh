@@ -50,8 +50,8 @@ KERNEL_DIR="${ROOT_DIR}/build/kernel"
 BLOBS_DIR="${ROOT_DIR}/build/u-boot"
 
 rootfs_dir=$(readlink -f build/rootfs/${RELEASE}-${FLAVOR})
-if [[ ! -f "${rootfs_dir}.done" ]]; then
-    echo "Rootfs not built (missing ${rootfs_dir}.done); run ./scripts/build-rootfs.sh"
+if ! rootfs_is_current "${rootfs_dir}.done"; then
+    echo "Rootfs ${rootfs_dir} is missing or not built for $(rootfs_stamp_id); run ./scripts/build-rootfs.sh"
     exit 1
 fi
 

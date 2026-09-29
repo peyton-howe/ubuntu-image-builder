@@ -32,11 +32,16 @@ source "${ROOT_DIR}/configs/flavors/${FLAVOR}.sh"
 
 # The extracted rootfs directory is the build artifact; build-image.sh copies
 # it straight into the image. The stamp is written last, so an interrupted
-# build leaves no stamp and the next run starts over.
+# build leaves no stamp and the next run starts over. It records the board and
+# kernel type (see rootfs_stamp_id) so another board rebuilds instead of
+# reusing this board's packages.
 ROOTFS_STAMP="${RELEASE}-${FLAVOR}.done"
-if [[ -f ${ROOTFS_STAMP} && -d ${RELEASE}-${FLAVOR} ]]; then
-    echo "[+] Rootfs already built: ${RELEASE}-${FLAVOR}"
+if rootfs_is_current "${ROOTFS_STAMP}" && [[ -d ${RELEASE}-${FLAVOR} ]]; then
+    echo "[+] Rootfs already built for $(rootfs_stamp_id): ${RELEASE}-${FLAVOR}"
     exit 0
+fi
+if [[ -f ${ROOTFS_STAMP} ]]; then
+    echo "[+] Rootfs was built for $(cat "${ROOTFS_STAMP}"), need $(rootfs_stamp_id); rebuilding"
 fi
 rm -f "${ROOTFS_STAMP}"
 
@@ -326,5 +331,5 @@ if [[ "$(uname -m)" != "aarch64" ]]; then
     rm -f "${ROOTFS_DIR}/usr/bin/qemu-aarch64-static"
 fi
 
-touch "${ROOTFS_STAMP}"
+rootfs_stamp_id > "${ROOTFS_STAMP}"
 echo "[✓] Rootfs: $(pwd)/${ROOTFS_DIR}"
