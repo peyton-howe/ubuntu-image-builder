@@ -17,7 +17,8 @@ Debian packages installed into the rootfs on the **stock** kernel path
 | File | Purpose |
 |---|---|
 | `files/unwrap-kernel` → `/etc/kernel/postinst.d/zz-rk3588-unwrap-kernel` | Replaces Ubuntu's wrapped `vmlinuz` with a raw ARM64 Image for U-Boot `booti`. Also runs from `postinst` for already-installed kernels |
-| `files/initramfs-hook` → `/etc/initramfs-tools/hooks/rk3588-mmc` | Rockchip MMC drivers in the initramfs |
+| `files/initramfs-hook` → `/etc/initramfs-tools/hooks/rk3588-mmc` | Rockchip MMC drivers in the initramfs (pre-25.10) |
+| `files/dracut-module-setup.sh` → `/usr/lib/dracut/modules.d/50rk3588-mmc/module-setup.sh` | Same MMC modules for dracut (Ubuntu 25.10+) |
 | `files/flash-kernel.db` | Merged into `/etc/flash-kernel/db` between `# BEGIN/END <pkg>` markers (`postinst`/`postrm`); flash-kernel owns that file |
 | `files/u-boot.default` | Keys merged into `/etc/default/u-boot` on every install/upgrade, then `u-boot-update` |
 | `files/modules-load.conf` | Loads `ledtrig_heartbeat` for the status LED |

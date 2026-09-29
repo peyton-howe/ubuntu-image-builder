@@ -34,7 +34,14 @@ if [ "$1" = configure ]; then
             u-boot-update || true
         fi
     fi
-    if command -v update-initramfs >/dev/null; then
+    # Ubuntu 25.10+ uses dracut; older releases use initramfs-tools. Prefer
+    # whichever is installed so Rockchip MMC modules land in the initramfs.
+    if command -v dracut >/dev/null; then
+        for kdir in /lib/modules/*; do
+            [ -d "$kdir" ] || continue
+            dracut -f --kver "$(basename "$kdir")" || true
+        done
+    elif command -v update-initramfs >/dev/null; then
         update-initramfs -u -k all || true
     fi
 fi
