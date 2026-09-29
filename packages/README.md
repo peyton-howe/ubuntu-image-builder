@@ -10,7 +10,7 @@ Debian packages installed into the rootfs on the **stock** kernel path
 | `rk3588-board-orangepi-5` | Board glue |
 | `rk3588-board-rock-5b-plus` | Board glue |
 | `rk3588-camera-dkms` | DKMS: `imx708` sensor + `rkisp2` ISP (`rockchip-isp2`). DCPHY is staged in `src/dcphy`, not built |
-| `rk3588-camera-overlays` | IMX708 `.dtbo`s, `/etc/rk3588-camera/overlays.conf`, `apply-overlays.sh` |
+| `rk3588-camera-overlays` | IMX708 `.dtbo`s, `rk3588-isp.dtbo` (ISP nodes from patch 0002, applied first by `apply-overlays.sh`), `/etc/rk3588-camera/overlays.conf`, `apply-overlays.sh` |
 
 **Board glue**, shared by all three board packages:
 
@@ -53,8 +53,9 @@ To test a change on a running board without reflashing:
 
 ## Regenerating camera sources
 
-`rk3588-camera-dkms/src/` and `rk3588-camera-overlays/dts/` are generated from
-`patches/kernel/mainline/` and committed. After changing the patch series:
+`rk3588-camera-dkms/src/` and `rk3588-camera-overlays/dts/` (including
+`rk3588-isp.dtso`) are generated from `patches/kernel/mainline/` and committed;
+edit the patches, not the generated files. After changing the patch series:
 
 ```bash
 ./scripts/extract-oot-from-patches.sh

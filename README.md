@@ -157,10 +157,21 @@ sensor into memory, and `rkisp2` reads the frames back through
 the rkisp2 pipeline handler, which Ubuntu's libcamera doesn't have yet. Build
 it yourself for now.
 
-Only **cam1** on the Orange Pi 5B has been tested. cam2/cam3 use the DCPHY,
-which needs a patched `phy-rockchip-samsung-dcphy` (kernel patch 0001). That
-isn't packaged for the stock kernel yet. The camera overlays also need the
-0002 ISP nodes in the base DTB, which today only the 5B's packaged DTB has.
+Stock kernels' DTBs don't have the ISP nodes the camera overlays reference
+(they come from kernel patch 0002), so `apply-overlays.sh` always puts
+`rk3588-isp.dtbo` first; U-Boot applies overlays in order and merges each
+one's labels into the base DTB. Overlays also need the base DTB to have
+`__symbols__`:
+
+| Board | Base DTB | Camera overlays |
+|---|---|---|
+| Orange Pi 5B | Packaged (built with `-@`) | cam1 tested on hardware |
+| ROCK 5B+ | Ubuntu's (has `__symbols__`, since upstream ships overlays for it) | cam0 (isp0) and cam1 (isp1), both at once; verified with `fdtoverlay`, not yet on hardware. Use the plain overlays, not `-isp` (those need the unapplied patch 0003) |
+| Orange Pi 5 | Ubuntu's, **no** `__symbols__` | Won't apply; needs a packaged DTB like the 5B's |
+
+cam2/cam3 on the Orange Pi 5/5B use the DCPHY, which needs a patched
+`phy-rockchip-samsung-dcphy` (kernel patch 0001). That isn't packaged for the
+stock kernel yet.
 
 ## Custom kernels (vendor / mainline)
 

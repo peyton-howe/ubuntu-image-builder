@@ -46,7 +46,14 @@ if grep -q '^U_BOOT_FDT_OVERLAYS=' "${UBOOT_DEFAULT}"; then
         | sed 's/^U_BOOT_FDT_OVERLAYS=//; s/^"//; s/"$//')"
 fi
 
+# Camera overlays reference &isp0/&isp1, which stock kernels' DTBs lack.
+# rk3588-isp.dtbo adds them; U-Boot applies overlays in list order and merges
+# each one's labels into the base, so it must come first. Applying it to a DTB
+# that already has the ISP nodes (e.g. the Orange Pi 5B's packaged one) is
+# harmless.
 merged=()
+isp="${OVERLAY_DIR}/rk3588-isp.dtbo"
+[[ -f ${isp} ]] && merged+=("${isp}")
 for item in ${existing} "${paths[@]}"; do
     [[ -z ${item} ]] && continue
     skip=0

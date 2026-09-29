@@ -1,3 +1,13 @@
+rk3588-camera-overlays (0.1.1-1) UNRELEASED; urgency=medium
+
+  * Add rk3588-isp.dtbo (ISP nodes from kernel patch 0002) and have
+    apply-overlays.sh apply it before the camera overlays, so they work on
+    stock DTBs that have __symbols__ but no ISP nodes (e.g. ROCK 5B+).
+  * ROCK 5B+ cam1 (VICAP variant) now enables isp1, so it gets rkisp2
+    processing and can run alongside cam0 on isp0.
+
+ -- Peyton Howe <peyton@localhost>  Tue, 29 Sep 2026 12:00:00 +0000
+
 rk3588-camera-overlays (0.1.0-1) UNRELEASED; urgency=medium
 
   * Initial scaffolding: IMX708 camera overlays from mainline patch series.
