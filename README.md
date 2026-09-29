@@ -12,7 +12,7 @@ are still available for development.
 |---|---|---|
 | Orange Pi 5B | `orangepi-5b` | Tested: boot, eMMC/SD, WiFi, Bluetooth, status LED, IMX708 camera on cam1 |
 | Orange Pi 5 | `orangepi-5` | Builds; not tested on hardware |
-| Radxa ROCK 5B+ | `rock-5b-plus` | Builds; not tested on hardware |
+| Radxa ROCK 5B+ | `rock-5b-plus` | Tested: boot, WiFi, Bluetooth, status LED, IMX708 on cam0 and cam1 |
 
 Releases (`--release`): `questing` (25.10), `resolute` (26.04), `stonking`
 (26.10 daily). Flavors (`--flavor`): `desktop`, `server`.
@@ -156,7 +156,12 @@ After reboot, `cat /proc/device-tree/isp@fdcb0000/status` should print
 sensor into memory, and `rkisp2` reads the frames back through
 `rkisp2_rawrd0` for processing. Processed images need a libcamera build with
 the rkisp2 pipeline handler, which Ubuntu's libcamera doesn't have yet. Build
-it yourself for now.
+it yourself for now. The upstream rkisp2 branch
+(`git.ideasonboard.com/epaul/libcamera`, `epaul/dev/rkisp2/upstream-v3`) only
+matches cameras on the csi2 port, so ROCK 5B+ cam1 (csi4) needs a libcamera
+patch until that's fixed upstream; it also creates one camera per pipeline
+handler, so two cameras at once isn't supported there yet. That patch is not
+shipped in this repo.
 
 Stock kernels' DTBs don't have the ISP nodes the camera overlays reference
 (they come from kernel patch 0002), so `apply-overlays.sh` always puts
@@ -167,7 +172,7 @@ one's labels into the base DTB. Overlays also need the base DTB to have
 | Board | Base DTB | Camera overlays |
 |---|---|---|
 | Orange Pi 5B | Packaged (built with `-@`) | cam1 tested on hardware |
-| ROCK 5B+ | Ubuntu's (has `__symbols__`, since upstream ships overlays for it) | cam0 (isp0) and cam1 (isp1), both at once; verified with `fdtoverlay`, not yet on hardware. Use the plain overlays, not `-isp` (those need the unapplied patch 0003) |
+| ROCK 5B+ | Ubuntu's (has `__symbols__`, since upstream ships overlays for it) | cam0 (isp0) and cam1 (isp1), both at once; tested on hardware. Use the plain overlays, not `-isp` (those need the unapplied patch 0003) |
 | Orange Pi 5 | Ubuntu's, **no** `__symbols__` | Won't apply; needs a packaged DTB like the 5B's |
 
 cam2/cam3 on the Orange Pi 5/5B use the DCPHY, which needs a patched
