@@ -1,35 +1,46 @@
 #!/usr/bin/env bash
 set -eE
-trap 'echo "Error in $0 on line $LINENO"; cleanup_loopdev "$loop"' ERR
+trap 'echo "Error in $0 on line $LINENO"' ERR
 
 cd "$(dirname -- "$(readlink -f -- "$0")")"
+# shellcheck source=/dev/null
+source scripts/common.sh
 
 usage() {
 cat << HEREDOC
-Usage: $0 --board=[orangepi-5] --release=[questing] --flavor=[server|desktop]
+Usage: $0 --board=[orangepi-5|rock-5b-plus] --release=[questing|resolute|stonking] --flavor=[server|desktop]
 
 Required arguments:
-  -b, --board=BOARD      target board 
-  -r, --release=RELEASE  ubuntu release 
-  -f, --flavor=FLAVOR    ubuntu flavor
+  -b, --board=BOARD           target board
+  -r, --release=RELEASE       ubuntu release
+  -f, --flavor=FLAVOR         ubuntu flavor
 
 Optional arguments:
-  -h,  --help            show this help message and exit
-  -c,  --clean           clean the build directory
-  -ko, --kernel-only     only compile the kernel
-  -uo, --uboot-only      only compile uboot
-  -ro, --rootfs-only     only build rootfs
-  -v,  --verbose         increase the verbosity of the bash script
+  -h,  --help                 show this help message and exit
+  -c,  --clean                clean the entire build directory
+  -rk, --rebuild-kernel       rebuild kernel from source (also forces rootfs + image rebuild)
+  -ru, --rebuild-uboot        rebuild u-boot (also forces image rebuild)
+  -rr, --rebuild-rootfs       rebuild rootfs (also forces image rebuild)
+  -kt, --kernel-type=TYPE     kernel type: vendor (default) or mainline
+  -ko, --kernel-only          only compile the kernel
+  -uo, --uboot-only           only compile uboot
+  -ro, --rootfs-only          only extract Ubuntu's official aarch64 ISO into a rootfs
+       --compress             xz-compress the output image (default)
+       --no-compress          leave the output image uncompressed
+  -v,  --verbose              increase the verbosity of the bash script
 HEREDOC
 }
 
-### =========================
-### Must be run as root
-### =========================
-if [ "$(id -u)" -ne 0 ]; then 
-    echo "Please run as root"
-    exit 1
-fi
+for _arg in "$@"; do
+    case "${_arg}" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+    esac
+done
+
+reexec_as_userns_root "$@"
 
 cd "$(dirname -- "$(readlink -f -- "$0")")"
 
@@ -63,6 +74,14 @@ while [ "$#" -gt 0 ]; do
             export FLAVOR="${2}"
             shift 2
             ;;
+        -kt=*|--kernel-type=*)
+            export KERNEL_TYPE="${1#*=}"
+            shift
+            ;;
+        -kt|--kernel-type)
+            export KERNEL_TYPE="${2}"
+            shift 2
+            ;;
         -ko|--kernel-only)
             export KERNEL_ONLY=Y
             shift
@@ -79,6 +98,37 @@ while [ "$#" -gt 0 ]; do
             export CLEAN=Y
             shift
             ;;
+        -rk|--rebuild-kernel)
+            export REBUILD_KERNEL=Y
+            shift
+            ;;
+        -ru|--rebuild-uboot)
+            export REBUILD_UBOOT=Y
+            shift
+            ;;
+        -rr|--rebuild-rootfs)
+            export REBUILD_ROOTFS=Y
+            shift
+            ;;
+        --compress)
+            export COMPRESS=Y
+            shift
+            ;;
+        --compress=*)
+            case "${1#*=}" in
+                Y|y|yes|true|1) export COMPRESS=Y ;;
+                N|n|no|false|0) export COMPRESS=N ;;
+                *)
+                    echo "Error: --compress expects true or false"
+                    exit 1
+                    ;;
+            esac
+            shift
+            ;;
+        --no-compress)
+            export COMPRESS=N
+            shift
+            ;;
         -v|--verbose)
             set -x
             shift
@@ -92,6 +142,8 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+export COMPRESS="${COMPRESS:-Y}"
 
 if [ "${RELEASE}" == "help" ]; then
     for file in configs/releases/*; do
@@ -156,12 +208,63 @@ if [ -n "${BOARD}" ]; then
     done
 fi
 
+unmount_rootfs() {
+    if [ -d build ]; then
+        BUILD_ABS="$(readlink -f build)"
+        for mnt_dir in build/rootfs/*/sys build/rootfs/*/dev build/rootfs/*/proc build/rootfs/*/run; do
+            [ -d "${mnt_dir}" ] && umount -R -lf "${mnt_dir}" 2>/dev/null || true
+        done
+        while read -r _ mnt _; do
+            case "${mnt}" in
+                "${BUILD_ABS}/rootfs/"*) umount -lf "${mnt}" 2>/dev/null || true ;;
+            esac
+        done < <(awk '{print $1, $2, $3}' /proc/mounts | sort -rk2)
+    fi
+}
+
 if [ "${CLEAN}" == "Y" ]; then
-    if [ -d build/rootfs ]; then
-        umount -lf build/rootfs/dev/pts 2> /dev/null || true
-        umount -lf build/rootfs/* 2> /dev/null || true
+    if [ -d build ]; then
+        BUILD_ABS="$(readlink -f build)"
+
+        unmount_rootfs
+
+        # Catch anything else under build/ by reading /proc/mounts deepest-first
+        while read -r _ mnt _; do
+            case "${mnt}" in
+                "${BUILD_ABS}/"*) umount -lf "${mnt}" 2>/dev/null || true ;;
+            esac
+        done < <(awk '{print $1, $2, $3}' /proc/mounts | sort -rk2)
+
+        # Detach loop devices pointing at image files inside build/
+        losetup --list --output NAME,BACK-FILE --noheadings \
+            | awk -v p="${BUILD_ABS}" '$2 ~ p {print $1}' \
+            | while read -r loop; do
+                losetup -d "${loop}" 2>/dev/null || true
+              done
     fi
     rm -rf build
+fi
+
+if [ "${REBUILD_UBOOT}" == "Y" ]; then
+    echo "[+] Clearing u-boot build artifacts..."
+    rm -f build/u-boot/u-boot-rockchip.bin 2>/dev/null || true
+    rm -f images/*.img images/*.img.xz 2>/dev/null || true
+fi
+
+if [ "${REBUILD_KERNEL}" == "Y" ]; then
+    echo "[+] Clearing kernel debs (keeping source tree)..."
+    find build/kernel -maxdepth 1 -name "*.deb" -delete 2>/dev/null || true
+    rm -rf build/kernel/linux-mainline-build build/kernel/linux-vendor-build 2>/dev/null || true
+    # Cascade: rootfs and image must also rebuild
+    REBUILD_ROOTFS=Y
+fi
+
+if [ "${REBUILD_ROOTFS}" == "Y" ]; then
+    echo "[+] Clearing rootfs..."
+    unmount_rootfs
+    rm -rf build/rootfs
+    # Cascade: image must also rebuild
+    rm -f images/*.img images/*.img.xz 2>/dev/null || true
 fi
 
 mkdir -p build/logs
@@ -169,10 +272,6 @@ logfile="build/logs/build-$(date +"%Y%m%d%H%M%S").log"
 exec > >(tee "$logfile") 2>&1
 
 if [ "${KERNEL_ONLY}" == "Y" ]; then
-    if [ -z "${RELEASE}" ]; then
-        usage
-        exit 1
-    fi
     ./scripts/build-kernel.sh
     exit 0
 fi

@@ -1,0 +1,19 @@
+# DCPHY RX v4, rebased to linux-stable
+# https://lore.kernel.org/linux-rockchip/20260821-dcphy-rx-v1-v4-0-f1797634233d@gmail.com/
+0001-phy-rockchip-samsung-dcphy-add-mipi-d-phy-receiver.patch
+# rkisp2 v3, rebased to linux-stable
+# https://lore.kernel.org/linux-media/20260827-rkisp2-v3-0-e91ff0a604d6@ideasonboard.com/
+0002-media-rockchip-rkisp2.patch
+# Adapt rkisp2 v3 to linux-stable 7.2 V4L2 ISP uAPI names
+0007-media-rkisp2-v4l2-isp-compat.patch
+# Shared media graph RFC — not applied. epaul libcamera upstream-v3 uses
+# separate rockchip-cif + rkisp2 media devices (VICAP capture → ISP dmarx),
+# not a combined graph. Keep the patch for later.
+# https://lore.kernel.org/linux-rockchip/20260619052637.1110672-1-paul.elder@ideasonboard.com/
+#0003-media-shared-media-graph.patch
+# Sony IMX708 V4L2 sensor driver
+0004-media-i2c-imx708.patch
+# DCPHY CSI hosts + Orange Pi 5 PHY enable
+0005-arm64-dts-rockchip-rk3588-dcphy-csi-rx.patch
+# IMX708 overlays (ROCK 5B+, Orange Pi 5/5B CAM1-3)
+0006-arm64-dts-rockchip-imx708-camera-overlays.patch
