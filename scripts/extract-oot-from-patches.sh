@@ -70,7 +70,8 @@ for rel, content in rk.items():
     if rel.startswith('drivers/media/platform/rockchip/rkisp2/'):
         dest = rk_root / Path(rel).relative_to('drivers/media/platform/rockchip/rkisp2')
     else:
-        dest = rk_root / 'uapi' / Path(rel).name
+        # Keep the include/uapi/ layout: sources #include <linux/media/rockchip/...>.
+        dest = rk_root / 'uapi' / Path(rel).relative_to('include/uapi')
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(content)
     print(f'dkms: rkisp2/{dest.relative_to(rk_root)}')
@@ -78,15 +79,18 @@ for rel, content in rk.items():
 # Apply compat patch 0007 with remapped paths
 compat = (patch_dir / '0007-media-rkisp2-v4l2-isp-compat.patch').read_text()
 compat = compat.replace('drivers/media/platform/rockchip/rkisp2/', 'rkisp2/')
-compat = compat.replace('include/uapi/linux/media/rockchip/', 'rkisp2/uapi/')
+compat = compat.replace('include/uapi/linux/media/rockchip/', 'rkisp2/uapi/linux/media/rockchip/')
 tmp = Path('/tmp/0007-remapped.patch')
 tmp.write_text(compat)
+# 0007 creates this file; a previous extraction leaves it behind and git
+# apply then refuses the whole patch.
+(rk_root / 'rkisp2-v4l2-compat.h').unlink(missing_ok=True)
 subprocess.run(
     ['git', 'apply', '--whitespace=nowarn',
      '--directory=packages/rk3588-camera-dkms/src', str(tmp)],
-    check=False,
+    check=True,
 )
-print('applied 0007 compat (best-effort)')
+print('applied 0007 compat')
 
 # DCPHY: prefer copy from a patched mainline tree if present
 dcphy_src = repo / 'build/kernel/linux-mainline/drivers/phy/rockchip/phy-rockchip-samsung-dcphy.c'

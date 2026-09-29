@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Build rk3588s-orangepi-5b.dtb with our board changes (AP6275P WiFi on
-# pcie2x1l2, Bluetooth on uart9) for stock Ubuntu kernels, whose own 5B DTB
-# lacks them. Those changes live in the rk3588s-orangepi-5b.dts hunk of
-# patches/kernel/mainline/0006; they edit the base DTS rather than add an
-# overlay, and Ubuntu's DTBs carry no __symbols__, so ship a whole DTB.
+# Build rk3588s-orangepi-5b.dtb with our board changes for stock Ubuntu
+# kernels, whose own 5B DTB lacks them:
+#   0006: rk3588s-orangepi-5b.dts hunk (AP6275P WiFi on pcie2x1l2, BT on uart9)
+#   0002: rk3588-base.dtsi hunk (disabled ISP nodes the camera overlays enable)
+# They edit base DTS files rather than add overlays, and Ubuntu's DTBs carry
+# no __symbols__, so ship a whole DTB (built with -@ so overlays can apply).
 #
 # Only the rockchip DTS and dt-bindings headers are fetched (sparse clone).
 set -euo pipefail
 
-PATCH="${1:?patch file}"
+PATCH_DIR="${1:?kernel patch dir}"
 OUT="${2:?output dtb}"
 WORK="${3:?work dir}"
 # Upstream ref matching the Ubuntu kernel's DTS (7.3.0-* is built from 7.3-rc).
@@ -30,8 +31,16 @@ if [[ ! -d ${src}/.git ]]; then
         /include/uapi/linux/input-event-codes.h
     git -C "${src}" checkout -q "${DTS_KERNEL_REF}"
 fi
-git -C "${src}" checkout -q -- "${DTS}"
-git -C "${src}" apply --include="${DTS}" "${PATCH}"
+ROCKCHIP=arch/arm64/boot/dts/rockchip
+# patch -> the one file whose hunk we take from it
+declare -A HUNKS=(
+    [0006-arm64-dts-rockchip-imx708-camera-overlays.patch]="${DTS}"
+    [0002-media-rockchip-rkisp2.patch]="${ROCKCHIP}/rk3588-base.dtsi"
+)
+for patch in "${!HUNKS[@]}"; do
+    git -C "${src}" checkout -q -- "${HUNKS[$patch]}"
+    git -C "${src}" apply --include="${HUNKS[$patch]}" "${PATCH_DIR}/${patch}"
+done
 # Board-package-only fixups layered on top of the 0006 hunk.
 for frag in "$(dirname "$0")"/rk3588s-orangepi-5b-*.dtsi; do
     cp "${frag}" "${src}/arch/arm64/boot/dts/rockchip/"
@@ -43,4 +52,4 @@ gcc -E -nostdinc -undef -D__DTS__ -x assembler-with-cpp \
     -I "${src}/include" -I "${src}/arch/arm64/boot/dts/rockchip" \
     "${src}/${DTS}" \
     | dtc -q -@ -I dts -O dtb -o "${OUT}" -
-echo "Built ${OUT} from ${DTS_KERNEL_REF} + $(basename "${PATCH}") (5B hunk) + local fixups"
+echo "Built ${OUT} from ${DTS_KERNEL_REF} + DTS hunks of ${!HUNKS[*]} + local fixups"

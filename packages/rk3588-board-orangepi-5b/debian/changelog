@@ -1,3 +1,10 @@
+rk3588-board-orangepi-5b (0.1.4-1) UNRELEASED; urgency=medium
+
+  * Add the ISP nodes from kernel patch 0002 to the packaged DTB (disabled;
+    the camera overlays enable them) so the IMX708 overlays can apply.
+
+ -- Peyton Howe <peyton@localhost>  Sun, 27 Sep 2026 12:00:00 +0000
+
 rk3588-board-orangepi-5b (0.1.3-1) UNRELEASED; urgency=medium
 
   * Ship our own rk3588s-orangepi-5b.dtb (upstream DTS + the 5B hunk of

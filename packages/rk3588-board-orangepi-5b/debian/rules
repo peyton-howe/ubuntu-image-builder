@@ -2,7 +2,7 @@
 export DH_VERBOSE = 1
 
 REPO_OVERLAY := $(CURDIR)/../../overlay
-BOARD_PATCH := $(CURDIR)/../../patches/kernel/mainline/0006-arm64-dts-rockchip-imx708-camera-overlays.patch
+KERNEL_PATCHES := $(CURDIR)/../../patches/kernel/mainline
 DTB := rk3588s-orangepi-5b.dtb
 PKG := rk3588-board-orangepi-5b
 
@@ -14,7 +14,7 @@ override_dh_auto_clean:
 
 # build/ keeps the sparse kernel checkout between builds.
 override_dh_auto_build:
-	$(CURDIR)/files/build-dtb.sh "$(BOARD_PATCH)" build/$(DTB) build
+	$(CURDIR)/files/build-dtb.sh "$(KERNEL_PATCHES)" build/$(DTB) build
 
 override_dh_auto_install:
 	install -d debian/$(PKG)/usr/share/$(PKG)

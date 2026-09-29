@@ -5,12 +5,17 @@
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/string.h>
+#include <linux/videodev2.h>
 #include <media/v4l2-isp.h>
 
 /*
- * rkisp2 v3 was written against a later V4L2 ISP stats helper API.
- * linux-stable 7.2 only has the params-side names.
+ * rkisp2 v3 was written against the generic V4L2 ISP buffer/stats API
+ * (v4l2_isp_buffer, v4l2_isp_stats_*). linux-stable 7.2 only has the
+ * params-side names, so alias onto those there. 7.3 has the generic API and
+ * keeps the old names as compatibility macros, so a macro
+ * v4l2_isp_params_buffer means the generic API is present.
  */
+#ifndef v4l2_isp_params_buffer
 
 #ifndef v4l2_isp_buffer
 #define v4l2_isp_buffer v4l2_isp_params_buffer
@@ -20,9 +25,7 @@
 #define v4l2_isp_buffer_size v4l2_isp_params_buffer_size
 #endif
 
-#ifndef V4L2_ISP_VERSION_V1
 #define V4L2_ISP_VERSION_V1 V4L2_ISP_PARAMS_VERSION_V1
-#endif
 
 #ifndef v4l2_isp_stats_block_type_info
 #define v4l2_isp_stats_block_type_info v4l2_isp_params_block_type_info
@@ -65,6 +68,16 @@ rkisp2_v4l2_stats_init_block(struct device *dev, struct v4l2_isp_params_buffer *
 
 	return hdr;
 }
+#endif
+
+#endif /* !v4l2_isp_params_buffer */
+
+/* Kernels without rkisp2 in videodev2.h (e.g. stock distro kernels + DKMS). */
+#ifndef V4L2_META_FMT_RKISP2_PARAMS
+#define V4L2_META_FMT_RKISP2_PARAMS	v4l2_fourcc('R', 'K', '2', 'P')
+#endif
+#ifndef V4L2_META_FMT_RKISP2_STATS
+#define V4L2_META_FMT_RKISP2_STATS	v4l2_fourcc('R', 'K', '2', 'S')
 #endif
 
 #endif /* _RKISP2_V4L2_COMPAT_H */

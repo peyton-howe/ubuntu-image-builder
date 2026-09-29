@@ -1,3 +1,10 @@
+rk3588-camera-dkms (0.1.1-1) UNRELEASED; urgency=medium
+
+  * Build the rkisp2 ISP driver (rockchip-isp2) alongside imx708; builds
+    against stock 7.3 kernels via the updated 0007 compat header.
+
+ -- Peyton Howe <peyton@localhost>  Sun, 27 Sep 2026 12:00:00 +0000
+
 rk3588-camera-dkms (0.1.0-1) UNRELEASED; urgency=medium
 
   * Initial scaffolding: IMX708 DKMS; rkisp2 and DCPHY sources staged.

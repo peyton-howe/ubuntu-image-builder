@@ -15,8 +15,8 @@
 
 #include <linux/media/v4l2-isp.h>
 
-/* linux-stable 7.2 uses the params_* name; later trees alias this. */
-#ifndef v4l2_isp_block_header
+/* 7.2 only has the params_* name; 7.3+ has the generic one and a compat macro. */
+#ifndef v4l2_isp_params_block_header
 #define v4l2_isp_block_header v4l2_isp_params_block_header
 #endif
 

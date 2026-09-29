@@ -17,6 +17,8 @@ override_dh_auto_install:
 	cp -a Makefile $(DEST)/
 	cp -a src/imx708 $(DEST)/imx708
 	cp -a src/rkisp2 $(DEST)/rkisp2
+	# The in-tree Makefile keys off CONFIG_VIDEO_ROCKCHIP_ISP2; DKMS always builds.
+	cp -a src/rkisp2/Makefile.oot $(DEST)/rkisp2/Makefile
 	cp -a src/dcphy $(DEST)/dcphy
 	# Working copy of dkms.conf next to sources (dh_dkms also installs one)
 	cp -a debian/rk3588-camera-dkms.dkms $(DEST)/dkms.conf
