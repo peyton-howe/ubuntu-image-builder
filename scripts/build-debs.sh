@@ -51,6 +51,9 @@ for name in "${PACKAGES[@]}"; do
         echo "Error: dpkg-buildpackage did not produce ${name}_*.deb"
         exit 1
     fi
+    # build-rootfs.sh installs every ${name}_*.deb it finds, so drop older
+    # versions; otherwise dpkg -i gets several and the last in glob order wins.
+    rm -f "${OUT_DIR}/${name}_"*.deb "${OUT_DIR}/${name}_"*.buildinfo "${OUT_DIR}/${name}_"*.changes
     for f in "${debs[@]}"; do
         mv -v "${f}" "${OUT_DIR}/"
         produced+=("$(basename "${f}")")
