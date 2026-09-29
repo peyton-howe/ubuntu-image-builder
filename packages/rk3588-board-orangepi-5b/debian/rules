@@ -1,7 +1,6 @@
 #!/usr/bin/make -f
 export DH_VERBOSE = 1
 
-REPO_OVERLAY := $(CURDIR)/../../overlay
 KERNEL_PATCHES := $(CURDIR)/../../patches/kernel/mainline
 DTB := rk3588s-orangepi-5b.dtb
 PKG := rk3588-board-orangepi-5b
@@ -22,12 +21,12 @@ override_dh_auto_install:
 	install -m 0644 files/u-boot.default debian/$(PKG)/usr/share/$(PKG)/u-boot.default
 	install -d debian/$(PKG)/usr/lib/$(PKG)/dtbs/rockchip
 	install -m 0644 build/$(DTB) debian/$(PKG)/usr/lib/$(PKG)/dtbs/rockchip/$(DTB)
-	install -m 0755 files/install-firmware.sh debian/$(PKG)/usr/lib/$(PKG)/install-firmware.sh
 	install -d debian/$(PKG)/etc/initramfs-tools/hooks
 	install -m 0755 files/initramfs-hook debian/$(PKG)/etc/initramfs-tools/hooks/rk3588-mmc
 	install -d debian/$(PKG)/usr/lib/modules-load.d
 	install -m 0644 files/modules-load.conf debian/$(PKG)/usr/lib/modules-load.d/$(PKG).conf
 	install -d debian/$(PKG)/etc/kernel/postinst.d
 	install -m 0755 files/unwrap-kernel debian/$(PKG)/etc/kernel/postinst.d/zz-rk3588-unwrap-kernel
-	# Firmware comes from overlay/firmware, else a sparse fetch into build/.
-	$(CURDIR)/files/install-firmware.sh "$(REPO_OVERLAY)" "debian/$(PKG)" build
+	# AP6275P WiFi/BT firmware, vendored from armbian/firmware (see firmware/README.md).
+	install -d debian/$(PKG)/lib/firmware/brcm
+	install -m 0644 firmware/brcm/* debian/$(PKG)/lib/firmware/brcm/

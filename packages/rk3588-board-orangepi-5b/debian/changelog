@@ -1,3 +1,10 @@
+rk3588-board-orangepi-5b (0.1.5-1) UNRELEASED; urgency=medium
+
+  * Vendor the AP6275P WiFi/BT firmware in the package instead of fetching
+    it from armbian/firmware at build time.
+
+ -- Peyton Howe <peyton@localhost>  Tue, 29 Sep 2026 12:00:00 +0000
+
 rk3588-board-orangepi-5b (0.1.4-1) UNRELEASED; urgency=medium
 
   * Add the ISP nodes from kernel patch 0002 to the packaged DTB (disabled;

@@ -1,3 +1,10 @@
+rk3588-board-orangepi-5 (0.1.4-1) UNRELEASED; urgency=medium
+
+  * Drop install-firmware.sh: the board has no onboard WiFi/BT, and the
+    script was a copy of the 5B's AP6275P one.
+
+ -- Peyton Howe <peyton@localhost>  Tue, 29 Sep 2026 12:00:00 +0000
+
 rk3588-board-orangepi-5 (0.1.3-1) UNRELEASED; urgency=medium
 
   * Drop the vendor-kernel panthor-gpu overlay from u-boot defaults; the
