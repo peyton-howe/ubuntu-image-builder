@@ -1,3 +1,4 @@
 # Fragment merged into /etc/default/u-boot by rk3588-board-orangepi-5
-# Relative to /lib/firmware/<kernel version>/, so each kernel gets its own DTB.
-U_BOOT_FDT="device-tree/rockchip/rk3588s-orangepi-5.dtb"
+# Packaged DTB (built with -@) so camera overlays can apply; Ubuntu's copy
+# has no __symbols__.
+U_BOOT_FDT="/usr/lib/rk3588-board-orangepi-5/dtbs/rockchip/rk3588s-orangepi-5.dtb"

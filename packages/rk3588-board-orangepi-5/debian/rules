@@ -1,18 +1,25 @@
 #!/usr/bin/make -f
 export DH_VERBOSE = 1
 
+DTB := rk3588s-orangepi-5.dtb
 PKG := rk3588-board-orangepi-5
 
 %:
 	dh $@
 
+override_dh_auto_clean:
+	rm -f build/$(DTB)
+
+# build/ keeps the sparse kernel checkout between builds.
 override_dh_auto_build:
-	:
+	$(CURDIR)/files/build-dtb.sh build/$(DTB) build
 
 override_dh_auto_install:
 	install -d debian/$(PKG)/usr/share/$(PKG)
 	install -m 0644 files/flash-kernel.db debian/$(PKG)/usr/share/$(PKG)/flash-kernel.db
 	install -m 0644 files/u-boot.default debian/$(PKG)/usr/share/$(PKG)/u-boot.default
+	install -d debian/$(PKG)/usr/lib/$(PKG)/dtbs/rockchip
+	install -m 0644 build/$(DTB) debian/$(PKG)/usr/lib/$(PKG)/dtbs/rockchip/$(DTB)
 	install -d debian/$(PKG)/etc/initramfs-tools/hooks
 	install -m 0755 files/initramfs-hook debian/$(PKG)/etc/initramfs-tools/hooks/rk3588-mmc
 	install -d debian/$(PKG)/usr/lib/modules-load.d
