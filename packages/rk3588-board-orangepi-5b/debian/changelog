@@ -1,3 +1,12 @@
+rk3588-board-orangepi-5b (0.1.6-1) UNRELEASED; urgency=medium
+
+  * Stop adding the kernel patch 0002 ISP nodes to the packaged DTB;
+    rk3588-camera-overlays (>= 0.1.1) applies them as rk3588-isp.dtbo
+    ahead of the camera overlays on every board.
+    Breaks older rk3588-camera-overlays, which lack it.
+
+ -- Peyton Howe <peyton@localhost>  Tue, 29 Sep 2026 12:00:00 +0000
+
 rk3588-board-orangepi-5b (0.1.5-1) UNRELEASED; urgency=medium
 
   * Vendor the AP6275P WiFi/BT firmware in the package instead of fetching

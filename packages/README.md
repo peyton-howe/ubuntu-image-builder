@@ -6,7 +6,7 @@ Debian packages installed into the rootfs on the **stock** kernel path
 
 | Package | Contents |
 |---|---|
-| `rk3588-board-orangepi-5b` | Board glue (below), plus its own DTB (upstream DTS + 5B hunks of kernel patches 0006/0002 + `files/rk3588s-orangepi-5b-*.dtsi`) and the AP6275P WiFi/BT firmware |
+| `rk3588-board-orangepi-5b` | Board glue (below), plus its own DTB (upstream DTS + the 5B hunk of kernel patch 0006 + `files/rk3588s-orangepi-5b-*.dtsi`) and the AP6275P WiFi/BT firmware |
 | `rk3588-board-orangepi-5` | Board glue |
 | `rk3588-board-rock-5b-plus` | Board glue |
 | `rk3588-camera-dkms` | DKMS: `imx708` sensor + `rkisp2` ISP (`rockchip-isp2`). DCPHY is staged in `src/dcphy`, not built |

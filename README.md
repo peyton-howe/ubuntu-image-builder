@@ -112,9 +112,10 @@ its **own DTB**, built by `packages/rk3588-board-orangepi-5b/files/build-dtb.sh`
 - It sparse-fetches the upstream rockchip DTS at `DTS_KERNEL_REF`
   (default `v7.3-rc4`, matching Ubuntu's 7.3 kernel). The fetch uses the
   GitHub mirror, because git.kernel.org ignores partial-clone filters.
-- It applies only the device-tree hunks of kernel patches **0006** (the 5B's
-  WiFi on `pcie2x1l2` and Bluetooth on `uart9`) and **0002** (the ISP nodes,
-  disabled until a camera overlay enables them).
+- It applies only the `rk3588s-orangepi-5b.dts` hunk of kernel patch
+  **0006** (the 5B's WiFi on `pcie2x1l2` and Bluetooth on `uart9`). The ISP
+  nodes come from `rk3588-isp.dtbo` at boot, as on every board (see
+  [Cameras](#cameras-imx708)).
 - It adds `rk3588s-orangepi-5b-wifi-lpo.dtsi`. The WiFi chip needs the
   HYM8563 RTC's 32 kHz clock, and `rtc-hym8563` switches that clock off when
   it probes. On Ubuntu that driver loads from the initramfs just before PCIe
