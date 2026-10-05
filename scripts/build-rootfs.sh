@@ -202,18 +202,15 @@ mkdir -p "${ROOTFS_DIR}/tmp/kernel-debs" "${ROOTFS_DIR}/tmp/rk3588-debs"
 
 if is_stock_kernel; then
     echo "[+] Stock kernel path: staging board/camera packages from ${DEBS_DIR}"
-    if ! compgen -G "${DEBS_DIR}/rk3588-camera-overlays_*.deb" > /dev/null \
-        || ! compgen -G "${DEBS_DIR}/rk3588-camera-dkms_*.deb" > /dev/null; then
-        echo "Error: missing camera .debs in ${DEBS_DIR}; run ./scripts/build-debs.sh first"
-        exit 1
-    fi
+    for pkg in $(stock_packages); do
+        if ! deb_is_current "${pkg}"; then
+            echo "Error: ${pkg} $(package_version "${pkg}") not in ${DEBS_DIR}; run ./scripts/build-debs.sh first"
+            exit 1
+        fi
+    done
     cp -v "${DEBS_DIR}/rk3588-camera-overlays_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
     cp -v "${DEBS_DIR}/rk3588-camera-dkms_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
     if [[ -n ${BOARD_PKG} ]]; then
-        if ! compgen -G "${DEBS_DIR}/${BOARD_PKG}_*.deb" > /dev/null; then
-            echo "Error: missing ${BOARD_PKG} .deb in ${DEBS_DIR}"
-            exit 1
-        fi
         cp -v "${DEBS_DIR}/${BOARD_PKG}_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
     else
         echo "Warning: no board support package mapping for BOARD=${BOARD:-unset}"

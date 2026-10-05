@@ -352,18 +352,15 @@ if [ -z "${BOARD}" ] || [ -z "${RELEASE}" ] || [ -z "${FLAVOR}" ]; then
 fi
 
 if is_stock_kernel; then
-    # Board/camera packages for the stock ISO path
+    # Board/camera packages for the stock ISO path; rebuild when missing or
+    # older than packages/*/debian/changelog.
     need_debs=0
-    if ! compgen -G "build/debs/rk3588-camera-overlays_*.deb" > /dev/null; then
-        need_debs=1
-    elif ! compgen -G "build/debs/rk3588-camera-dkms_*.deb" > /dev/null; then
-        need_debs=1
-    else
-        board_pkg="$(board_support_package "${BOARD}")"
-        if [[ -n ${board_pkg} ]] && ! compgen -G "build/debs/${board_pkg}_*.deb" > /dev/null; then
+    for pkg in $(stock_packages); do
+        if ! deb_is_current "${pkg}"; then
+            echo "[+] ${pkg} $(package_version "${pkg}") not in build/debs; rebuilding packages"
             need_debs=1
         fi
-    fi
+    done
     if [[ ${need_debs} -eq 1 ]]; then
         ./scripts/build-debs.sh
     fi

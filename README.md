@@ -60,8 +60,9 @@ Only run one stage:
 ```
 
 A plain rerun without flags reuses every finished stage and rebuilds only the
-image, which takes a few minutes. Existing `.deb`s are **not** rebuilt
-automatically, so use `-rd` after editing anything under `packages/`.
+image, which takes a few minutes. A `.deb` is rebuilt automatically, along
+with the rootfs, only when its `debian/changelog` version changes, so use `-rd`
+after editing anything under `packages/` without bumping the version.
 
 ## How the stock path works
 

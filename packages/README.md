@@ -34,8 +34,9 @@ sudo ./scripts/build-debs.sh rk3588-board-orangepi-5b # just one
 Build with sudo, the same way as the image. Package builds leave root-owned
 files in `packages/*/build/`, so a later build without sudo fails to clean
 them. `build-debs.sh` keeps only the newest `.deb` of each package in
-`build/debs/`. Bump `debian/changelog` when you change a package, then
-rebuild the image with `./build.sh … -rd`.
+`build/debs/`. Bump `debian/changelog` when you change a package; a plain
+`./build.sh` then rebuilds the `.deb`s and the rootfs (use `-rd` to force a
+rebuild without a version bump).
 
 To test a change on a running board without reflashing:
 `scp build/debs/<pkg>.deb board:/tmp/ && ssh board sudo dpkg -i /tmp/<pkg>.deb`.

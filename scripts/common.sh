@@ -93,11 +93,39 @@ is_stock_kernel() {
     [[ "${KERNEL_TYPE:-stock}" == "stock" ]]
 }
 
+# Repo root, whatever the caller's cwd (build-rootfs.sh runs in build/rootfs).
+REPO_ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Version at the top of packages/$1/debian/changelog, e.g. 0.1.7-1.
+package_version() {
+    sed -n '1s/^[^ ]* (\([^)]*\)).*/\1/p' "${REPO_ROOT_DIR}/packages/$1/debian/changelog"
+}
+
+# Packages from packages/ that the stock-kernel rootfs installs for BOARD.
+stock_packages() {
+    echo rk3588-camera-overlays rk3588-camera-dkms
+    board_support_package "${1:-${BOARD:-}}"
+}
+
+# True when build/debs has package $1 at its current changelog version, so a
+# .deb left over from an older checkout is rebuilt instead of reused.
+deb_is_current() {
+    compgen -G "${REPO_ROOT_DIR}/build/debs/$1_$(package_version "$1")_*.deb" > /dev/null
+}
+
 # The rootfs is named <release>-<flavor> but has one board's package (and, on
 # vendor/mainline, one kernel) installed, so its .done stamp records what it
 # was built for; a different BOARD or KERNEL_TYPE means it must be rebuilt.
+# On the stock path it also records the package versions, so bumping a
+# package under packages/ rebuilds the rootfs that has the old one installed.
 rootfs_stamp_id() {
-    echo "board=${BOARD:-} kernel=${KERNEL_TYPE:-stock}"
+    local id="board=${BOARD:-} kernel=${KERNEL_TYPE:-stock}" pkg
+    if is_stock_kernel; then
+        for pkg in $(stock_packages); do
+            id+=" ${pkg}=$(package_version "${pkg}")"
+        done
+    fi
+    echo "${id}"
 }
 
 # True when stamp file $1 exists and matches the current BOARD/KERNEL_TYPE.
