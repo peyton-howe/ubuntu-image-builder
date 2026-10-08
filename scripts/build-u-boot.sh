@@ -10,6 +10,11 @@ fi
 
 ROOT_DIR=$(pwd)
 
+if [[ -z ${BOARD} ]]; then
+    echo "Error: BOARD is not set"
+    exit 1
+fi
+
 if [[ -z ${UBOOT_RULES_TARGET} ]]; then
     echo "Error: UBOOT_CONFIG is not set"
     # Source board-specific configuration
@@ -25,7 +30,10 @@ cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ..
 # shellcheck source=/dev/null
 source scripts/common.sh
 require_cmds make git aarch64-linux-gnu-gcc
-mkdir -p build/u-boot && cd build/u-boot
+
+OUT_BIN="$(uboot_bin_path "${BOARD}")"
+mkdir -p build/u-boot "$(dirname "${OUT_BIN}")"
+cd build/u-boot
 
 if [ ! -d u-boot ]; then
     git clone --depth=1 --progress -b v2026.07 https://github.com/u-boot/u-boot.git
@@ -36,13 +44,23 @@ fi
 
 cd u-boot
 
-# Apply board-specific patches if present
-if [[ "${BOARD}" == "orangepi-5b" ]] && [ -f "${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch" ]; then
-    if ! git apply --reverse --check "${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch" 2>/dev/null; then
-        echo "[+] Applying Orange Pi 5B u-boot patch..."
-        git apply "${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch"
+# Board-specific patches on the shared source tree: apply for 5B, reverse
+# for every other board so a previous 5B build does not leave the defconfig
+# behind.
+OPI5B_PATCH="${ROOT_DIR}/patches/0001-Add-Orange-Pi-5b-defconfig.patch"
+if [[ -f ${OPI5B_PATCH} ]]; then
+    if [[ ${BOARD} == "orangepi-5b" ]]; then
+        if ! git apply --reverse --check "${OPI5B_PATCH}" 2>/dev/null; then
+            echo "[+] Applying Orange Pi 5B u-boot patch..."
+            git apply "${OPI5B_PATCH}"
+        else
+            echo "[+] Orange Pi 5B u-boot patch already applied, skipping."
+        fi
     else
-        echo "[+] Orange Pi 5B u-boot patch already applied, skipping."
+        if git apply --reverse --check "${OPI5B_PATCH}" 2>/dev/null; then
+            echo "[+] Reverting Orange Pi 5B u-boot patch for ${BOARD}..."
+            git apply --reverse "${OPI5B_PATCH}"
+        fi
     fi
 fi
 
@@ -52,5 +70,5 @@ make CROSS_COMPILE=aarch64-linux-gnu- \
      BL31=../rkbin/bin/rk35/rk3588_bl31_v1.56.elf \
      "${UBOOT_RULES_TARGET}" all -j"$(nproc)"
 
-cp u-boot-rockchip.bin ..
-
+cp -f u-boot-rockchip.bin "${ROOT_DIR}/${OUT_BIN}"
+echo "[+] Installed ${OUT_BIN}"

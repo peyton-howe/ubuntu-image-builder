@@ -60,15 +60,16 @@ Only run one stage:
 ```
 
 A plain rerun without flags reuses every finished stage and rebuilds only the
-image, which takes a few minutes. Existing `.deb`s are **not** rebuilt
-automatically, so use `-rd` after editing anything under `packages/`.
+image, which takes a few minutes. A `.deb` is rebuilt automatically, along
+with the rootfs, only when its `debian/changelog` version changes, so use `-rd`
+after editing anything under `packages/` without bumping the version.
 
 ## How the stock path works
 
 ```
 Ubuntu ISO ──build-rootfs.sh──► build/rootfs/<release>-<flavor>/   (+ board/camera .debs, DKMS)
                                         │
-U-Boot + rkbin ──build-u-boot.sh──►  build/u-boot/u-boot-rockchip.bin
+U-Boot + rkbin ──build-u-boot.sh──►  build/u-boot/<board>/u-boot-rockchip.bin
                                         │
                            build-image.sh ──► images/*.img  (GPT, one ext4 root, U-Boot at 32 KiB)
 ```
@@ -80,8 +81,13 @@ U-Boot + rkbin ──build-u-boot.sh──►  build/u-boot/u-boot-rockchip.bin
    `u-boot-menu`, DKMS, headers matching the ISO's kernel, and the board and
    camera packages. It fails if the board package doesn't install. It
    finishes by writing `<release>-<flavor>.done`, which records the board and
-   kernel type; building for a different board rebuilds the rootfs.
-3. **`scripts/build-image.sh`** copies the rootfs into a new image. It keeps
+   kernel type; building for a different board rebuilds the rootfs. On
+   Ubuntu 25.10+ it keeps **dracut** (and does not install initramfs-tools,
+   which would remove dracut); older releases use initramfs-tools.
+3. **`scripts/build-u-boot.sh`** writes a **per-board** binary under
+   `build/u-boot/<board>/`, so switching boards does not reuse another
+   board's blob. The u-boot/rkbin source trees are shared.
+4. **`scripts/build-image.sh`** copies the rootfs into a new image. It keeps
    numeric owners, xattrs and ACLs, so file capabilities like `snap-confine`'s
    survive. It then writes fstab, `/etc/default/u-boot` and `extlinux.conf`,
    and dd's U-Boot.
@@ -95,7 +101,8 @@ The board packages make Ubuntu's kernel bootable from our U-Boot:
   `/etc/kernel/postinst.d/zz-rk3588-unwrap-kernel` hook replaces each
   `vmlinuz` in place with the raw Image, now and on every kernel upgrade.
 - **initramfs.** Adds the Rockchip MMC drivers, which Ubuntu builds as
-  modules, so the root filesystem on SD/eMMC can be mounted.
+  modules, so the root filesystem on SD/eMMC can be mounted. Board packages
+  ship both an initramfs-tools hook and a dracut module (`50rk3588-mmc`).
 - **flash-kernel.** Its database doesn't know these boards, and without an
   entry kernel upgrades fail. The package merges a `Machine:` entry into
   `/etc/flash-kernel/db`.
@@ -211,14 +218,11 @@ to regenerate the DKMS sources and overlays in `packages/`.
   image: only uid 0 is mapped, so the rootfs copy can't restore non-root file
   owners, and file capabilities written there aren't valid on the board.
   Builds without sudo are unsupported.
-- **initramfs-tools replaces dracut.** Ubuntu 26.10 defaults to dracut, but
-  `build-rootfs.sh` installs `initramfs-tools`, which removes dracut. The
-  board packages' MMC hook is an initramfs-tools hook. If Ubuntu stops
-  shipping initramfs-tools, that hook needs a dracut equivalent.
 - **GitHub rate limits.** The Orange Pi 5 and 5B package builds fetch
   device-tree sources from GitHub. The fetch is cached under each package's
   `build/` directory, but fresh clones and CI fetch every time and can hit
   HTTP 429.
 - **Cosmetic.** `build-image.sh` passes `${SUITE}` to board hooks, but nothing
-  sets it (the hooks don't use it). The release configs export misspelled
-  `RELASE_NAME`/`RELASE_VERSION`, which nothing reads.
+  sets it (the hooks don't use it). The release configs misspell
+  `RELASE_NAME`/`RELASE_VERSION`; `RELASE_VERSION` is what selects dracut
+  vs initramfs-tools.

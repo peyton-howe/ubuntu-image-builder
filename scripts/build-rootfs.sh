@@ -202,19 +202,16 @@ mkdir -p "${ROOTFS_DIR}/tmp/kernel-debs" "${ROOTFS_DIR}/tmp/rk3588-debs"
 
 if is_stock_kernel; then
     echo "[+] Stock kernel path: staging board/camera packages from ${DEBS_DIR}"
-    if ! compgen -G "${DEBS_DIR}/rk3588-camera-overlays_*.deb" > /dev/null \
-        || ! compgen -G "${DEBS_DIR}/rk3588-camera-dkms_*.deb" > /dev/null; then
-        echo "Error: missing camera .debs in ${DEBS_DIR}; run ./scripts/build-debs.sh first"
-        exit 1
-    fi
-    cp -v "${DEBS_DIR}/rk3588-camera-overlays_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
-    cp -v "${DEBS_DIR}/rk3588-camera-dkms_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
-    if [[ -n ${BOARD_PKG} ]]; then
-        if ! compgen -G "${DEBS_DIR}/${BOARD_PKG}_*.deb" > /dev/null; then
-            echo "Error: missing ${BOARD_PKG} .deb in ${DEBS_DIR}"
+    for pkg in $(stock_packages); do
+        if ! deb_is_current "${pkg}"; then
+            echo "Error: ${pkg} $(package_version "${pkg}") not in ${DEBS_DIR}; run ./scripts/build-debs.sh first"
             exit 1
         fi
-        cp -v "${DEBS_DIR}/${BOARD_PKG}_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    done
+    cp -v "${DEBS_DIR}/rk3588-camera-overlays_$(package_version "rk3588-camera-overlays")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    cp -v "${DEBS_DIR}/rk3588-camera-dkms_$(package_version "rk3588-camera-dkms")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    if [[ -n ${BOARD_PKG} ]]; then
+        cp -v "${DEBS_DIR}/${BOARD_PKG}_$(package_version "${BOARD_PKG}")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
     else
         echo "Warning: no board support package mapping for BOARD=${BOARD:-unset}"
     fi
@@ -227,6 +224,14 @@ fi
 
 prepare_chroot_mounts "${ROOTFS_DIR}"
 
+# Ubuntu 25.10+ → dracut; older → initramfs-tools (board packages support both).
+if release_uses_dracut; then
+    INITRAMFS_PKG=dracut
+else
+    INITRAMFS_PKG=initramfs-tools
+fi
+echo "[+] Initramfs generator for ${RELEASE} (${RELASE_VERSION:-unknown}): ${INITRAMFS_PKG}"
+
 # =========================
 # 4. Configure rootfs inside chroot
 # =========================
@@ -237,6 +242,7 @@ export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 KERNEL_TYPE='${KERNEL_TYPE}'
 BOARD_PKG='${BOARD_PKG}'
+INITRAMFS_PKG='${INITRAMFS_PKG}'
 
 # The live image ships a cdrom source (installer normally drops this
 # post-install); there's no /cdrom mount here so apt-get update fails on it.
@@ -273,7 +279,9 @@ EOF2
 
 echo '[+] Updating apt sources...'
 apt-get update
-apt-get install -y u-boot-menu u-boot-tools initramfs-tools linux-base
+# Ubuntu 25.10+ defaults to dracut (Conflicts: initramfs-tools). Older
+# releases keep initramfs-tools. Board packages ship hooks for both.
+apt-get install -y u-boot-menu u-boot-tools linux-base ${INITRAMFS_PKG}
 
 if [[ \"\${KERNEL_TYPE}\" == stock ]]; then
     echo '[+] Installing headers for DKMS (stock ISO kernel)...'

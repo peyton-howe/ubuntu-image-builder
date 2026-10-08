@@ -268,6 +268,12 @@ fi
 
 if [ "${REBUILD_UBOOT}" == "Y" ]; then
     echo "[+] Clearing u-boot build artifacts..."
+    if [ -n "${BOARD}" ]; then
+        rm -f "$(uboot_bin_path "${BOARD}")" 2>/dev/null || true
+    else
+        rm -f build/u-boot/*/u-boot-rockchip.bin 2>/dev/null || true
+    fi
+    # Legacy flat path from before per-board output.
     rm -f build/u-boot/u-boot-rockchip.bin 2>/dev/null || true
     rm -f images/*.img images/*.img.xz 2>/dev/null || true
 fi
@@ -346,18 +352,15 @@ if [ -z "${BOARD}" ] || [ -z "${RELEASE}" ] || [ -z "${FLAVOR}" ]; then
 fi
 
 if is_stock_kernel; then
-    # Board/camera packages for the stock ISO path
+    # Board/camera packages for the stock ISO path; rebuild when missing or
+    # older than packages/*/debian/changelog.
     need_debs=0
-    if ! compgen -G "build/debs/rk3588-camera-overlays_*.deb" > /dev/null; then
-        need_debs=1
-    elif ! compgen -G "build/debs/rk3588-camera-dkms_*.deb" > /dev/null; then
-        need_debs=1
-    else
-        board_pkg="$(board_support_package "${BOARD}")"
-        if [[ -n ${board_pkg} ]] && ! compgen -G "build/debs/${board_pkg}_*.deb" > /dev/null; then
+    for pkg in $(stock_packages); do
+        if ! deb_is_current "${pkg}"; then
+            echo "[+] ${pkg} $(package_version "${pkg}") not in build/debs; rebuilding packages"
             need_debs=1
         fi
-    fi
+    done
     if [[ ${need_debs} -eq 1 ]]; then
         ./scripts/build-debs.sh
     fi
@@ -368,8 +371,9 @@ else
     fi
 fi
 
-# Build U-Boot if not found
-if [[ ! -e "$(find build/u-boot/u-boot-rockchip.bin 2>/dev/null | sort | tail -n1)" ]]; then
+# Build U-Boot if this board's binary is missing (per-board path; do not
+# reuse another board's blob).
+if [[ ! -f $(uboot_bin_path "${BOARD}") ]]; then
     ./scripts/build-u-boot.sh
 fi
 

@@ -93,14 +93,59 @@ is_stock_kernel() {
     [[ "${KERNEL_TYPE:-stock}" == "stock" ]]
 }
 
+# Repo root, whatever the caller's cwd (build-rootfs.sh runs in build/rootfs).
+REPO_ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Version at the top of packages/$1/debian/changelog, e.g. 0.1.7-1.
+package_version() {
+    sed -n '1s/^[^ ]* (\([^)]*\)).*/\1/p' "${REPO_ROOT_DIR}/packages/$1/debian/changelog"
+}
+
+# Packages from packages/ that the stock-kernel rootfs installs for BOARD.
+stock_packages() {
+    echo rk3588-camera-overlays rk3588-camera-dkms
+    board_support_package "${1:-${BOARD:-}}"
+}
+
+# True when build/debs has package $1 at its current changelog version, so a
+# .deb left over from an older checkout is rebuilt instead of reused.
+deb_is_current() {
+    compgen -G "${REPO_ROOT_DIR}/build/debs/$1_$(package_version "$1")_*.deb" > /dev/null
+}
+
 # The rootfs is named <release>-<flavor> but has one board's package (and, on
 # vendor/mainline, one kernel) installed, so its .done stamp records what it
 # was built for; a different BOARD or KERNEL_TYPE means it must be rebuilt.
+# On the stock path it also records the package versions, so bumping a
+# package under packages/ rebuilds the rootfs that has the old one installed.
 rootfs_stamp_id() {
-    echo "board=${BOARD:-} kernel=${KERNEL_TYPE:-stock}"
+    local id="board=${BOARD:-} kernel=${KERNEL_TYPE:-stock}" pkg
+    if is_stock_kernel; then
+        for pkg in $(stock_packages); do
+            id+=" ${pkg}=$(package_version "${pkg}")"
+        done
+    fi
+    echo "${id}"
 }
 
 # True when stamp file $1 exists and matches the current BOARD/KERNEL_TYPE.
 rootfs_is_current() {
     [[ -f $1 && "$(cat "$1")" == "$(rootfs_stamp_id)" ]]
+}
+
+# Per-board U-Boot binary. The shared u-boot/rkbin source trees stay under
+# build/u-boot/; only the built blob is board-specific so switching boards
+# does not reuse another board's image.
+uboot_bin_path() {
+    local board="${1:-${BOARD:?BOARD is required}}"
+    echo "build/u-boot/${board}/u-boot-rockchip.bin"
+}
+
+# Ubuntu 25.10 (questing) and later default to dracut, which Conflicts with
+# initramfs-tools. RELASE_VERSION comes from configs/releases/*.sh.
+release_uses_dracut() {
+    local ver="${1:-${RELASE_VERSION:-}}"
+    [[ -n ${ver} ]] || return 1
+    # True when ver >= 25.10 (sort -V, input already in order).
+    printf '%s\n%s\n' "25.10" "${ver}" | sort -C -V
 }
