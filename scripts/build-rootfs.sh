@@ -208,10 +208,10 @@ if is_stock_kernel; then
             exit 1
         fi
     done
-    cp -v "${DEBS_DIR}/rk3588-camera-overlays_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
-    cp -v "${DEBS_DIR}/rk3588-camera-dkms_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    cp -v "${DEBS_DIR}/rk3588-camera-overlays_$(package_version "rk3588-camera-overlays")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    cp -v "${DEBS_DIR}/rk3588-camera-dkms_$(package_version "rk3588-camera-dkms")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
     if [[ -n ${BOARD_PKG} ]]; then
-        cp -v "${DEBS_DIR}/${BOARD_PKG}_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+        cp -v "${DEBS_DIR}/${BOARD_PKG}_$(package_version "${BOARD_PKG}")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
     else
         echo "Warning: no board support package mapping for BOARD=${BOARD:-unset}"
     fi

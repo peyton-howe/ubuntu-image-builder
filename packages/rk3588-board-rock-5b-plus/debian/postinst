@@ -34,14 +34,14 @@ if [ "$1" = configure ]; then
             u-boot-update || true
         fi
     fi
-    # Ubuntu 25.10+ uses dracut; older releases use initramfs-tools. Prefer
-    # whichever is installed so Rockchip MMC modules land in the initramfs.
-    if command -v dracut >/dev/null; then
+    # The generator packages own the kernel hooks; dracut-core can coexist
+    # with initramfs-tools, so the dracut executable alone is not enough.
+    if [ "$(dpkg-query -W -f='${Status}' dracut 2>/dev/null)" = "install ok installed" ]; then
         for kdir in /lib/modules/*; do
             [ -d "$kdir" ] || continue
-            dracut -f --kver "$(basename "$kdir")" || true
+            dracut -f --kver "$(basename "$kdir")"
         done
-    elif command -v update-initramfs >/dev/null; then
+    elif [ "$(dpkg-query -W -f='${Status}' initramfs-tools 2>/dev/null)" = "install ok installed" ]; then
         update-initramfs -u -k all || true
     fi
 fi

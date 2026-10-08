@@ -10,6 +10,11 @@ fi
 
 ROOT_DIR=$(pwd)
 
+if [[ -z ${BOARD} ]]; then
+    echo "Error: BOARD is not set"
+    exit 1
+fi
+
 if [[ -z ${UBOOT_RULES_TARGET} ]]; then
     echo "Error: UBOOT_CONFIG is not set"
     # Source board-specific configuration
@@ -25,11 +30,6 @@ cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ..
 # shellcheck source=/dev/null
 source scripts/common.sh
 require_cmds make git aarch64-linux-gnu-gcc
-
-if [[ -z ${BOARD} ]]; then
-    echo "Error: BOARD is not set"
-    exit 1
-fi
 
 OUT_BIN="$(uboot_bin_path "${BOARD}")"
 mkdir -p build/u-boot "$(dirname "${OUT_BIN}")"
