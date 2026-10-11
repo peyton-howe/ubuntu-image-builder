@@ -15,6 +15,9 @@ override_dh_auto_install:
 	install -m 0644 files/u-boot.default debian/$(PKG)/usr/share/$(PKG)/u-boot.default
 	install -d debian/$(PKG)/etc/initramfs-tools/hooks
 	install -m 0755 files/initramfs-hook debian/$(PKG)/etc/initramfs-tools/hooks/rk3588-mmc
+	install -d debian/$(PKG)/usr/lib/dracut/modules.d/50rk3588-mmc
+	install -m 0755 files/dracut-module-setup.sh \
+		debian/$(PKG)/usr/lib/dracut/modules.d/50rk3588-mmc/module-setup.sh
 	install -d debian/$(PKG)/usr/lib/modules-load.d
 	install -m 0644 files/modules-load.conf debian/$(PKG)/usr/lib/modules-load.d/$(PKG).conf
 	install -d debian/$(PKG)/etc/kernel/postinst.d

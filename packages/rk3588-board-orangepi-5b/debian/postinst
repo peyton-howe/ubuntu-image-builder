@@ -34,7 +34,14 @@ if [ "$1" = configure ]; then
             u-boot-update || true
         fi
     fi
-    if command -v update-initramfs >/dev/null; then
+    # The generator packages own the kernel hooks; dracut-core can coexist
+    # with initramfs-tools, so the dracut executable alone is not enough.
+    if [ "$(dpkg-query -W -f='${Status}' dracut 2>/dev/null)" = "install ok installed" ]; then
+        for kdir in /lib/modules/*; do
+            [ -d "$kdir" ] || continue
+            dracut -f --kver "$(basename "$kdir")"
+        done
+    elif [ "$(dpkg-query -W -f='${Status}' initramfs-tools 2>/dev/null)" = "install ok installed" ]; then
         update-initramfs -u -k all || true
     fi
 fi
