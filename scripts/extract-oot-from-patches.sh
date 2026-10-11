@@ -43,12 +43,13 @@ def extract_new_files(patch_path: Path, want_suffixes=None, want_prefixes=None):
         out[rel] = '\n'.join(content) + ('\n' if content else '')
     return out
 
-# Patch 0006 still carries per-board imx708 overlays for the mainline
-# kernel build. The stock package keeps its own port + sensor overlays
-# in packages/rk3588-camera-overlays/dts/; do not copy 0006 back over them.
+# Patches 0006, 0008 and 0009 still carry per-board imx708 and imx415
+# overlays for the mainline kernel build. The stock package keeps its own
+# port + sensor overlays in packages/rk3588-camera-overlays/dts/; do not
+# copy those patches' overlays back over them.
 dts_dir = repo / 'packages/rk3588-camera-overlays/dts'
 dts_dir.mkdir(parents=True, exist_ok=True)
-print('overlays: skip 0006 dtso (package overlays are maintained in dts/)')
+print('overlays: skip 0006/0008/0009 dtso (package overlays are maintained in dts/)')
 
 # ISP nodes: 0002 adds them to rk3588-base.dtsi, which stock kernels' DTBs
 # lack. Ship them as an overlay applied before the camera overlays (which
@@ -87,14 +88,8 @@ isp_body = '\n'.join(isp_nodes).strip('\n')
 ''')
 print('overlays: rk3588-isp.dtso (from 0002)')
 
-# IMX708
-imx = extract_new_files(patch_dir / '0004-media-i2c-imx708.patch', want_suffixes=['.c'])
-imx_dir = repo / 'packages/rk3588-camera-dkms/src/imx708'
-imx_dir.mkdir(parents=True, exist_ok=True)
-for rel, content in imx.items():
-    if rel.endswith('imx708.c'):
-        (imx_dir / 'imx708.c').write_text(content)
-        print('dkms: imx708/imx708.c')
+# IMX708 in the DKMS package is the linux-rockchip driver, not patch 0004.
+print('dkms: imx708/imx708.c left as the linux-rockchip driver')
 
 # rkisp2
 rk = extract_new_files(patch_dir / '0002-media-rockchip-rkisp2.patch',

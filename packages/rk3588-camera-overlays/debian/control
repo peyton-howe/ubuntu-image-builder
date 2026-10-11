@@ -11,7 +11,7 @@ Architecture: all
 Depends: ${misc:Depends}, python3, u-boot-menu | u-boot-tools
 Description: Device-tree overlays for RK3588 cameras
  One overlay per CSI port (Orange Pi 5/5B and ROCK 5B+) and one
- overlay per sensor (imx708, imx219, imx519). Select a camera with
+ overlay per sensor (imx708, imx219, imx519, imx415). Select a camera with
  /etc/rk3588-camera/overlays.conf in Raspberry Pi syntax
  (imx708,port0). apply-overlays.sh bakes port, 4lane, and
  link-frequency into the dtbo U-Boot loads.

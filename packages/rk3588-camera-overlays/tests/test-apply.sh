@@ -39,6 +39,9 @@ python3 "${PKG}/scripts/resolve-overlay.py" \
 python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx519.dtbo" "${WORK}/imx519-port0.dtbo" --port 0 --isp 0
 python3 "${PKG}/scripts/resolve-overlay.py" \
+    "${WORK}/imx415.dtbo" "${WORK}/imx415-port1-30fps.dtbo" \
+    --port 1 --isp 1 --link-frequency 360000000
+python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx708.dtbo" "${WORK}/imx708-port0-unite.dtbo" \
     --port 0 --unite --four-lane
 
@@ -80,6 +83,10 @@ apply "${WORK}/imx519.dtb" \
     "${WORK}/rk3588-isp.dtbo" \
     "${WORK}/rk3588-rock-5b-plus-port0.dtbo" \
     "${WORK}/imx519-port0.dtbo"
+apply "${WORK}/imx415.dtb" \
+    "${WORK}/rk3588-isp.dtbo" \
+    "${WORK}/rk3588-rock-5b-plus-port1.dtbo" \
+    "${WORK}/imx415-port1-30fps.dtbo"
 apply "${WORK}/rock-unite.dtb" \
     "${WORK}/rk3588-isp.dtbo" \
     "${WORK}/rk3588-isp-unite.dtbo" \
@@ -171,6 +178,16 @@ opi3 = load("opi3.dtb")
 assert prop(opi3, "/i2c@2/camera-port3", "compatible") == b"sony,imx708\0"
 assert prop(opi3, "/csi@1", "status") == b"okay\0"
 assert opi3.find("/i2c@7/camera-port1") is None
+
+imx415 = load("imx415.dtb")
+assert prop(imx415, "/i2c@4/camera-port1", "compatible") == b"sony,imx415\0"
+assert prop(imx415, "/i2c@4/camera-port1", "reg") == struct.pack(">I", 0x1A)
+for ep in ("/i2c@4/camera-port1/port/endpoint", "/csi@4/port/endpoint"):
+    assert u32s(prop(imx415, ep, "data-lanes")) == (1, 2, 3, 4)
+    assert u64(prop(imx415, ep, "link-frequencies")) == 360000000
+    assert imx415.find(ep).get("clock-noncontinuous") is None
+assert prop(imx415, "/isp@fdcc0000", "status") == b"okay\0"
+assert prop(imx415, "/isp@fdcb0000", "status") == b"disabled\0"
 
 unite = load("rock-unite.dtb")
 assert prop(unite, "/isp-unite@fdcb0000", "status") == b"okay\0"

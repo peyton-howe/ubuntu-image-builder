@@ -42,7 +42,6 @@
 			cam_port0_sensor_ep: endpoint {
 				remote-endpoint = <&cam_port0_csi_ep>;
 				data-lanes = <1 2>;
-				clock-noncontinuous;
 				link-frequencies = /bits/ 64 <450000000>;
 			};
 		};
@@ -65,7 +64,6 @@
 	cam_port0_csi_ep: endpoint {
 		remote-endpoint = <&cam_port0_sensor_ep>;
 		data-lanes = <1 2>;
-		clock-noncontinuous;
 		link-frequencies = /bits/ 64 <450000000>;
 	};
 };

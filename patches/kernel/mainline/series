@@ -17,3 +17,7 @@
 0005-arm64-dts-rockchip-rk3588-dcphy-csi-rx.patch
 # IMX708 overlays (ROCK 5B+, Orange Pi 5/5B CAM1-3)
 0006-arm64-dts-rockchip-imx708-camera-overlays.patch
+# IMX708 4-lane 549 MHz overlays for ROCK 5B+ CAM0/CAM1
+0009-arm64-dts-rockchip-imx708-4lane-overlays.patch
+# IMX415 (Radxa Camera 4K) at 24 MHz: 1440 Mbps ~60 fps, or 720 Mbps ~30 fps
+0008-arm64-dts-rockchip-imx415-4k60-overlays.patch

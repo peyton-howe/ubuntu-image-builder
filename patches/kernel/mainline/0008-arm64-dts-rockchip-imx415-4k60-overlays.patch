@@ -1,0 +1,522 @@
+From: Peyton Howe <peyton@localhost>
+Subject: [PATCH] arm64: dts: rockchip: IMX415 overlays for ROCK 5B+
+
+Clock the Radxa Camera 4K at 24 MHz. The 720 MHz link frequency selects
+the mainline driver's 4-lane 1440 Mbps mode (3864x2192 at about 60 fps).
+The 360 MHz link frequency selects 4-lane 720 Mbps (about 30 fps).
+
+CAM0 is i2c3/csi2/isp0. CAM1 is i2c4/csi4/isp1.
+
+diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+--- a/arch/arm64/boot/dts/rockchip/Makefile
++++ b/arch/arm64/boot/dts/rockchip/Makefile
+@@ -207,5 +207,9 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus-imx708-cam0.dtbo
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus-imx708-cam1.dtbo
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus-imx415-cam0.dtbo
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus-imx415-cam1.dtbo
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus-imx415-cam0-30fps.dtbo
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus-imx415-cam1-30fps.dtbo
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus-radxa-cam4k-cam0.dtbo
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus-radxa-cam4k-cam1.dtbo
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5t.dtb
+@@ -336,6 +340,16 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus-imx708-cam.dtb
+ rk3588-rock-5b-plus-imx708-cam-dtbs := rk3588-rock-5b-plus.dtb \
+ 	rk3588-rock-5b-plus-imx708-cam0.dtbo \
+ 	rk3588-rock-5b-plus-imx708-cam1.dtbo
++
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus-imx415-cam.dtb
++rk3588-rock-5b-plus-imx415-cam-dtbs := rk3588-rock-5b-plus.dtb \
++	rk3588-rock-5b-plus-imx415-cam0.dtbo \
++	rk3588-rock-5b-plus-imx415-cam1.dtbo
++
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588-rock-5b-plus-imx415-30fps-cam.dtb
++rk3588-rock-5b-plus-imx415-30fps-cam-dtbs := rk3588-rock-5b-plus.dtb \
++	rk3588-rock-5b-plus-imx415-cam0-30fps.dtbo \
++	rk3588-rock-5b-plus-imx415-cam1-30fps.dtbo
+ 
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3588s-orangepi-5-cam1-imx708.dtb
+ rk3588s-orangepi-5-cam1-imx708-dtbs := rk3588s-orangepi-5.dtb \
+diff --git a/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam0.dtso b/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam0.dtso
+new file mode 100644
+index 000000000..000000000
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam0.dtso
+@@ -0,0 +1,115 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Device tree overlay for the Radxa Camera 4K (IMX415) on the CAM0 port of
++ * the Radxa ROCK 5B+.
++ *
++ * The sensor clock is 24 MHz so the mainline imx415 driver selects its
++ * 4-lane 1440 Mbps mode (link frequency 720 MHz). At minimum blanking that
++ * is 3864x2192 at about 60.04 fps. The stock Radxa overlay uses 37.125 MHz
++ * and 891 Mbps, which tops out at 30 fps.
++ */
++
++/dts-v1/;
++/plugin/;
++
++#include <dt-bindings/clock/rockchip,rk3588-cru.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/rockchip.h>
++
++&{/} {
++	savdd_cam0: regulator-savdd-cam0 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <2900000>;
++		regulator-max-microvolt = <2900000>;
++		regulator-name = "savdd_cam0";
++		vin-supply = <&vcc_3v3_s3>;
++	};
++
++	sdvdd_cam0: regulator-sdvdd-cam0 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <1100000>;
++		regulator-max-microvolt = <1100000>;
++		regulator-name = "sdvdd_cam0";
++		vin-supply = <&vcc5v0_sys>;
++	};
++
++	siovdd_cam0: regulator-siovdd-cam0 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-name = "siovdd_cam0";
++		vin-supply = <&vcc_3v3_s3>;
++	};
++};
++
++&i2c3 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++
++	imx415: camera-sensor@1a {
++		compatible = "sony,imx415";
++		reg = <0x1a>;
++		assigned-clocks = <&cru CLK_MIPI_CAMARAOUT_M3>;
++		assigned-clock-rates = <24000000>;
++		clocks = <&cru CLK_MIPI_CAMARAOUT_M3>;
++
++		avdd-supply = <&savdd_cam0>;
++		dvdd-supply = <&sdvdd_cam0>;
++		ovdd-supply = <&siovdd_cam0>;
++
++		orientation = <2>; /* External */
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&cam0_rstn &mipim0_camera3_clk>;
++		reset-gpios = <&gpio4 RK_PA0 GPIO_ACTIVE_LOW>;
++
++		port {
++			imx415_output: endpoint {
++				data-lanes = <1 2 3 4>;
++				link-frequencies = /bits/ 64 <720000000>;
++				remote-endpoint = <&csi2_input>;
++			};
++		};
++	};
++};
++
++&pinctrl {
++	cam0 {
++		cam0_rstn: cam0-rstn-pinctrl {
++			rockchip,pins = <4 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
++
++&csi2 {
++	status = "okay";
++};
++
++&csi2_in {
++	csi2_input: endpoint {
++		data-lanes = <1 2 3 4>;
++		link-frequencies = /bits/ 64 <720000000>;
++		remote-endpoint = <&imx415_output>;
++	};
++};
++
++&csi_dphy0 {
++	status = "okay";
++};
++
++&vicap {
++	status = "okay";
++};
++
++&vicap_mmu {
++	status = "okay";
++};
++
++&isp0 {
++	status = "okay";
++};
++
++&isp0_mmu {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam1.dtso b/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam1.dtso
+new file mode 100644
+index 000000000..000000000
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam1.dtso
+@@ -0,0 +1,115 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Device tree overlay for the Radxa Camera 4K (IMX415) on the CAM1 port of
++ * the Radxa ROCK 5B+.
++ *
++ * The sensor clock is 24 MHz so the mainline imx415 driver selects its
++ * 4-lane 1440 Mbps mode (link frequency 720 MHz). At minimum blanking that
++ * is 3864x2192 at about 60.04 fps.
++ */
++
++/dts-v1/;
++/plugin/;
++
++#include <dt-bindings/clock/rockchip,rk3588-cru.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/rockchip.h>
++
++&{/} {
++	savdd_cam1: regulator-savdd-cam1 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <2900000>;
++		regulator-max-microvolt = <2900000>;
++		regulator-name = "savdd_cam1";
++		vin-supply = <&vcc_3v3_s3>;
++	};
++
++	sdvdd_cam1: regulator-sdvdd-cam1 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <1100000>;
++		regulator-max-microvolt = <1100000>;
++		regulator-name = "sdvdd_cam1";
++		vin-supply = <&vcc5v0_sys>;
++	};
++
++	siovdd_cam1: regulator-siovdd-cam1 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-name = "siovdd_cam1";
++		vin-supply = <&vcc_3v3_s3>;
++	};
++};
++
++&i2c4 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++
++	cam1_imx415: camera-sensor@1a {
++		compatible = "sony,imx415";
++		reg = <0x1a>;
++		assigned-clocks = <&cru CLK_MIPI_CAMARAOUT_M4>;
++		assigned-clock-rates = <24000000>;
++		clocks = <&cru CLK_MIPI_CAMARAOUT_M4>;
++
++		avdd-supply = <&savdd_cam1>;
++		dvdd-supply = <&sdvdd_cam1>;
++		ovdd-supply = <&siovdd_cam1>;
++
++		orientation = <2>; /* External */
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&cam1_rstn &mipim0_camera4_clk>;
++		reset-gpios = <&gpio2 RK_PB0 GPIO_ACTIVE_LOW>;
++
++		port {
++			cam1_imx415_output: endpoint {
++				data-lanes = <1 2 3 4>;
++				link-frequencies = /bits/ 64 <720000000>;
++				remote-endpoint = <&csi4_input>;
++			};
++		};
++	};
++};
++
++&pinctrl {
++	cam1 {
++		cam1_rstn: cam1-rstn-pinctrl {
++			rockchip,pins = <2 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
++
++&csi4 {
++	status = "okay";
++};
++
++&csi4_in {
++	csi4_input: endpoint {
++		data-lanes = <1 2 3 4>;
++		link-frequencies = /bits/ 64 <720000000>;
++		remote-endpoint = <&cam1_imx415_output>;
++	};
++};
++
++&csi_dphy1 {
++	status = "okay";
++};
++
++&vicap {
++	status = "okay";
++};
++
++&vicap_mmu {
++	status = "okay";
++};
++
++/* rkisp2 processes the captured frames; cam0 uses isp0, so cam1 gets isp1. */
++&isp1 {
++	status = "okay";
++};
++
++&isp1_mmu {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam0-30fps.dtso b/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam0-30fps.dtso
+new file mode 100644
+index 000000000..000000000
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam0-30fps.dtso
+@@ -0,0 +1,114 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Device tree overlay for the Radxa Camera 4K (IMX415) on the CAM0 port of
++ * the Radxa ROCK 5B+.
++ *
++ * The sensor clock is 24 MHz so the mainline imx415 driver selects its
++ * 4-lane 720 Mbps mode (link frequency 360 MHz). At minimum blanking that
++ * is 3864x2192 at about 30.02 fps.
++ */
++
++/dts-v1/;
++/plugin/;
++
++#include <dt-bindings/clock/rockchip,rk3588-cru.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/rockchip.h>
++
++&{/} {
++	savdd_cam0: regulator-savdd-cam0 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <2900000>;
++		regulator-max-microvolt = <2900000>;
++		regulator-name = "savdd_cam0";
++		vin-supply = <&vcc_3v3_s3>;
++	};
++
++	sdvdd_cam0: regulator-sdvdd-cam0 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <1100000>;
++		regulator-max-microvolt = <1100000>;
++		regulator-name = "sdvdd_cam0";
++		vin-supply = <&vcc5v0_sys>;
++	};
++
++	siovdd_cam0: regulator-siovdd-cam0 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-name = "siovdd_cam0";
++		vin-supply = <&vcc_3v3_s3>;
++	};
++};
++
++&i2c3 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++
++	imx415: camera-sensor@1a {
++		compatible = "sony,imx415";
++		reg = <0x1a>;
++		assigned-clocks = <&cru CLK_MIPI_CAMARAOUT_M3>;
++		assigned-clock-rates = <24000000>;
++		clocks = <&cru CLK_MIPI_CAMARAOUT_M3>;
++
++		avdd-supply = <&savdd_cam0>;
++		dvdd-supply = <&sdvdd_cam0>;
++		ovdd-supply = <&siovdd_cam0>;
++
++		orientation = <2>; /* External */
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&cam0_rstn &mipim0_camera3_clk>;
++		reset-gpios = <&gpio4 RK_PA0 GPIO_ACTIVE_LOW>;
++
++		port {
++			imx415_output: endpoint {
++				data-lanes = <1 2 3 4>;
++				link-frequencies = /bits/ 64 <360000000>;
++				remote-endpoint = <&csi2_input>;
++			};
++		};
++	};
++};
++
++&pinctrl {
++	cam0 {
++		cam0_rstn: cam0-rstn-pinctrl {
++			rockchip,pins = <4 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
++
++&csi2 {
++	status = "okay";
++};
++
++&csi2_in {
++	csi2_input: endpoint {
++		data-lanes = <1 2 3 4>;
++		link-frequencies = /bits/ 64 <360000000>;
++		remote-endpoint = <&imx415_output>;
++	};
++};
++
++&csi_dphy0 {
++	status = "okay";
++};
++
++&vicap {
++	status = "okay";
++};
++
++&vicap_mmu {
++	status = "okay";
++};
++
++&isp0 {
++	status = "okay";
++};
++
++&isp0_mmu {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam1-30fps.dtso b/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam1-30fps.dtso
+new file mode 100644
+index 000000000..000000000
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus-imx415-cam1-30fps.dtso
+@@ -0,0 +1,115 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Device tree overlay for the Radxa Camera 4K (IMX415) on the CAM1 port of
++ * the Radxa ROCK 5B+.
++ *
++ * The sensor clock is 24 MHz so the mainline imx415 driver selects its
++ * 4-lane 720 Mbps mode (link frequency 360 MHz). At minimum blanking that
++ * is 3864x2192 at about 30.02 fps.
++ */
++
++/dts-v1/;
++/plugin/;
++
++#include <dt-bindings/clock/rockchip,rk3588-cru.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/rockchip.h>
++
++&{/} {
++	savdd_cam1: regulator-savdd-cam1 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <2900000>;
++		regulator-max-microvolt = <2900000>;
++		regulator-name = "savdd_cam1";
++		vin-supply = <&vcc_3v3_s3>;
++	};
++
++	sdvdd_cam1: regulator-sdvdd-cam1 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <1100000>;
++		regulator-max-microvolt = <1100000>;
++		regulator-name = "sdvdd_cam1";
++		vin-supply = <&vcc5v0_sys>;
++	};
++
++	siovdd_cam1: regulator-siovdd-cam1 {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-name = "siovdd_cam1";
++		vin-supply = <&vcc_3v3_s3>;
++	};
++};
++
++&i2c4 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++
++	cam1_imx415: camera-sensor@1a {
++		compatible = "sony,imx415";
++		reg = <0x1a>;
++		assigned-clocks = <&cru CLK_MIPI_CAMARAOUT_M4>;
++		assigned-clock-rates = <24000000>;
++		clocks = <&cru CLK_MIPI_CAMARAOUT_M4>;
++
++		avdd-supply = <&savdd_cam1>;
++		dvdd-supply = <&sdvdd_cam1>;
++		ovdd-supply = <&siovdd_cam1>;
++
++		orientation = <2>; /* External */
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&cam1_rstn &mipim0_camera4_clk>;
++		reset-gpios = <&gpio2 RK_PB0 GPIO_ACTIVE_LOW>;
++
++		port {
++			cam1_imx415_output: endpoint {
++				data-lanes = <1 2 3 4>;
++				link-frequencies = /bits/ 64 <360000000>;
++				remote-endpoint = <&csi4_input>;
++			};
++		};
++	};
++};
++
++&pinctrl {
++	cam1 {
++		cam1_rstn: cam1-rstn-pinctrl {
++			rockchip,pins = <2 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
++
++&csi4 {
++	status = "okay";
++};
++
++&csi4_in {
++	csi4_input: endpoint {
++		data-lanes = <1 2 3 4>;
++		link-frequencies = /bits/ 64 <360000000>;
++		remote-endpoint = <&cam1_imx415_output>;
++	};
++};
++
++&csi_dphy1 {
++	status = "okay";
++};
++
++&vicap {
++	status = "okay";
++};
++
++&vicap_mmu {
++	status = "okay";
++};
++
++/* rkisp2 processes the captured frames; cam0 uses isp0, so cam1 gets isp1. */
++&isp1 {
++	status = "okay";
++};
++
++&isp1_mmu {
++	status = "okay";
++};
