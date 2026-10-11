@@ -22,6 +22,7 @@ Debian packages installed into the rootfs on the **stock** kernel path
 | `files/flash-kernel.db` | Merged into `/etc/flash-kernel/db` between `# BEGIN/END <pkg>` markers (`postinst`/`postrm`); flash-kernel owns that file |
 | `files/u-boot.default` | Keys merged into `/etc/default/u-boot` on every install/upgrade, then `u-boot-update` |
 | `files/modules-load.conf` | Loads `ledtrig_heartbeat` for the status LED |
+| `files/panthor-profiling.rules` → `/usr/lib/udev/rules.d/60-rk3588-panthor-profiling.rules` | Turns on panthor GPU timestamp profiling (`profiling=2`) so fdinfo has `drm-engine-panthor` and system monitors can show GPU usage. `postinst` applies it to the running GPU |
 
 ## Building
 
