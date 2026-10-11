@@ -12,3 +12,5 @@ DEST_MODULE_LOCATION[1]="/updates/dkms"
 
 MAKE[0]="make -C ${kernel_source_dir} M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build"
 CLEAN[0]="make -C ${kernel_source_dir} M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build clean"
+# $kernelver is expanded by DKMS when it reads this file.
+POST_INSTALL="refresh-initramfs.sh $kernelver"

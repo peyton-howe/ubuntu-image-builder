@@ -15,6 +15,7 @@ override_dh_auto_build:
 override_dh_auto_install:
 	install -d $(DEST)
 	cp -a Makefile $(DEST)/
+	install -m 0755 refresh-initramfs.sh $(DEST)/refresh-initramfs.sh
 	cp -a src/imx708 $(DEST)/imx708
 	cp -a src/rkisp2 $(DEST)/rkisp2
 	# The in-tree Makefile keys off CONFIG_VIDEO_ROCKCHIP_ISP2; DKMS always builds.

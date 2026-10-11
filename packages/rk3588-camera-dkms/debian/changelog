@@ -1,9 +1,47 @@
-rk3588-camera-dkms (0.1.3-1) UNRELEASED; urgency=medium
+rk3588-camera-dkms (0.1.11-1) UNRELEASED; urgency=medium
 
   * Bind rockchip,rk3588-isp-unite. The device clocks both ISP cores
     and register writes go to both windows.
+  * Version above the 0.1.8 to 0.1.10 imx708 test builds.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
+
+rk3588-camera-dkms (0.1.7-1) UNRELEASED; urgency=medium
+
+  * Run depmod before rebuilding the initrd and reloading imx708. DKMS runs
+    POST_INSTALL before its own depmod, so modprobe could not find the new
+    module and dracut left it out.
+
+ -- Peyton Howe <peyton@localhost>  Sat, 10 Oct 2026 21:00:00 +0000
+
+rk3588-camera-dkms (0.1.6-1) UNRELEASED; urgency=medium
+
+  * Program a 2608-pixel line length in the 2304x1296 binned mode. It still
+    wrote 7824, so the sensor ran at 39.8 fps instead of about 120.
+
+ -- Peyton Howe <peyton@localhost>  Sat, 10 Oct 2026 20:00:00 +0000
+
+rk3588-camera-dkms (0.1.5-1) UNRELEASED; urgency=medium
+
+  * After installing imx708, rebuild that kernel's initrd and reload the
+    module if it is already loaded. The previous copy in the initrd was
+    what the next boot probed.
+
+ -- Peyton Howe <peyton@localhost>  Sat, 10 Oct 2026 18:00:00 +0000
+
+rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
+
+  * Accept a 549 MHz IMX708 link frequency so the 4-lane ROCK 5B+ overlay
+    can probe.
+
+ -- Peyton Howe <peyton@localhost>  Sat, 10 Oct 2026 16:00:00 +0000
+
+rk3588-camera-dkms (0.1.3-1) UNRELEASED; urgency=medium
+
+  * Replace imx708.c with the linux-rockchip driver, and ship
+    rk-camera-module.h so it can build out of tree.
+
+ -- Peyton Howe <peyton@localhost>  Sat, 10 Oct 2026 12:00:00 +0000
 
 rk3588-camera-dkms (0.1.2-1) UNRELEASED; urgency=medium
 

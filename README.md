@@ -185,6 +185,7 @@ Two cameras, or a Pi-style link-frequency override:
 ```bash
 RK3588_CAMERA_OVERLAYS="imx708,port1 imx708,port2"
 RK3588_CAMERA_OVERLAYS="imx708,port0,link-frequency=447000000"
+RK3588_CAMERA_OVERLAYS="imx708,port0,4lane,link-frequency=549000000"
 RK3588_CAMERA_OVERLAYS="imx708,port1,isp1"
 RK3588_CAMERA_OVERLAYS="imx708,port0,unite"
 ```
@@ -207,9 +208,12 @@ one core and the right half to the other is still the vendor rkcif
 `TOISP_UNITE` path. Capture here stays on VICAP, then one `rkisp2`
 memory read.
 
-`link-frequency` is in Hz. The imx708 driver accepts 447000000, 450000000
-(the default), and 453000000, and only two data lanes. `4lane` is the same
-knob the Pi has; the imx708 driver rejects it. `orientation` is 0 front,
+`link-frequency` is in Hz. The imx708 driver (from linux-rockchip) takes
+two or four data lanes. Two lanes run at 450000000 (the default), 447000000,
+or 453000000. For four lanes use `4lane,link-frequency=549000000`, the rate
+the ROCK 5B+ 4-lane overlays used. Faster rates need D-PHY deskew
+calibration from the sensor, which this driver does not enable.
+`orientation` is 0 front,
 1 rear, 2 external (default 2).
 
 Sensors shipped: `imx708` (the DKMS driver), `imx219` (mainline binding;
