@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * IMX708 on Orange Pi 5 / 5B CAM3 (Samsung DCPHY1 CSI RX + CSI1).
+ * ROCK 5B+ CAM1 (port1): Inno CSI D-PHY1 + CSI4 on i2c4.
+ *
+ * Publishes cam_port1_sensor, cam_port1_sensor_ep, cam_port1_csi_ep,
+ * and cam_port1_reg. Which ISP is enabled is chosen per camera, not by
+ * this port.
  */
 
 /dts-v1/;
@@ -11,65 +15,63 @@
 #include <dt-bindings/pinctrl/rockchip.h>
 
 &{/} {
-	cam3_regulator: cam3_regulator {
+	cam_port1_reg: cam-port1-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "cam3_regulator";
+		regulator-name = "cam-port1-regulator";
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <1800000>;
 		vin-supply = <&vcc_3v3_s3>;
 	};
 };
 
-&i2c2 {
+&i2c4 {
 	#address-cells = <1>;
 	#size-cells = <0>;
-	clock-frequency = <400000>;
 	status = "okay";
 
-	imx708: camera-sensor@1a {
-		compatible = "sony,imx708";
-		reg = <0x1a>;
+	cam_port1_sensor: camera-port1 {
+		status = "disabled";
 		assigned-clocks = <&cru CLK_MIPI_CAMARAOUT_M4>;
 		assigned-clock-rates = <24000000>;
 		clocks = <&cru CLK_MIPI_CAMARAOUT_M4>;
-		vdig-supply = <&cam3_regulator>;
-		vana1-supply = <&cam3_regulator>;
-		vana2-supply = <&cam3_regulator>;
-		vddl-supply = <&cam3_regulator>;
-		orientation = <2>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&cam3_rstn &mipim0_camera4_clk>;
-		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_HIGH>;
+		pinctrl-0 = <&cam1_rstn &mipim0_camera4_clk>;
+		reset-gpios = <&gpio2 RK_PB0 GPIO_ACTIVE_LOW>;
+
 		port {
-			imx708_output: endpoint {
+			cam_port1_sensor_ep: endpoint {
+				remote-endpoint = <&cam_port1_csi_ep>;
 				data-lanes = <1 2>;
 				clock-noncontinuous;
 				link-frequencies = /bits/ 64 <450000000>;
-				remote-endpoint = <&csi1_input>;
 			};
 		};
 	};
 };
 
 &pinctrl {
-	cam3 {
-		cam3_rstn: cam3-rstn-pinctrl {
-			rockchip,pins = <1 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
+	cam1 {
+		cam1_rstn: cam1-rstn-pinctrl {
+			rockchip,pins = <2 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 };
 
-&csi1 {
+&csi4 {
 	status = "okay";
 };
 
-&csi1_in {
-	csi1_input: endpoint {
+&csi4_in {
+	cam_port1_csi_ep: endpoint {
+		remote-endpoint = <&cam_port1_sensor_ep>;
 		data-lanes = <1 2>;
 		clock-noncontinuous;
 		link-frequencies = /bits/ 64 <450000000>;
-		remote-endpoint = <&imx708_output>;
 	};
+};
+
+&csi_dphy1 {
+	status = "okay";
 };
 
 &vicap {
@@ -77,13 +79,5 @@
 };
 
 &vicap_mmu {
-	status = "okay";
-};
-
-&isp0 {
-	status = "okay";
-};
-
-&isp0_mmu {
 	status = "okay";
 };

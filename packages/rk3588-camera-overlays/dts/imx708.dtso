@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Sony IMX708, attached to whichever camera port overlay is loaded with it.
+ *
+ * The port overlay publishes cam_portN_sensor, cam_portN_sensor_ep,
+ * cam_portN_csi_ep, and cam_portN_reg. apply-overlays.sh rewrites the
+ * generic cam_port_* fixups below to that port, points cam_isp at isp0
+ * or isp1 (or at isp_unite when unite is set), and can also set 4lane,
+ * link-frequency, rotation, and orientation.
+ *
+ *   imx708,port0
+ *   imx708,port1,link-frequency=447000000
+ *
+ * The shipped imx708 driver accepts link frequencies 447000000, 450000000
+ * (the default), and 453000000, and only two data lanes. 4lane is still
+ * accepted here so the same knob works for sensors that use four lanes.
+ * resolve-overlay.py rewrites every data-lanes and link-frequencies
+ * property in the overlay when those parameters are set.
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	fragment@0 {
+		target = <&cam_port_sensor>;
+		__overlay__ {
+			compatible = "sony,imx708";
+			reg = <0x1a>;
+			status = "okay";
+			orientation = <2>; /* External */
+			vdig-supply = <&cam_port_reg>;
+			vana1-supply = <&cam_port_reg>;
+			vana2-supply = <&cam_port_reg>;
+			vddl-supply = <&cam_port_reg>;
+		};
+	};
+
+	fragment@1 {
+		target = <&cam_port_sensor_ep>;
+		__overlay__ {
+			data-lanes = <1 2>;
+			clock-noncontinuous;
+			link-frequencies = /bits/ 64 <450000000>;
+		};
+	};
+
+	fragment@2 {
+		target = <&cam_port_csi_ep>;
+		__overlay__ {
+			data-lanes = <1 2>;
+			clock-noncontinuous;
+			link-frequencies = /bits/ 64 <450000000>;
+		};
+	};
+
+#include "sensor-isp.dtsi"
+};

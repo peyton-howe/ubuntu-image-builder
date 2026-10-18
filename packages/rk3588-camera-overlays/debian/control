@@ -8,8 +8,10 @@ Homepage: https://github.com/peyton-howe/ubuntu-image-builder
 
 Package: rk3588-camera-overlays
 Architecture: all
-Depends: ${misc:Depends}, u-boot-menu | u-boot-tools
-Description: Device-tree overlays for RK3588 IMX708 cameras
- Prebuilt .dtbo overlays for Orange Pi 5/5B and ROCK 5B+ camera
- connectors. Installs under /usr/share/rk3588-camera/overlays and
- provides /etc/rk3588-camera/overlays.conf for u-boot-menu selection.
+Depends: ${misc:Depends}, python3, u-boot-menu | u-boot-tools
+Description: Device-tree overlays for RK3588 cameras
+ One overlay per CSI port (Orange Pi 5/5B and ROCK 5B+) and one
+ overlay per sensor (imx708, imx219, imx519). Select a camera with
+ /etc/rk3588-camera/overlays.conf in Raspberry Pi syntax
+ (imx708,port0). apply-overlays.sh bakes port, 4lane, and
+ link-frequency into the dtbo U-Boot loads.

@@ -122,7 +122,7 @@ its **own DTB**, built by `packages/rk3588-board-orangepi-5b/files/build-dtb.sh`
 - It applies only the `rk3588s-orangepi-5b.dts` hunk of kernel patch
   **0006** (the 5B's WiFi on `pcie2x1l2` and Bluetooth on `uart9`). The ISP
   nodes come from `rk3588-isp.dtbo` at boot, as on every board (see
-  [Cameras](#cameras-imx708)).
+  [Cameras](#cameras)).
 - It adds `rk3588s-orangepi-5b-wifi-lpo.dtsi`. The WiFi chip needs the
   HYM8563 RTC's 32 kHz clock, and `rtc-hym8563` switches that clock off when
   it probes. On Ubuntu that driver loads from the initramfs just before PCIe
@@ -151,24 +151,76 @@ USB). Its drivers and firmware are already in Ubuntu's kernel and
 `linux-firmware`, so WiFi and Bluetooth work on a fresh install. Uses
 Ubuntu's DTB (which has `__symbols__`).
 
-## Cameras (IMX708)
+## Cameras
 
 `rk3588-camera-dkms` builds the `imx708` sensor driver and the `rkisp2` ISP
-driver against the installed kernel. `rk3588-camera-overlays` ships the
-overlays. None are enabled by default. On the board:
+driver against the installed kernel. `rk3588-camera-overlays` ships one
+overlay per CSI port and one overlay per sensor. None are enabled by default.
+
+A port overlay turns the connector on (I2C, clock, reset, regulator, CSI
+host) and publishes `cam_portN_*` labels. A sensor overlay describes the
+chip and attaches to whichever port you name. It also enables one ISP.
+U-Boot does not apply Raspberry Pi overlay parameters, so
+`apply-overlays.sh` bakes `portN`, `ispN`, `unite`, `4lane`, `link-frequency`,
+`rotation`, and `orientation` into a dtbo under `/var/lib/rk3588-camera/`
+and points `U_BOOT_FDT_OVERLAYS` at it. It also selects the port overlay
+for the installed board package.
 
 ```bash
-sudo sed -i 's/^RK3588_CAMERA_OVERLAYS=.*/RK3588_CAMERA_OVERLAYS="rk3588s-orangepi-5-cam1-imx708"/' \
+sudo sed -i 's/^RK3588_CAMERA_OVERLAYS=.*/RK3588_CAMERA_OVERLAYS="imx708,port1"/' \
     /etc/rk3588-camera/overlays.conf
 sudo /usr/lib/rk3588-camera/apply-overlays.sh
 sudo reboot
 ```
 
-`apply-overlays.sh` treats `overlays.conf` as the full list of camera
-overlays: it replaces any previously managed camera/ISP entries in
-`U_BOOT_FDT_OVERLAYS` and keeps unrelated overlays. To switch cameras, edit
-the conf and re-run the script; to disable them, set
-`RK3588_CAMERA_OVERLAYS=""` and re-run.
+The port number is the CAM number on the board:
+
+| Board | Ports |
+|---|---|
+| Orange Pi 5 / 5B | `port1` (CAM1), `port2` (CAM2), `port3` (CAM3) |
+| ROCK 5B+ | `port0` (CAM0), `port1` (CAM1) |
+
+Two cameras, or a Pi-style link-frequency override:
+
+```bash
+RK3588_CAMERA_OVERLAYS="imx708,port1 imx708,port2"
+RK3588_CAMERA_OVERLAYS="imx708,port0,link-frequency=447000000"
+RK3588_CAMERA_OVERLAYS="imx708,port1,isp1"
+RK3588_CAMERA_OVERLAYS="imx708,port0,unite"
+```
+
+The first camera in that list enables isp0 and its IOMMU. The second
+enables isp1. `isp0` or `isp1` on a camera overrides that. Two cameras
+cannot share an ISP. On an Orange Pi 5B, `imx708,port1 imx708,port2`
+puts CAM1 on isp0 and CAM2 on isp1.
+
+`unite` gives that one camera both ISPs. `apply-overlays.sh` loads
+`rk3588-isp-unite.dtbo` after `rk3588-isp.dtbo`. The generated sensor
+dtbo enables `isp-unite` (registers at `0xfdcb0000` and `0xfdcc0000`)
+and its IOMMU, and leaves `isp0` and `isp1` disabled. A second camera
+on the same line is rejected, and so is `isp0` or `isp1` next to
+`unite`. This follows Rockchip's dual-ISP overlay (the 4k90
+`rock-5b-radxa-camera-4k-unite.dts` case: one device, both cores).
+`rkisp2` binds `rockchip,rk3588-isp-unite` and writes both register
+windows. The CIF line split that feeds the left half of each line to
+one core and the right half to the other is still the vendor rkcif
+`TOISP_UNITE` path. Capture here stays on VICAP, then one `rkisp2`
+memory read.
+
+`link-frequency` is in Hz. The imx708 driver accepts 447000000, 450000000
+(the default), and 453000000, and only two data lanes. `4lane` is the same
+knob the Pi has; the imx708 driver rejects it. `orientation` is 0 front,
+1 rear, 2 external (default 2).
+
+Sensors shipped: `imx708` (the DKMS driver), `imx219` (mainline binding;
+needs the kernel's imx219 module), `imx519` (Raspberry Pi binding; no driver
+in this repo). Adding another sensor is a new `.dtso` with the same
+`cam_port_*` fixups.
+
+`apply-overlays.sh` treats `overlays.conf` as the full camera list: it
+replaces previously managed camera/ISP entries in `U_BOOT_FDT_OVERLAYS` and
+keeps unrelated overlays. To switch cameras, edit the conf and re-run the
+script. To disable them, set `RK3588_CAMERA_OVERLAYS=""` and re-run.
 
 After reboot, `cat /proc/device-tree/isp@fdcb0000/status` should print
 `okay`. The pipeline uses two media devices: `rockchip-cif` captures from the
@@ -184,16 +236,21 @@ shipped in this repo.
 
 Stock kernels' DTBs don't have the ISP nodes the camera overlays reference
 (they come from kernel patch 0002), so `apply-overlays.sh` always puts
-`rk3588-isp.dtbo` first; U-Boot applies overlays in order and merges each
-one's labels into the base DTB. Overlays also need the base DTB to have
+`rk3588-isp.dtbo` first. `unite` adds `rk3588-isp-unite.dtbo` next. Port
+overlays come after that, then the sensor. U-Boot
+applies overlays in order and merges each one's labels into the base DTB, so
+the sensor can resolve `cam_portN_*`. Overlays also need the base DTB to have
 `__symbols__`:
 
-| Board | Base DTB | Camera overlays |
+| Board | Base DTB | Camera ports |
 |---|---|---|
-| Orange Pi 5B | Packaged (built with `-@`) | cam1 tested on hardware |
-| ROCK 5B+ | Ubuntu's (has `__symbols__`, since upstream ships overlays for it) | cam0 (isp0) and cam1 (isp1), both at once; tested on hardware. Use the plain overlays, not `-isp` (those need the unapplied patch 0003) |
-| Orange Pi 5 | Packaged (built with `-@`) | cam1/cam2/cam3 can apply; not tested on hardware |
+| Orange Pi 5B | Packaged (built with `-@`) | port1 tested on hardware (as the old cam1 IMX708 overlay) |
+| ROCK 5B+ | Ubuntu's (has `__symbols__`, since upstream ships overlays for it) | port0 and port1 together; tested on hardware as the old cam0/cam1 overlays. ISP follows list order now |
+| Orange Pi 5 | Packaged (built with `-@`) | port1/port2/port3 can apply; not tested on hardware |
 
+The generated sensor overlay enables the chosen ISP and leaves capture on
+VICAP. It does not wire CSI straight into the ISP (that needed the
+unapplied kernel patch 0003).
 cam2/cam3 on the Orange Pi 5/5B use the DCPHY, which needs a patched
 `phy-rockchip-samsung-dcphy` (kernel patch 0001). That isn't packaged for the
 stock kernel yet.

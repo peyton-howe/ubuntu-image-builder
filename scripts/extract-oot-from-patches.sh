@@ -43,14 +43,12 @@ def extract_new_files(patch_path: Path, want_suffixes=None, want_prefixes=None):
         out[rel] = '\n'.join(content) + ('\n' if content else '')
     return out
 
-# Overlays
-ov = extract_new_files(patch_dir / '0006-arm64-dts-rockchip-imx708-camera-overlays.patch',
-                       want_suffixes=['.dtso'])
+# Patch 0006 still carries per-board imx708 overlays for the mainline
+# kernel build. The stock package keeps its own port + sensor overlays
+# in packages/rk3588-camera-overlays/dts/; do not copy 0006 back over them.
 dts_dir = repo / 'packages/rk3588-camera-overlays/dts'
 dts_dir.mkdir(parents=True, exist_ok=True)
-for rel, content in ov.items():
-    (dts_dir / Path(rel).name).write_text(content)
-    print(f'overlays: {Path(rel).name}')
+print('overlays: skip 0006 dtso (package overlays are maintained in dts/)')
 
 # ISP nodes: 0002 adds them to rk3588-base.dtsi, which stock kernels' DTBs
 # lack. Ship them as an overlay applied before the camera overlays (which

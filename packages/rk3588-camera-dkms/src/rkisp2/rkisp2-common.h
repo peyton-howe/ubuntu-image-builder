@@ -59,8 +59,8 @@ struct regmap;
 #define RKISP2_DRIVER_NAME			"rkisp2"
 #define RKISP2_BUS_INFO				"platform:" RKISP2_DRIVER_NAME
 
-/* maximum number of clocks */
-#define RKISP2_MAX_BUS_CLK			8
+/* maximum number of clocks (unite lists both ISP cores) */
+#define RKISP2_MAX_BUS_CLK			16
 
 /* IRQ lines */
 enum rkisp2_irq_line {
@@ -137,6 +137,7 @@ enum rkisp2_feature {
  * @features: bitmask of rkisp2_feature features implemented by the ISP
  * @max_width: maximum input frame width
  * @max_height: maximum input frame height
+ * @unite: device owns both ISP register windows
  *
  * This structure contains information about the ISP specific to a particular
  * ISP model, version, or integration in a particular SoC.
@@ -150,6 +151,7 @@ struct rkisp2_info {
 	unsigned int features;
 	unsigned int max_width;
 	unsigned int max_height;
+	bool unite;
 };
 
 /*
@@ -445,6 +447,7 @@ struct rkisp2_debug {
  * struct rkisp2_device - ISP platform device
  *
  * @base_addr:	   base register address
+ * @unite_base:	   second ISP window, when this device is isp-unite
  * @dev:	   a pointer to the struct device
  * @clk_size:	   number of clocks
  * @clks:	   array of clocks
@@ -470,6 +473,7 @@ struct rkisp2_debug {
  */
 struct rkisp2_device {
 	void __iomem *base_addr;
+	void __iomem *unite_base;
 	struct device *dev;
 	unsigned int clk_size;
 	struct clk_bulk_data clks[RKISP2_MAX_BUS_CLK];
@@ -519,6 +523,22 @@ static inline void
 rkisp2_write(struct rkisp2_device *rkisp2, unsigned int addr, u32 val)
 {
 	writel(val, rkisp2->base_addr + addr);
+	if (rkisp2->unite_base)
+		writel(val, rkisp2->unite_base + addr);
+}
+
+/* Clear a pending interrupt on the second window after the primary ack. */
+static inline void
+rkisp2_unite_ack(struct rkisp2_device *rkisp2, unsigned int mis, unsigned int icr)
+{
+	u32 status;
+
+	if (!rkisp2->unite_base)
+		return;
+
+	status = readl(rkisp2->unite_base + mis);
+	if (status)
+		writel(status, rkisp2->unite_base + icr);
 }
 
 static inline u32 rkisp2_read(struct rkisp2_device *rkisp2, unsigned int addr)

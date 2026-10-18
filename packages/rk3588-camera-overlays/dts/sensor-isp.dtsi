@@ -1,0 +1,18 @@
+/*
+ * Included by each sensor overlay. apply-overlays.sh renames cam_isp and
+ * cam_isp_mmu to isp0/isp0_mmu or isp1/isp1_mmu. With unite, both become
+ * isp_unite and isp_unite_mmu, and that one camera holds both ISPs.
+ */
+	fragment@3 {
+		target = <&cam_isp>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@4 {
+		target = <&cam_isp_mmu>;
+		__overlay__ {
+			status = "okay";
+		};
+	};

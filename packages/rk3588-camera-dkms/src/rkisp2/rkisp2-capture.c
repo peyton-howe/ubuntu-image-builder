@@ -728,8 +728,15 @@ irqreturn_t rkisp2_capture_isr(int irq, void *ctx)
 		return IRQ_NONE;
 
 	status = rkisp2_read(rkisp2, RKISP2_CIF_MI_MIS);
-	if (!status)
-		return IRQ_NONE;
+	if (!status) {
+		if (!rkisp2->unite_base)
+			return IRQ_NONE;
+		status = readl(rkisp2->unite_base + RKISP2_CIF_MI_MIS);
+		if (!status)
+			return IRQ_NONE;
+		writel(status, rkisp2->unite_base + RKISP2_CIF_MI_ICR);
+		return IRQ_HANDLED;
+	}
 
 	for (i = 0; i < 2; ++i) {
 		struct rkisp2_capture *cap = &rkisp2->capture_devs[i];
@@ -760,6 +767,7 @@ irqreturn_t rkisp2_capture_isr(int irq, void *ctx)
 	rkisp2_dmarx_isr(rkisp2, status);
 
 	rkisp2_write(rkisp2, RKISP2_CIF_MI_ICR, status);
+	rkisp2_unite_ack(rkisp2, RKISP2_CIF_MI_MIS, RKISP2_CIF_MI_ICR);
 
 	return IRQ_HANDLED;
 }
