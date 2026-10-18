@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * IMX708 on Orange Pi 5 / 5B CAM1 (Inno CSI D-PHY + CSI2).
+ * Orange Pi 5 / 5B CAM1 (port1): Inno CSI D-PHY + CSI2 on i2c7.
+ *
+ * Enables the connector and publishes the labels a sensor overlay binds to:
+ *   cam_port1_sensor, cam_port1_sensor_ep, cam_port1_csi_ep, cam_port1_reg
+ * The sensor node stays disabled until a sensor overlay enables it.
  */
 
 /dts-v1/;
@@ -11,9 +15,9 @@
 #include <dt-bindings/pinctrl/rockchip.h>
 
 &{/} {
-	cam1_regulator: cam1_regulator {
+	cam_port1_reg: cam-port1-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "cam1_regulator";
+		regulator-name = "cam-port1-regulator";
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <1800000>;
 		vin-supply = <&vcc_3v3_s3>;
@@ -28,26 +32,21 @@
 	pinctrl-0 = <&i2c7m0_xfer>;
 	status = "okay";
 
-	imx708: camera-sensor@1a {
-		compatible = "sony,imx708";
-		reg = <0x1a>;
+	cam_port1_sensor: camera-port1 {
+		status = "disabled";
 		assigned-clocks = <&cru CLK_MIPI_CAMARAOUT_M3>;
 		assigned-clock-rates = <24000000>;
 		clocks = <&cru CLK_MIPI_CAMARAOUT_M3>;
-		vdig-supply = <&cam1_regulator>;
-		vana1-supply = <&cam1_regulator>;
-		vana2-supply = <&cam1_regulator>;
-		vddl-supply = <&cam1_regulator>;
-		orientation = <2>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&cam1_rstn &mipim0_camera3_clk>;
 		reset-gpios = <&gpio3 RK_PC4 GPIO_ACTIVE_HIGH>;
+
 		port {
-			imx708_output: endpoint {
+			cam_port1_sensor_ep: endpoint {
+				remote-endpoint = <&cam_port1_csi_ep>;
 				data-lanes = <1 2>;
 				clock-noncontinuous;
 				link-frequencies = /bits/ 64 <450000000>;
-				remote-endpoint = <&csi2_input>;
 			};
 		};
 	};
@@ -66,11 +65,11 @@
 };
 
 &csi2_in {
-	csi2_input: endpoint {
+	cam_port1_csi_ep: endpoint {
+		remote-endpoint = <&cam_port1_sensor_ep>;
 		data-lanes = <1 2>;
 		clock-noncontinuous;
 		link-frequencies = /bits/ 64 <450000000>;
-		remote-endpoint = <&imx708_output>;
 	};
 };
 
@@ -83,13 +82,5 @@
 };
 
 &vicap_mmu {
-	status = "okay";
-};
-
-&isp0 {
-	status = "okay";
-};
-
-&isp0_mmu {
 	status = "okay";
 };
