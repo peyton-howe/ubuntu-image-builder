@@ -665,7 +665,15 @@ static const struct imx708_reg mode_hdr_regs[] = {
 	{0x3369, 0x38},
 };
 
-/* Mode configs. Keep separate lists for when HDR is enabled or not. */
+/*
+ * Mode configs. Keep separate lists for when HDR is enabled or not.
+ *
+ * line_length_pix must be one the sensor permits for the mode:
+ *   full resolution and HDR: 5216, 10432, 15648 or 20864
+ *   2x2 binned:              2608, 5216, 7824 or 10432
+ * The 720p cropped and HDR modes do not produce frames at 2608, so they
+ * stay at 5216 or longer.
+ */
 static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 	{
 		/* Full resolution. */
