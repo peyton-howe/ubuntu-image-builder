@@ -159,7 +159,7 @@ struct imx708_reg_list {
  * for. The first entry needs no particular rate and is the fallback for any
  * link too slow for the others.
  */
-#define IMX708_NUM_MODE_TIMINGS		4
+#define IMX708_NUM_MODE_TIMINGS		5
 
 struct imx708_mode_timing {
 	/*
@@ -257,6 +257,9 @@ static const u8 pdaf_gains[2][9] = {
  * patterns from the transmitter, which this driver does not enable.
  */
 #define IMX708_DESKEW_LANE_RATE		1500000000ULL
+
+/* Total link rate of 750 MHz on 2 lanes. */
+#define IMX708_LINK_BPS_2LANE_750	3000000000ULL
 
 /* Total link rate the faster timings were set up for: 960 MHz, 2 lanes. */
 #define IMX708_LINK_BPS_FAST		3840000000ULL
@@ -703,6 +706,16 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 				.pixel_rate = 595200000,
 			},
 			{
+				/*
+				 * 22.6 fps. A line takes 16.72 us against
+				 * 15.36 us to drain it at this link rate.
+				 */
+				.min_link_bps = IMX708_LINK_BPS_2LANE_750,
+				.line_length_pix = 10432,
+				.vblank_default = 58,
+				.pixel_rate = 624000000,
+			},
+			{
 				.min_link_bps = IMX708_LINK_BPS_FAST,
 				.line_length_pix = 10432,
 				.vblank_default = 58,
@@ -745,6 +758,17 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 				.line_length_pix = 7824,
 				.vblank_default = 1198,
 				.pixel_rate = 585600000,
+			},
+			{
+				/*
+				 * 89.5 fps at the minimum vblank, the default
+				 * here. A line takes 8.36 us against 7.68 us to
+				 * drain it at this link rate.
+				 */
+				.min_link_bps = IMX708_LINK_BPS_2LANE_750,
+				.line_length_pix = 5216,
+				.vblank_default = 40,
+				.pixel_rate = 624000000,
 			},
 			{
 				.min_link_bps = IMX708_LINK_BPS_FAST,
@@ -804,7 +828,12 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 				.pixel_rate = 566400000,
 			},
 			{
-				.min_link_bps = IMX708_LINK_BPS_FAST,
+				/*
+				 * The Pi's timing for a 960 MHz 2-lane link. A
+				 * line takes 6.07 us against 5.12 us to drain it
+				 * at 3 Gbps, so it needs no more than that.
+				 */
+				.min_link_bps = IMX708_LINK_BPS_2LANE_750,
 				.line_length_pix = 5216,
 				.vblank_default = 4627,
 				.pixel_rate = 859200000,

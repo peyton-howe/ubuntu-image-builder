@@ -21,6 +21,9 @@ rk3588-camera-dkms (0.1.11-1) UNRELEASED; urgency=medium
     line at 624 MHz. 750 MHz is the fastest lane rate without deskew.
   * imx708: 2304x1296 runs at 179 fps on 4-lane 750 MHz, a 2608-pixel line
     at 624 MHz.
+  * imx708: add a tier for 3 Gbps links such as 2-lane 750 MHz: 4608x2592
+    at 22.6 fps and 2304x1296 at 89.5 fps, both at 624 MHz, and 1536x864
+    up to 182 fps on the Pi's fast timing.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
