@@ -684,13 +684,13 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 		},
 		.timings = {
 			{
-				.line_length_pix = 0x3d20,
+				.line_length_pix = 15648,
 				.vblank_default = 58,
 				.pixel_rate = 595200000,
 			},
 			{
 				.min_link_bps = IMX708_LINK_BPS_FAST,
-				.line_length_pix = 0x28c0,
+				.line_length_pix = 10432,
 				.vblank_default = 58,
 				.pixel_rate = 830400000,
 			},
@@ -717,13 +717,13 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 		},
 		.timings = {
 			{
-				.line_length_pix = 0x1e90,
+				.line_length_pix = 7824,
 				.vblank_default = 1198,
 				.pixel_rate = 585600000,
 			},
 			{
 				.min_link_bps = IMX708_LINK_BPS_FAST,
-				.line_length_pix = 0x1460,
+				.line_length_pix = 5216,
 				.vblank_default = 3888,
 				.pixel_rate = 811200000,
 			},
@@ -763,13 +763,13 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 		},
 		.timings = {
 			{
-				.line_length_pix = 0x1460,
+				.line_length_pix = 5216,
 				.vblank_default = 2755,
 				.pixel_rate = 566400000,
 			},
 			{
 				.min_link_bps = IMX708_LINK_BPS_FAST,
-				.line_length_pix = 0x1460,
+				.line_length_pix = 5216,
 				.vblank_default = 4627,
 				.pixel_rate = 859200000,
 			},
@@ -799,7 +799,7 @@ static const struct imx708_mode supported_modes_10bit_hdr[] = {
 		},
 		.timings = {
 			{
-				.line_length_pix = 0x1460,
+				.line_length_pix = 5216,
 				.vblank_default = 3673,
 				.pixel_rate = 777600000,
 			},
