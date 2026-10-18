@@ -208,11 +208,18 @@ one core and the right half to the other is still the vendor rkcif
 `TOISP_UNITE` path. Capture here stays on VICAP, then one `rkisp2`
 memory read.
 
-`link-frequency` is in Hz. The imx708 driver (from linux-rockchip) takes
-two or four data lanes. Two lanes run at 450000000 (the default), 447000000,
-or 453000000. For four lanes use `4lane,link-frequency=549000000`, the rate
-the ROCK 5B+ 4-lane overlays used. Faster rates need D-PHY deskew
-calibration from the sensor, which this driver does not enable.
+`link-frequency` is in Hz. The imx708 driver takes two or four data lanes
+and works out its PLLs from the link frequency, the way the Raspberry Pi
+driver does. Any frequency the output PLL can make exactly is accepted
+(450000000, the default, 447000000, 453000000, 549000000, ...). Keep it at
+or below 750000000: faster lanes need D-PHY deskew calibration from the
+sensor, which this driver does not enable, and it warns at probe.
+
+Each mode has a fallback timing and, from the Pi driver, a faster one that
+needs at least 3.84 Gbps of link (link frequency x 2 x lanes). With
+`4lane,link-frequency=549000000` the driver uses the faster timings:
+4608x2592 at 30 fps instead of 14, and 2304x1296 up to about 116 fps
+instead of 56. Two lanes at 450 MHz stay on the fallback timings.
 `orientation` is 0 front,
 1 rear, 2 external (default 2).
 

@@ -5,6 +5,15 @@ rk3588-camera-dkms (0.1.11-1) UNRELEASED; urgency=medium
   * Version above the 0.1.8 to 0.1.10 imx708 test builds.
   * Drop rk-camera-module.h, rk-video-format.h and the asm/unaligned.h
     shim. imx708.c includes none of them.
+  * imx708: work out both PLLs from the mode timing and the link
+    frequency, as the Raspberry Pi driver does, without its CCS PLL
+    calculator. Any link frequency the output PLL can make exactly is
+    accepted, and above 1.5 Gbps per lane the driver warns that deskew is
+    not enabled.
+  * imx708: give each mode the Pi's fallback timing plus its faster one,
+    used when the link carries at least 3.84 Gbps. 4-lane 549 MHz gets
+    4608x2592 at 30 fps. 2304x1296 goes back to the Pi's 7824-pixel line
+    on slower links; the 2608-pixel line overran a 2-lane 450 MHz link.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
