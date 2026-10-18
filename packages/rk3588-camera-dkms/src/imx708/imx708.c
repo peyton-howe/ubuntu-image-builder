@@ -159,7 +159,7 @@ struct imx708_reg_list {
  * for. The first entry needs no particular rate and is the fallback for any
  * link too slow for the others.
  */
-#define IMX708_NUM_MODE_TIMINGS		3
+#define IMX708_NUM_MODE_TIMINGS		4
 
 struct imx708_mode_timing {
 	/*
@@ -764,6 +764,17 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 				.line_length_pix = 2608,
 				.vblank_default = 115,
 				.pixel_rate = 441600000,
+			},
+			{
+				/*
+				 * 179 fps at the minimum vblank, the default
+				 * here. A line takes 4.18 us against 3.84 us to
+				 * drain it at this link rate.
+				 */
+				.min_link_bps = IMX708_LINK_BPS_4LANE_750,
+				.line_length_pix = 2608,
+				.vblank_default = 40,
+				.pixel_rate = 624000000,
 			},
 		},
 		.exposure_lines_min = 4,

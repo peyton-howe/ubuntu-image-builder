@@ -19,6 +19,8 @@ rk3588-camera-dkms (0.1.11-1) UNRELEASED; urgency=medium
     the IVT PLL allows.
   * imx708: 4608x2592 runs at 45 fps on 4-lane 750 MHz, a 5216-pixel
     line at 624 MHz. 750 MHz is the fastest lane rate without deskew.
+  * imx708: 2304x1296 runs at 179 fps on 4-lane 750 MHz, a 2608-pixel line
+    at 624 MHz.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
