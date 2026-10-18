@@ -45,8 +45,11 @@ if [ "$1" = configure ]; then
         update-initramfs -u -k all || true
     fi
     # Apply the panthor profiling rule to the running GPU now instead of at
-    # the next boot. Skipped in the image build chroot, where udev isn't running.
-    if [ -d /run/udev ] && command -v udevadm >/dev/null; then
+    # the next boot. The image build chroot bind-mounts the host's /run.
+    # Only trigger when ischroot confirms we are outside a chroot (exit 1).
+    chroot_status=0
+    ischroot || chroot_status=$?
+    if [ "$chroot_status" -eq 1 ] && [ -d /run/udev ] && command -v udevadm >/dev/null; then
         udevadm trigger --action=add --subsystem-match=platform \
             --property-match=DRIVER=panthor || true
     fi

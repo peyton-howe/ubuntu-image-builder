@@ -1,3 +1,10 @@
+rk3588-board-orangepi-5 (0.1.9-1) UNRELEASED; urgency=medium
+
+  * Skip the panthor udev trigger in image build chroots, where /run is
+    bind-mounted from the host.
+
+ -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
+
 rk3588-board-orangepi-5 (0.1.8-1) UNRELEASED; urgency=medium
 
   * Ship a udev rule enabling panthor's GPU timestamp profiling, so DRM
