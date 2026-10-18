@@ -264,6 +264,12 @@ static const u8 pdaf_gains[2][9] = {
 /* Total link rate of 549 MHz on 4 lanes. */
 #define IMX708_LINK_BPS_4LANE_549	4392000000ULL
 
+/*
+ * Total link rate of 750 MHz on 4 lanes, the fastest lane rate that needs
+ * no deskew calibration.
+ */
+#define IMX708_LINK_BPS_4LANE_750	6000000000ULL
+
 struct imx708_pll {
 	u32 vt_pre_div;
 	u32 vt_mult;
@@ -701,6 +707,17 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 				.line_length_pix = 10432,
 				.vblank_default = 58,
 				.pixel_rate = 830400000,
+			},
+			{
+				/*
+				 * 45 fps by default, 45.14 fps at the minimum
+				 * vblank. A line takes 8.36 us against 7.68 us
+				 * to drain it at this link rate.
+				 */
+				.min_link_bps = IMX708_LINK_BPS_4LANE_750,
+				.line_length_pix = 5216,
+				.vblank_default = 66,
+				.pixel_rate = 624000000,
 			},
 		},
 		.exposure_lines_min = 8,

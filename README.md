@@ -220,7 +220,9 @@ needs at least 3.84 Gbps of link (link frequency x 2 x lanes). 2304x1296
 has a third that needs the 4.39 Gbps of 4-lane 549 MHz. With
 `4lane,link-frequency=549000000` the driver uses the fastest of them:
 4608x2592 at 30 fps instead of 14, and 2304x1296 at 120 fps by default
-(up to 127) instead of up to 56. Two lanes at 450 MHz stay on the fallback timings.
+(up to 127) instead of up to 56. 4608x2592 has a third timing that needs
+the 6 Gbps of `4lane,link-frequency=750000000` and runs at 45 fps. Two
+lanes at 450 MHz stay on the fallback timings.
 `orientation` is 0 front,
 1 rear, 2 external (default 2).
 
