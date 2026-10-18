@@ -20,5 +20,8 @@ override_dh_auto_install:
 		debian/$(PKG)/usr/lib/dracut/modules.d/50rk3588-mmc/module-setup.sh
 	install -d debian/$(PKG)/usr/lib/modules-load.d
 	install -m 0644 files/modules-load.conf debian/$(PKG)/usr/lib/modules-load.d/$(PKG).conf
+	install -d debian/$(PKG)/usr/lib/udev/rules.d
+	install -m 0644 files/panthor-profiling.rules \
+		debian/$(PKG)/usr/lib/udev/rules.d/60-rk3588-panthor-profiling.rules
 	install -d debian/$(PKG)/etc/kernel/postinst.d
 	install -m 0755 files/unwrap-kernel debian/$(PKG)/etc/kernel/postinst.d/zz-rk3588-unwrap-kernel

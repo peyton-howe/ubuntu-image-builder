@@ -44,6 +44,15 @@ if [ "$1" = configure ]; then
     elif [ "$(dpkg-query -W -f='${Status}' initramfs-tools 2>/dev/null)" = "install ok installed" ]; then
         update-initramfs -u -k all || true
     fi
+    # Apply the panthor profiling rule to the running GPU now instead of at
+    # the next boot. The image build chroot bind-mounts the host's /run.
+    # Only trigger when ischroot confirms we are outside a chroot (exit 1).
+    chroot_status=0
+    ischroot || chroot_status=$?
+    if [ "$chroot_status" -eq 1 ] && [ -d /run/udev ] && command -v udevadm >/dev/null; then
+        udevadm trigger --action=add --subsystem-match=platform \
+            --property-match=DRIVER=panthor || true
+    fi
 fi
 
 #DEBHELPER#
