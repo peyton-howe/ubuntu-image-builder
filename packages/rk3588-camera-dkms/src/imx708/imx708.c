@@ -28,6 +28,15 @@ static int qbc_adjust = 2;
 module_param(qbc_adjust, int, 0644);
 MODULE_PARM_DESC(qbc_adjust, "Quad Bayer broken line correction strength [0,2-5]");
 
+/*
+ * Spare CSI-2 link time to leave per line when a mode timing is worked out
+ * from the link frequency. It covers packet headers and line blanking on
+ * the link.
+ */
+static unsigned int link_margin_pct = 8;
+module_param(link_margin_pct, uint, 0444);
+MODULE_PARM_DESC(link_margin_pct, "Spare CSI-2 link time per line when timings are computed, in percent");
+
 #define IMX708_REG_VALUE_08BIT		1
 #define IMX708_REG_VALUE_16BIT		2
 
@@ -154,19 +163,12 @@ struct imx708_reg_list {
 };
 
 /*
- * Mode timings, which depend on how much bandwidth the CSI-2 link has to
- * drain each line. A mode lists one timing per link rate it has been set up
- * for. The first entry needs no particular rate and is the fallback for any
- * link too slow for the others.
+ * A mode timing: line length and pixel rate, which set how long a line
+ * takes, and the default vblank. Each mode has a fixed fallback timing,
+ * the Raspberry Pi's, and imx708_update_timing() works out a faster one
+ * when the CSI-2 link has the bandwidth for it.
  */
-#define IMX708_NUM_MODE_TIMINGS		5
-
 struct imx708_mode_timing {
-	/*
-	 * Total CSI-2 bit rate, link frequency x 2 x data lanes, this timing
-	 * needs. Unset in the fallback entry.
-	 */
-	u64 min_link_bps;
 	/* H-timing in pixels */
 	unsigned int line_length_pix;
 	/* Default framerate. */
@@ -192,8 +194,15 @@ struct imx708_mode {
 	/* Default register values */
 	struct imx708_reg_list reg_list;
 
-	/* Timings, the first being the fallback. */
-	struct imx708_mode_timing timings[IMX708_NUM_MODE_TIMINGS];
+	/* Timing for links too slow for anything faster. */
+	struct imx708_mode_timing fallback;
+
+	/*
+	 * Line lengths a computed timing may use. None for a mode that only
+	 * runs its fallback timing.
+	 */
+	const unsigned int *line_lengths;
+	unsigned int num_line_lengths;
 
 	/* Not all modes have the same minimum exposure. */
 	u32 exposure_lines_min;
@@ -258,20 +267,8 @@ static const u8 pdaf_gains[2][9] = {
  */
 #define IMX708_DESKEW_LANE_RATE		1500000000ULL
 
-/* Total link rate of 750 MHz on 2 lanes. */
-#define IMX708_LINK_BPS_2LANE_750	3000000000ULL
-
-/* Total link rate the faster timings were set up for: 960 MHz, 2 lanes. */
-#define IMX708_LINK_BPS_FAST		3840000000ULL
-
-/* Total link rate of 549 MHz on 4 lanes. */
-#define IMX708_LINK_BPS_4LANE_549	4392000000ULL
-
-/*
- * Total link rate of 750 MHz on 4 lanes, the fastest lane rate that needs
- * no deskew calibration.
- */
-#define IMX708_LINK_BPS_4LANE_750	6000000000ULL
+/* Bits per pixel on the link: the modes are all RAW10. */
+#define IMX708_BITS_PER_PIXEL		10
 
 struct imx708_pll {
 	u32 vt_pre_div;
@@ -675,14 +672,24 @@ static const struct imx708_reg mode_hdr_regs[] = {
 };
 
 /*
- * Mode configs. Keep separate lists for when HDR is enabled or not.
- *
- * line_length_pix must be one the sensor permits for the mode:
+ * Line lengths the sensor permits:
  *   full resolution and HDR: 5216, 10432, 15648 or 20864
  *   2x2 binned:              2608, 5216, 7824 or 10432
- * The 720p cropped and HDR modes do not produce frames at 2608, so they
- * stay at 5216 or longer.
+ * The 720p cropped and HDR modes do not produce frames at 2608.
  */
+static const unsigned int imx708_line_lengths_full[] = {
+	5216, 10432, 15648, 20864,
+};
+
+static const unsigned int imx708_line_lengths_binned[] = {
+	2608, 5216, 7824, 10432,
+};
+
+static const unsigned int imx708_line_lengths_binned_crop[] = {
+	5216, 7824, 10432,
+};
+
+/* Mode configs. Keep separate lists for when HDR is enabled or not. */
 static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 	{
 		/* Full resolution. */
@@ -699,40 +706,13 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 			.num_of_regs = ARRAY_SIZE(mode_4608x2592_regs),
 			.regs = mode_4608x2592_regs,
 		},
-		.timings = {
-			{
-				.line_length_pix = 15648,
-				.vblank_default = 58,
-				.pixel_rate = 595200000,
-			},
-			{
-				/*
-				 * 22.6 fps. A line takes 16.72 us against
-				 * 15.36 us to drain it at this link rate.
-				 */
-				.min_link_bps = IMX708_LINK_BPS_2LANE_750,
-				.line_length_pix = 10432,
-				.vblank_default = 58,
-				.pixel_rate = 624000000,
-			},
-			{
-				.min_link_bps = IMX708_LINK_BPS_FAST,
-				.line_length_pix = 10432,
-				.vblank_default = 58,
-				.pixel_rate = 830400000,
-			},
-			{
-				/*
-				 * 45 fps by default, 45.14 fps at the minimum
-				 * vblank. A line takes 8.36 us against 7.68 us
-				 * to drain it at this link rate.
-				 */
-				.min_link_bps = IMX708_LINK_BPS_4LANE_750,
-				.line_length_pix = 5216,
-				.vblank_default = 66,
-				.pixel_rate = 624000000,
-			},
+		.fallback = {
+			.line_length_pix = 15648,
+			.vblank_default = 58,
+			.pixel_rate = 595200000,
 		},
+		.line_lengths = imx708_line_lengths_full,
+		.num_line_lengths = ARRAY_SIZE(imx708_line_lengths_full),
 		.exposure_lines_min = 8,
 		.exposure_lines_step = 1,
 		.hdr = false,
@@ -753,54 +733,13 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 			.num_of_regs = ARRAY_SIZE(mode_2x2binned_regs),
 			.regs = mode_2x2binned_regs,
 		},
-		.timings = {
-			{
-				.line_length_pix = 7824,
-				.vblank_default = 1198,
-				.pixel_rate = 585600000,
-			},
-			{
-				/*
-				 * 89.5 fps at the minimum vblank, the default
-				 * here. A line takes 8.36 us against 7.68 us to
-				 * drain it at this link rate.
-				 */
-				.min_link_bps = IMX708_LINK_BPS_2LANE_750,
-				.line_length_pix = 5216,
-				.vblank_default = 40,
-				.pixel_rate = 624000000,
-			},
-			{
-				.min_link_bps = IMX708_LINK_BPS_FAST,
-				.line_length_pix = 5216,
-				.vblank_default = 3888,
-				.pixel_rate = 811200000,
-			},
-			{
-				/*
-				 * The shortest binned line at the lowest pixel
-				 * rate the IVT PLL allows: 120 fps by default,
-				 * 126.7 fps at the minimum vblank. A line takes
-				 * 5.91 us against 5.25 us to drain it at this
-				 * link rate.
-				 */
-				.min_link_bps = IMX708_LINK_BPS_4LANE_549,
-				.line_length_pix = 2608,
-				.vblank_default = 115,
-				.pixel_rate = 441600000,
-			},
-			{
-				/*
-				 * 179 fps at the minimum vblank, the default
-				 * here. A line takes 4.18 us against 3.84 us to
-				 * drain it at this link rate.
-				 */
-				.min_link_bps = IMX708_LINK_BPS_4LANE_750,
-				.line_length_pix = 2608,
-				.vblank_default = 40,
-				.pixel_rate = 624000000,
-			},
+		.fallback = {
+			.line_length_pix = 7824,
+			.vblank_default = 1198,
+			.pixel_rate = 585600000,
 		},
+		.line_lengths = imx708_line_lengths_binned,
+		.num_line_lengths = ARRAY_SIZE(imx708_line_lengths_binned),
 		.exposure_lines_min = 4,
 		.exposure_lines_step = 2,
 		.hdr = false,
@@ -821,24 +760,13 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 			.num_of_regs = ARRAY_SIZE(mode_2x2binned_720p_regs),
 			.regs = mode_2x2binned_720p_regs,
 		},
-		.timings = {
-			{
-				.line_length_pix = 5216,
-				.vblank_default = 2755,
-				.pixel_rate = 566400000,
-			},
-			{
-				/*
-				 * The Pi's timing for a 960 MHz 2-lane link. A
-				 * line takes 6.07 us against 5.12 us to drain it
-				 * at 3 Gbps, so it needs no more than that.
-				 */
-				.min_link_bps = IMX708_LINK_BPS_2LANE_750,
-				.line_length_pix = 5216,
-				.vblank_default = 4627,
-				.pixel_rate = 859200000,
-			},
+		.fallback = {
+			.line_length_pix = 5216,
+			.vblank_default = 2755,
+			.pixel_rate = 566400000,
 		},
+		.line_lengths = imx708_line_lengths_binned_crop,
+		.num_line_lengths = ARRAY_SIZE(imx708_line_lengths_binned_crop),
 		.exposure_lines_min = 4,
 		.exposure_lines_step = 2,
 		.hdr = false,
@@ -862,12 +790,10 @@ static const struct imx708_mode supported_modes_10bit_hdr[] = {
 			.num_of_regs = ARRAY_SIZE(mode_hdr_regs),
 			.regs = mode_hdr_regs,
 		},
-		.timings = {
-			{
-				.line_length_pix = 5216,
-				.vblank_default = 3673,
-				.pixel_rate = 777600000,
-			},
+		.fallback = {
+			.line_length_pix = 5216,
+			.vblank_default = 3673,
+			.pixel_rate = 777600000,
 		},
 		.exposure_lines_min = 8 * IMX708_HDR_EXPOSURE_RATIO * IMX708_HDR_EXPOSURE_RATIO,
 		.exposure_lines_step = 2 * IMX708_HDR_EXPOSURE_RATIO * IMX708_HDR_EXPOSURE_RATIO,
@@ -977,6 +903,9 @@ struct imx708 {
 
 	/* Two or Four lanes */
 	u8 lanes;
+
+	/* Timing for the current mode and link frequency */
+	struct imx708_mode_timing timing;
 
 	/* PLL configuration for the current mode and link frequency */
 	struct imx708_pll pll;
@@ -1218,27 +1147,104 @@ static u64 imx708_link_bps(const struct imx708 *imx708)
 }
 
 /*
- * Return the timing to use for the current mode: the one needing the most
- * link bandwidth that this link still has.
+ * Highest pixel rate at or below max_rate that the IVT branch can make
+ * exactly, or 0 if there is none.
  */
-static const struct imx708_mode_timing *
-imx708_get_timing(const struct imx708 *imx708)
+static u64 imx708_vt_rate_floor(u32 inclk_freq, u64 max_rate)
 {
-	const struct imx708_mode *mode = imx708->mode;
-	const struct imx708_mode_timing *best = &mode->timings[0];
-	u64 link_bps = imx708_link_bps(imx708);
-	unsigned int i;
+	static const u32 sys_divs[] = { 2, 4 };
+	unsigned int i, pre_div, mult;
+	u64 best = 0;
 
-	for (i = 1; i < ARRAY_SIZE(mode->timings); i++) {
-		const struct imx708_mode_timing *timing = &mode->timings[i];
+	for (pre_div = 1; pre_div <= 4; pre_div++) {
+		u64 ip_clk = inclk_freq / pre_div;
 
-		if (timing->min_link_bps &&
-		    timing->min_link_bps <= link_bps &&
-		    timing->min_link_bps > best->min_link_bps)
-			best = timing;
+		if (inclk_freq % pre_div ||
+		    ip_clk < IMX708_PLL_IP_CLK_MIN ||
+		    ip_clk > IMX708_PLL_IP_CLK_MAX)
+			continue;
+
+		for (i = 0; i < ARRAY_SIZE(sys_divs); i++) {
+			u32 div = sys_divs[i] * IMX708_VT_PIX_CLK_DIV;
+
+			/* Highest multiplier first; the first fit is the best. */
+			for (mult = IMX708_VT_PLL_MULT_MAX;
+			     mult >= IMX708_VT_PLL_MULT_MIN; mult--) {
+				u64 pll_out = ip_clk * mult;
+				u64 pix_clk, rate;
+				u32 rem;
+
+				if (pll_out > IMX708_VT_PLL_OUT_MAX)
+					continue;
+				if (pll_out < IMX708_VT_PLL_OUT_MIN)
+					break;
+
+				pix_clk = div_u64_rem(pll_out, div, &rem);
+				if (rem || pix_clk > IMX708_VT_PIX_CLK_MAX)
+					continue;
+				if (pix_clk < IMX708_VT_PIX_CLK_MIN)
+					break;
+
+				rate = pix_clk * IMX708_VT_PIX_PER_CLK;
+				if (rate > max_rate)
+					continue;
+
+				best = max(best, rate);
+				break;
+			}
+		}
 	}
 
 	return best;
+}
+
+/*
+ * Work out the timing for the current mode and link frequency.
+ *
+ * A line has to cross the link, width x 10 bits at link frequency x 2 x
+ * lanes, with link_margin_pct to spare, before the sensor has the next
+ * one. For each line length the mode permits, take the highest pixel rate
+ * the IVT branch can make that keeps the line at least that long, and use
+ * the line length that gives the shortest line. Within 1% of each other,
+ * the lower pixel rate wins. The mode's fallback timing stays unless the
+ * result is more than 1% faster, and a computed timing defaults to the
+ * mode's highest frame rate.
+ */
+static void imx708_update_timing(struct imx708 *imx708)
+{
+	const struct imx708_mode *mode = imx708->mode;
+	struct imx708_mode_timing *best = &imx708->timing;
+	u64 line_bits = (u64)mode->width * IMX708_BITS_PER_PIXEL;
+	u64 link_bps = imx708_link_bps(imx708);
+	bool computed = false;
+	unsigned int i;
+
+	*best = mode->fallback;
+
+	for (i = 0; i < mode->num_line_lengths; i++) {
+		u64 len = mode->line_lengths[i];
+		u64 max_rate, rate;
+		u64 this_time, best_time;
+
+		max_rate = div64_u64(len * 100 * link_bps,
+				     line_bits * (100 + link_margin_pct));
+		rate = imx708_vt_rate_floor(imx708->inclk_freq, max_rate);
+		if (!rate)
+			continue;
+
+		/* Line times scaled by both pixel rates, so they compare. */
+		this_time = len * best->pixel_rate;
+		best_time = (u64)best->line_length_pix * rate;
+
+		if (this_time * 100 < best_time * 99 ||
+		    (computed && this_time * 100 <= best_time * 101 &&
+		     rate < best->pixel_rate)) {
+			best->line_length_pix = len;
+			best->pixel_rate = rate;
+			best->vblank_default = mode->vblank_min;
+			computed = true;
+		}
+	}
 }
 
 /*
@@ -1333,7 +1339,7 @@ static int imx708_pll_calculate_vt(u32 inclk_freq, u64 pixel_rate,
 static int imx708_pll_update(struct imx708 *imx708)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(&imx708->sd);
-	const struct imx708_mode_timing *timing = imx708_get_timing(imx708);
+	const struct imx708_mode_timing *timing = &imx708->timing;
 	int ret;
 
 	ret = imx708_pll_calculate_vt(imx708->inclk_freq, timing->pixel_rate,
@@ -1394,9 +1400,11 @@ static int imx708_pll_write(struct imx708 *imx708)
 
 static void imx708_set_framing_limits(struct imx708 *imx708)
 {
-	const struct imx708_mode_timing *timing = imx708_get_timing(imx708);
+	const struct imx708_mode_timing *timing = &imx708->timing;
 	const struct imx708_mode *mode = imx708->mode;
 	unsigned int hblank;
+
+	imx708_update_timing(imx708);
 
 	__v4l2_ctrl_modify_range(imx708->pixel_rate,
 				 timing->pixel_rate, timing->pixel_rate,
@@ -1805,7 +1813,7 @@ static int imx708_start_streaming(struct imx708 *imx708)
 	/* Line length and PLL tree for this mode and link frequency */
 	ret = imx708_write_reg(imx708, IMX708_REG_LINE_LENGTH,
 			       IMX708_REG_VALUE_16BIT,
-			       imx708_get_timing(imx708)->line_length_pix);
+			       imx708->timing.line_length_pix);
 	if (!ret)
 		ret = imx708_pll_update(imx708);
 	if (!ret)

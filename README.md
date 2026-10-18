@@ -215,18 +215,25 @@ driver does. Any frequency the output PLL can make exactly is accepted
 or below 750000000: faster lanes need D-PHY deskew calibration from the
 sensor, which this driver does not enable, and it warns at probe.
 
-Each mode has a fallback timing and, from the Pi driver, a faster one that
-needs at least 3.84 Gbps of link (link frequency x 2 x lanes). 2304x1296
-has a third that needs the 4.39 Gbps of 4-lane 549 MHz. With
-`4lane,link-frequency=549000000` the driver uses the fastest of them:
-4608x2592 at 30 fps instead of 14, and 2304x1296 at 120 fps by default
-(up to 127) instead of up to 56. 4608x2592 has a third timing that needs
-the 6 Gbps of `4lane,link-frequency=750000000` and runs at 45 fps; there
-2304x1296 runs at 179 fps. 1536x864 tops out at about 182 fps from 3 Gbps up,
-and HDR stays at 30 fps. `link-frequency=750000000` on two lanes (3 Gbps)
-gets a middle tier: 4608x2592 at 22.6 fps, 2304x1296 at 89.5 fps and
-1536x864 up to 182 fps. Two lanes at 450 MHz stay on the fallback
-timings.
+Frame rates follow from the link. Each mode keeps the Pi's timing as a
+fallback, and the driver works out a faster one when the link
+(link frequency x 2 x lanes) has room. For each line length the sensor
+permits for the mode it takes the highest pixel rate that leaves 8% of
+each line's link time to spare (the `link_margin_pct` module parameter),
+and keeps whichever gives the shortest line time. A
+computed timing defaults to the mode's highest frame rate. HDR always uses
+its fixed timing.
+
+| Link | 4608x2592 | 2304x1296 | 1536x864 |
+|---|---|---|---|
+| 2 lanes, 450 MHz | 14.4 | 30 (up to 56) | 30 (up to 120) |
+| 2 lanes, 600 MHz | 18.2 | 72 | 160 |
+| 2 lanes, 750 MHz | 22.7 | 90 | 183 |
+| 4 lanes, 450 MHz | 27.3 | 108 | 183 |
+| 4 lanes, 549 MHz | 33.2 | 132 | 183 |
+| 4 lanes, 750 MHz | 45.5 | 180 | 183 |
+
+These are worked out, not measured; check the frame rate on the board.
 `orientation` is 0 front,
 1 rear, 2 external (default 2).
 

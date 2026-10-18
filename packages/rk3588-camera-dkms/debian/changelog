@@ -5,25 +5,18 @@ rk3588-camera-dkms (0.1.11-1) UNRELEASED; urgency=medium
   * Version above the 0.1.8 to 0.1.10 imx708 test builds.
   * Drop rk-camera-module.h, rk-video-format.h and the asm/unaligned.h
     shim. imx708.c includes none of them.
-  * imx708: work out both PLLs from the mode timing and the link
-    frequency, as the Raspberry Pi driver does, without its CCS PLL
+  * imx708: work out both PLLs from the link frequency and the mode
+    timing, as the Raspberry Pi driver does, without its CCS PLL
     calculator. Any link frequency the output PLL can make exactly is
     accepted, and above 1.5 Gbps per lane the driver warns that deskew is
     not enabled.
-  * imx708: give each mode the Pi's fallback timing plus its faster one,
-    used when the link carries at least 3.84 Gbps. 4-lane 549 MHz gets
-    4608x2592 at 30 fps. 2304x1296 goes back to the Pi's 7824-pixel line
-    on slower links; the 2608-pixel line overran a 2-lane 450 MHz link.
-  * imx708: 2304x1296 runs at 120 fps by default on 4-lane 549 MHz (up
-    to 126.7 fps): a 2608-pixel line at 441.6 MHz, the lowest pixel rate
-    the IVT PLL allows.
-  * imx708: 4608x2592 runs at 45 fps on 4-lane 750 MHz, a 5216-pixel
-    line at 624 MHz. 750 MHz is the fastest lane rate without deskew.
-  * imx708: 2304x1296 runs at 179 fps on 4-lane 750 MHz, a 2608-pixel line
-    at 624 MHz.
-  * imx708: add a tier for 3 Gbps links such as 2-lane 750 MHz: 4608x2592
-    at 22.6 fps and 2304x1296 at 89.5 fps, both at 624 MHz, and 1536x864
-    up to 182 fps on the Pi's fast timing.
+  * imx708: work out each mode's timing from the link too: the permitted
+    line length and highest pixel rate that give the shortest line time
+    while leaving link_margin_pct (default 8) of the line's link time to
+    spare, defaulting to the mode's highest frame rate. The Pi's timing stays as the fallback,
+    and HDR keeps its fixed timing. 2-lane 450 MHz is unchanged; 4-lane
+    549 MHz gives 4608x2592 at 33 fps and 2304x1296 at 132 fps, and
+    4-lane 750 MHz 45 and 180 fps.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
