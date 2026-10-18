@@ -159,7 +159,7 @@ struct imx708_reg_list {
  * for. The first entry needs no particular rate and is the fallback for any
  * link too slow for the others.
  */
-#define IMX708_NUM_MODE_TIMINGS		2
+#define IMX708_NUM_MODE_TIMINGS		3
 
 struct imx708_mode_timing {
 	/*
@@ -260,6 +260,9 @@ static const u8 pdaf_gains[2][9] = {
 
 /* Total link rate the faster timings were set up for: 960 MHz, 2 lanes. */
 #define IMX708_LINK_BPS_FAST		3840000000ULL
+
+/* Total link rate of 549 MHz on 4 lanes. */
+#define IMX708_LINK_BPS_4LANE_549	4392000000ULL
 
 struct imx708_pll {
 	u32 vt_pre_div;
@@ -723,6 +726,19 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 				.line_length_pix = 0x1460,
 				.vblank_default = 3888,
 				.pixel_rate = 811200000,
+			},
+			{
+				/*
+				 * The shortest binned line at the lowest pixel
+				 * rate the IVT PLL allows: 120 fps by default,
+				 * 126.7 fps at the minimum vblank. A line takes
+				 * 5.91 us against 5.25 us to drain it at this
+				 * link rate.
+				 */
+				.min_link_bps = IMX708_LINK_BPS_4LANE_549,
+				.line_length_pix = 2608,
+				.vblank_default = 115,
+				.pixel_rate = 441600000,
 			},
 		},
 		.exposure_lines_min = 4,

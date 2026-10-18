@@ -14,6 +14,9 @@ rk3588-camera-dkms (0.1.11-1) UNRELEASED; urgency=medium
     used when the link carries at least 3.84 Gbps. 4-lane 549 MHz gets
     4608x2592 at 30 fps. 2304x1296 goes back to the Pi's 7824-pixel line
     on slower links; the 2608-pixel line overran a 2-lane 450 MHz link.
+  * imx708: 2304x1296 runs at 120 fps by default on 4-lane 549 MHz (up
+    to 126.7 fps): a 2608-pixel line at 441.6 MHz, the lowest pixel rate
+    the IVT PLL allows.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
