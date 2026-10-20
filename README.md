@@ -316,7 +316,11 @@ to regenerate the DKMS sources and overlays in `packages/`.
   sensor started, with nothing logged. Waiting 15 s in between avoided it
   in testing, as did using only libcamera or only raw V4L2. At 4-lane
   750 MHz libcamera alone hung the same way on its fourth run, while 80
-  raw V4L2 start/stops were clean, so use 549 MHz with libcamera. The cause
+  raw V4L2 start/stops were clean, so use 549 MHz with libcamera. The
+  trigger narrows to rkcif capturing into imported DMABUFs, which is how
+  libcamera queues its buffers: a raw capture that exports rkcif's MMAP
+  buffers and queues them back as DMABUFs hung on its 38th stream at
+  750 MHz, while the same loop with MMAP buffers ran 80 clean. The cause
   isn't known. It is separate from the rkcif stream-stop hang that the
   replacement `rockchip-cif` module in `rk3588-camera-dkms` fixes.
 - **GitHub rate limits.** The Orange Pi 5 and 5B package builds fetch
