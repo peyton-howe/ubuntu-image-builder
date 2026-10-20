@@ -1546,6 +1546,15 @@ static int imx708_set_ctrl(struct v4l2_ctrl *ctrl)
 	case V4L2_CID_WIDE_DYNAMIC_RANGE:
 		/* Already handled above. */
 		break;
+	case V4L2_CID_PIXEL_RATE:
+	case V4L2_CID_LINK_FREQ:
+		/*
+		 * Read-only. imx708_set_framing_limits() changes their range,
+		 * and V4L2 applies the new value through here; there is no
+		 * register to write. Rejecting it left the old value in place
+		 * whenever the sensor was powered, as it is at probe.
+		 */
+		break;
 	default:
 		dev_info(&client->dev,
 			 "ctrl(id:0x%x,val:0x%x) is not handled\n",
