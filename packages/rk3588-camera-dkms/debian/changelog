@@ -13,11 +13,15 @@ rk3588-camera-dkms (0.1.11-1) UNRELEASED; urgency=medium
   * imx708: work out each mode's timing from the link too: the permitted
     line length and highest pixel rate that give the shortest line time
     while leaving link_margin_pct (default 8) of the line's link time to
-    spare and the link idle for min_line_gap_ns (default 500) between
+    spare and the link idle for min_line_gap_ns (default 600) between
     lines, defaulting to the mode's highest frame rate. The Pi's timing
     stays as the fallback, and HDR keeps its fixed timing. 2-lane 450 MHz
     is unchanged; 4-lane 549 MHz gives 4608x2592 at 33 fps and 2304x1296
-    at 130 fps, and 4-lane 750 MHz 45 and 172 fps.
+    at 128 fps, and 4-lane 750 MHz 45 and 168 fps.
+  * Build the DCPHY replacement module (phy-rockchip-samsung-dcphy, DCPHY RX
+    v4) for the Orange Pi 5 CAM2/CAM3 receivers. It installs under
+    updates/dkms, which depmod prefers over Ubuntu's transmitter-only module.
+    dcphy-compat.h supplies PHY_TYPE_DSI/PHY_TYPE_CSI for stock headers.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
