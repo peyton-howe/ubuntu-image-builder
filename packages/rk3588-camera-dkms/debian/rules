@@ -20,6 +20,7 @@ override_dh_auto_install:
 	# The in-tree Makefile keys off CONFIG_VIDEO_ROCKCHIP_ISP2; DKMS always builds.
 	cp -a src/rkisp2/Makefile.oot $(DEST)/rkisp2/Makefile
 	cp -a src/dcphy $(DEST)/dcphy
+	cp -a src/rkcif $(DEST)/rkcif
 	# Working copy of dkms.conf next to sources (dh_dkms also installs one)
 	cp -a debian/rk3588-camera-dkms.dkms $(DEST)/dkms.conf
 	sed -i 's/#MODULE_VERSION#/$(VERSION)/' $(DEST)/dkms.conf

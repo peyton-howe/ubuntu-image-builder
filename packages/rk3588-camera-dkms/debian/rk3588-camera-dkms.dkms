@@ -10,5 +10,10 @@ BUILT_MODULE_NAME[1]="rockchip-isp2"
 BUILT_MODULE_LOCATION[1]="rkisp2"
 DEST_MODULE_LOCATION[1]="/updates/dkms"
 
+# Replaces Ubuntu's in-tree rockchip-cif (VICAP capture).
+BUILT_MODULE_NAME[2]="rockchip-cif"
+BUILT_MODULE_LOCATION[2]="rkcif"
+DEST_MODULE_LOCATION[2]="/updates/dkms"
+
 MAKE[0]="make -C ${kernel_source_dir} M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build"
 CLEAN[0]="make -C ${kernel_source_dir} M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build clean"
