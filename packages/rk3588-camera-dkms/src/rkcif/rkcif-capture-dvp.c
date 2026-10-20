@@ -774,12 +774,15 @@ irqreturn_t rkcif_dvp_isr(int irq, void *ctx)
 
 		stream = &rkcif->interfaces[RKCIF_DVP].streams[RKCIF_ID0];
 
+		spin_lock(&stream->stop_lock);
 		if (stream->stopping) {
 			rkcif_dvp_stop_streaming(stream);
+			spin_unlock(&stream->stop_lock);
 			wake_up(&stream->wq_stopped);
 			ret = IRQ_HANDLED;
 			goto out;
 		}
+		spin_unlock(&stream->stop_lock);
 
 		if (lastline != stream->pix.height) {
 			v4l2_err(&rkcif->v4l2_dev,

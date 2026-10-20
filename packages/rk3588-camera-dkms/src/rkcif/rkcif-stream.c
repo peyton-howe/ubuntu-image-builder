@@ -6,6 +6,7 @@
  * Copyright (C) 2025 Collabora, Ltd.
  */
 
+#include <linux/module.h>
 #include <linux/pm_runtime.h>
 
 #include <media/v4l2-common.h>
@@ -23,6 +24,10 @@
 #define CIF_MIN_HEIGHT	 64
 #define CIF_MAX_WIDTH	 8192
 #define CIF_MAX_HEIGHT	 8192
+
+static bool stop_debug;
+module_param(stop_debug, bool, 0644);
+MODULE_PARM_DESC(stop_debug, "Log each step of stopping a stream");
 
 static inline struct rkcif_buffer *to_rkcif_buffer(struct vb2_v4l2_buffer *vb)
 {
@@ -305,25 +310,59 @@ static void rkcif_stream_stop_streaming(struct vb2_queue *queue)
 {
 	struct rkcif_stream *stream = queue->drv_priv;
 	struct rkcif_device *rkcif = stream->rkcif;
+	unsigned long flags;
+	ktime_t start;
 	u64 mask;
-	int ret;
+	long ret;
 
+	/*
+	 * Stop the capture first, at the next frame end, while the source is
+	 * still sending: the DMA then finishes a whole frame and stays idle.
+	 * Stopping the source first can cut a frame off, leaving the DMA
+	 * waiting for lines that never come, and the buffers and the dummy
+	 * buffer were then freed and runtime PM dropped under it. On RK3588
+	 * that hung the board after a few start/stop cycles.
+	 */
+	start = ktime_get();
+	spin_lock_irqsave(&stream->stop_lock, flags);
+	stream->stopping = true;
+	spin_unlock_irqrestore(&stream->stop_lock, flags);
+
+	ret = wait_event_timeout(stream->wq_stopped, !READ_ONCE(stream->stopping),
+				 msecs_to_jiffies(1000));
+
+	spin_lock_irqsave(&stream->stop_lock, flags);
+	if (stream->stopping) {
+		/* No frame end: stop anyway, even if mid-frame */
+		if (stream->stop_streaming)
+			stream->stop_streaming(stream);
+		stream->stopping = false;
+		ret = 0;
+	}
+	spin_unlock_irqrestore(&stream->stop_lock, flags);
+
+	if (!ret)
+		dev_warn(rkcif->dev, "stream %d: no frame end within 1 s, capture stopped mid-frame\n",
+			 stream->id);
+	else if (stop_debug)
+		dev_info(rkcif->dev, "stream %d: capture stopped at frame end after %lld us\n",
+			 stream->id, ktime_us_delta(ktime_get(), start));
+
+	/* Now stop the source */
 	mask = BIT_ULL(stream->id);
 	v4l2_subdev_disable_streams(&stream->interface->sd, RKCIF_IF_PAD_SRC,
 				    mask);
+	if (stop_debug)
+		dev_info(rkcif->dev, "stream %d: source stopped\n", stream->id);
 
-	stream->stopping = true;
-	ret = wait_event_timeout(stream->wq_stopped, !stream->stopping,
-				 msecs_to_jiffies(1000));
-
-	if (!ret && stream->stop_streaming)
-		stream->stop_streaming(stream);
+	/* The DMA is idle: buffers and the dummy buffer can go */
+	rkcif_stream_return_all_buffers(stream, VB2_BUF_STATE_ERROR);
 
 	pm_runtime_put(rkcif->dev);
 
-	rkcif_stream_return_all_buffers(stream, VB2_BUF_STATE_ERROR);
-
 	video_device_pipeline_stop(&stream->vdev);
+	if (stop_debug)
+		dev_info(rkcif->dev, "stream %d: stopped\n", stream->id);
 }
 
 static const struct vb2_ops rkcif_stream_vb2_ops = {
@@ -539,6 +578,7 @@ int rkcif_stream_register(struct rkcif_device *rkcif,
 	INIT_LIST_HEAD(&stream->driver_queue);
 	spin_lock_init(&stream->driver_queue_lock);
 
+	spin_lock_init(&stream->stop_lock);
 	init_waitqueue_head(&stream->wq_stopped);
 
 	mutex_init(&stream->vlock);
