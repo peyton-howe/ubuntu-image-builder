@@ -154,7 +154,13 @@ struct rkcif_stream {
 	/* in case of no available buffer, HW can write to the dummy buffer */
 	struct rkcif_dummy_buffer dummy;
 
+	/*
+	 * Set by stop_streaming() and cleared by the frame end interrupt once
+	 * it has stopped the capture. stop_lock serialises the two, since the
+	 * interrupt handler cannot sleep.
+	 */
 	bool stopping;
+	spinlock_t stop_lock;
 	wait_queue_head_t wq_stopped;
 
 	/* queue of available buffers plus spinlock that protects it */

@@ -3,6 +3,11 @@ rk3588-camera-dkms (0.1.11-1) UNRELEASED; urgency=medium
   * Bind rockchip,rk3588-isp-unite. The device clocks both ISP cores
     and register writes go to both windows.
   * Version above the 0.1.8 to 0.1.10 imx708 test builds.
+  * Replace Ubuntu's rockchip-cif with rkcif v7.3 plus a fixed stream stop.
+    It now stops the capture at a frame end before stopping the source,
+    and frees the buffers and dummy buffer only after the DMA is idle.
+    The interrupt handler no longer takes the subdev state mutex. With the
+    stock driver, repeated start/stop hung a ROCK 5B+ within a few cycles.
   * Drop rk-camera-module.h, rk-video-format.h and the asm/unaligned.h
     shim. imx708.c includes none of them.
   * imx708: work out both PLLs from the link frequency and the mode

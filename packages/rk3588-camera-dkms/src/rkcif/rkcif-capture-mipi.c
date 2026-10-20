@@ -776,13 +776,16 @@ out:
 	return ret;
 }
 
+/*
+ * Called from the frame end interrupt, or with stream->stop_lock held, so it
+ * must not sleep. It only writes registers, so it takes no subdev state lock:
+ * that is a mutex, and taking it in the interrupt handler could sleep in
+ * atomic context.
+ */
 static void rkcif_mipi_stop_streaming(struct rkcif_stream *stream)
 {
 	struct rkcif_interface *interface = stream->interface;
-	struct v4l2_subdev_state *state;
 	u32 int_temp = 0, int_mask = 0;
-
-	state = v4l2_subdev_lock_and_get_active_state(&interface->sd);
 
 	rkcif_mipi_stream_write(stream, RKCIF_MIPI_CTRL0, 0);
 
@@ -798,8 +801,6 @@ static void rkcif_mipi_stop_streaming(struct rkcif_stream *stream)
 	rkcif_mipi_write(interface, RKCIF_MIPI_INTSTAT, int_temp);
 
 	stream->stopping = false;
-
-	v4l2_subdev_unlock_state(state);
 }
 
 static void rkcif_mipi_set_crop(struct rkcif_stream *stream, u16 left, u16 top)
@@ -831,11 +832,14 @@ irqreturn_t rkcif_mipi_isr(int irq, void *ctx)
 			    intstat & RKCIF_MIPI_INT_FRAME1_END(stream->id)) {
 				ret = IRQ_HANDLED;
 
+				spin_lock(&stream->stop_lock);
 				if (stream->stopping) {
 					rkcif_mipi_stop_streaming(stream);
+					spin_unlock(&stream->stop_lock);
 					wake_up(&stream->wq_stopped);
 					continue;
 				}
+				spin_unlock(&stream->stop_lock);
 
 				rkcif_stream_pingpong(stream);
 			}
