@@ -308,6 +308,14 @@ to regenerate the DKMS sources and overlays in `packages/`.
   image: only uid 0 is mapped, so the rootfs copy can't restore non-root file
   owners, and file capabilities written there aren't valid on the board.
   Builds without sudo are unsupported.
+- **Raw V4L2 capture straight before libcamera can hang the board.** On a
+  ROCK 5B+ (IMX708, 4 lanes at 549 MHz), starting a libcamera stream within
+  a few seconds of a raw capture on the rkcif video node (`v4l2-ctl
+  --stream-mmap`) hung the board about one time in four, right after the
+  sensor started, with nothing logged. Waiting 15 s in between avoided it
+  in testing, as did using only libcamera or only raw V4L2. The cause isn't
+  known. It is separate from the rkcif stream-stop hang that the
+  replacement `rockchip-cif` module in `rk3588-camera-dkms` fixes.
 - **GitHub rate limits.** The Orange Pi 5 and 5B package builds fetch
   device-tree sources from GitHub. The fetch is cached under each package's
   `build/` directory, but fresh clones and CI fetch every time and can hit
