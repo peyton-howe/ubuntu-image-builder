@@ -41,10 +41,11 @@ MODULE_PARM_DESC(link_margin_pct, "Spare CSI-2 link time per line when timings a
  * Shortest idle time to leave on the link between lines, whatever the
  * percentage margin gives. Short binned lines get little absolute slack from
  * a percentage. On a ROCK 5B+ at 4-lane 750 MHz, binned lines with 0.31 us
- * or 0.51 us between them left the CSI receiver dead until reboot, or hung
- * the board; 0.58 us ran cleanly.
+ * between them stopped the CSI receive chain delivering frames on the second
+ * stream start, until the sensor was rebound; with 0.51 us, 40 binned
+ * start/stops were clean.
  */
-static unsigned int min_line_gap_ns = 600;
+static unsigned int min_line_gap_ns = 500;
 module_param(min_line_gap_ns, uint, 0444);
 MODULE_PARM_DESC(min_line_gap_ns, "Shortest idle CSI-2 link time per line when timings are computed, in ns");
 

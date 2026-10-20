@@ -219,13 +219,14 @@ Frame rates follow from the link. Each mode keeps the Pi's timing as a
 fallback, and the driver works out a faster one when the link
 (link frequency x 2 x lanes) has room. For each line length the sensor
 permits for the mode it takes the highest pixel rate that leaves 8% of
-each line's link time to spare and the link idle for at least 0.6 us
+each line's link time to spare and the link idle for at least 0.5 us
 between lines (the `link_margin_pct` and `min_line_gap_ns` module
 parameters), and keeps whichever gives the shortest line time. A
 computed timing defaults to the mode's highest frame rate. HDR always uses
-its fixed timing. On a ROCK 5B+ at 4-lane 750 MHz, binned lines with 0.3
-or 0.5 us between them left the CSI receiver dead until reboot, or hung
-the board; 0.58 us ran cleanly.
+its fixed timing. On a ROCK 5B+ at 4-lane 750 MHz, binned lines with
+0.31 us between them stopped the CSI receive chain delivering frames on the
+second stream start, until the sensor was rebound; with 0.51 us they ran
+cleanly.
 Module options set in `/etc/modprobe.d` only take effect after
 `sudo update-initramfs -u`, because imx708 loads from the initramfs.
 
@@ -235,8 +236,8 @@ Module options set in `/etc/modprobe.d` only take effect after
 | 2 lanes, 600 MHz | 18.2 | 72 | 160 |
 | 2 lanes, 750 MHz | 22.7 | 90 | 183 |
 | 4 lanes, 450 MHz | 27.3 | 108 | 183 |
-| 4 lanes, 549 MHz | 33.2 | 128 | 183 |
-| 4 lanes, 750 MHz | 45.5 | 168 | 183 |
+| 4 lanes, 549 MHz | 33.2 | 130 | 183 |
+| 4 lanes, 750 MHz | 45.5 | 172 | 183 |
 
 These are worked out, not measured; check the frame rate on the board.
 `orientation` is 0 front,
@@ -313,8 +314,10 @@ to regenerate the DKMS sources and overlays in `packages/`.
   a few seconds of a raw capture on the rkcif video node (`v4l2-ctl
   --stream-mmap`) hung the board about one time in four, right after the
   sensor started, with nothing logged. Waiting 15 s in between avoided it
-  in testing, as did using only libcamera or only raw V4L2. The cause isn't
-  known. It is separate from the rkcif stream-stop hang that the
+  in testing, as did using only libcamera or only raw V4L2. At 4-lane
+  750 MHz libcamera alone hung the same way on its fourth run, while 80
+  raw V4L2 start/stops were clean, so use 549 MHz with libcamera. The cause
+  isn't known. It is separate from the rkcif stream-stop hang that the
   replacement `rockchip-cif` module in `rk3588-camera-dkms` fixes.
 - **GitHub rate limits.** The Orange Pi 5 and 5B package builds fetch
   device-tree sources from GitHub. The fetch is cached under each package's
