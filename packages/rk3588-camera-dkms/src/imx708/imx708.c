@@ -37,6 +37,16 @@ static unsigned int link_margin_pct = 8;
 module_param(link_margin_pct, uint, 0444);
 MODULE_PARM_DESC(link_margin_pct, "Spare CSI-2 link time per line when timings are computed, in percent");
 
+/*
+ * Shortest idle time to leave on the link between lines, whatever the
+ * percentage margin gives. Short binned lines get little absolute slack from
+ * a percentage, and on RK3588 a gap of about 0.3 us left the CSI receiver
+ * wedged until reboot, or hung the board.
+ */
+static unsigned int min_line_gap_ns = 500;
+module_param(min_line_gap_ns, uint, 0444);
+MODULE_PARM_DESC(min_line_gap_ns, "Shortest idle CSI-2 link time per line when timings are computed, in ns");
+
 #define IMX708_REG_VALUE_08BIT		1
 #define IMX708_REG_VALUE_16BIT		2
 
@@ -1202,8 +1212,9 @@ static u64 imx708_vt_rate_floor(u32 inclk_freq, u64 max_rate)
  * Work out the timing for the current mode and link frequency.
  *
  * A line has to cross the link, width x 10 bits at link frequency x 2 x
- * lanes, with link_margin_pct to spare, before the sensor has the next
- * one. For each line length the mode permits, take the highest pixel rate
+ * lanes, before the sensor has the next one, with link_margin_pct of that
+ * time to spare and the link idle for at least min_line_gap_ns. For each
+ * line length the mode permits, take the highest pixel rate
  * the IVT branch can make that keeps the line at least that long, and use
  * the line length that gives the shortest line. Within 1% of each other,
  * the lower pixel rate wins. The mode's fallback timing stays unless the
@@ -1216,18 +1227,23 @@ static void imx708_update_timing(struct imx708 *imx708)
 	struct imx708_mode_timing *best = &imx708->timing;
 	u64 line_bits = (u64)mode->width * IMX708_BITS_PER_PIXEL;
 	u64 link_bps = imx708_link_bps(imx708);
+	u64 drain_ps, min_time_ps;
 	bool computed = false;
 	unsigned int i;
 
 	*best = mode->fallback;
+
+	/* Shortest line time the link allows, in picoseconds */
+	drain_ps = div64_u64(line_bits * 1000000000000ULL, link_bps);
+	min_time_ps = max(div_u64(drain_ps * (100 + link_margin_pct), 100),
+			  drain_ps + (u64)min_line_gap_ns * 1000);
 
 	for (i = 0; i < mode->num_line_lengths; i++) {
 		u64 len = mode->line_lengths[i];
 		u64 max_rate, rate;
 		u64 this_time, best_time;
 
-		max_rate = div64_u64(len * 100 * link_bps,
-				     line_bits * (100 + link_margin_pct));
+		max_rate = div64_u64(len * 1000000000000ULL, min_time_ps);
 		rate = imx708_vt_rate_floor(imx708->inclk_freq, max_rate);
 		if (!rate)
 			continue;

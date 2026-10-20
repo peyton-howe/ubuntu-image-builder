@@ -219,10 +219,14 @@ Frame rates follow from the link. Each mode keeps the Pi's timing as a
 fallback, and the driver works out a faster one when the link
 (link frequency x 2 x lanes) has room. For each line length the sensor
 permits for the mode it takes the highest pixel rate that leaves 8% of
-each line's link time to spare (the `link_margin_pct` module parameter),
-and keeps whichever gives the shortest line time. A
+each line's link time to spare and the link idle for at least 0.5 us
+between lines (the `link_margin_pct` and `min_line_gap_ns` module
+parameters), and keeps whichever gives the shortest line time. A
 computed timing defaults to the mode's highest frame rate. HDR always uses
-its fixed timing.
+its fixed timing. On a ROCK 5B+, binned lines with 0.3 us between them at
+4-lane 750 MHz left the CSI receiver dead until reboot, or hung the board.
+Module options set in `/etc/modprobe.d` only take effect after
+`sudo update-initramfs -u`, because imx708 loads from the initramfs.
 
 | Link | 4608x2592 | 2304x1296 | 1536x864 |
 |---|---|---|---|
@@ -230,8 +234,8 @@ its fixed timing.
 | 2 lanes, 600 MHz | 18.2 | 72 | 160 |
 | 2 lanes, 750 MHz | 22.7 | 90 | 183 |
 | 4 lanes, 450 MHz | 27.3 | 108 | 183 |
-| 4 lanes, 549 MHz | 33.2 | 132 | 183 |
-| 4 lanes, 750 MHz | 45.5 | 180 | 183 |
+| 4 lanes, 549 MHz | 33.2 | 130 | 183 |
+| 4 lanes, 750 MHz | 45.5 | 172 | 183 |
 
 These are worked out, not measured; check the frame rate on the board.
 `orientation` is 0 front,
