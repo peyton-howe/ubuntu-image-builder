@@ -110,7 +110,7 @@ Build `.dtbo` from the `.dtso` in patch `0006` (and any enablement overlays extr
 - Symlink or copy into the path `u-boot-menu` / extlinux expects  
   (today: under `/lib/firmware/<kver>/device-tree/...` or next to the board `.dtb`)
 
-`postinst` / `u-boot-update` hook: append selected overlays to `U_BOOT_FDT_OVERLAYS` (or write `extlinux.conf` `fdtoverlays` lines). Keep camera selection configurable (`/etc/rk3588-camera/overlays.conf`: `cam1-imx708`, etc.).
+`postinst` / `u-boot-update` hook: append selected overlays to `U_BOOT_FDT_OVERLAYS` (or write `extlinux.conf` `fdtoverlays` lines). Keep camera selection configurable (`/etc/rk3588-camera/overlays.conf`: `imx708,port1`, with `4lane`, `link-frequency`, and `ispN` baked in by `apply-overlays.sh`).
 
 **Important:** overlays that only fragment *existing* nodes work on stock DT. Nodes that **do not exist** in Ubuntu’s `rk3588-base.dtsi` (ISP, CSI hosts from `0002`/`0005`) need either:
 

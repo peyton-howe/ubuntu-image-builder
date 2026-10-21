@@ -33,3 +33,5 @@ override_dh_auto_install:
 	install -d debian/rk3588-camera-overlays/usr/lib/rk3588-camera
 	install -m 0755 scripts/apply-overlays.sh \
 		debian/rk3588-camera-overlays/usr/lib/rk3588-camera/apply-overlays.sh
+	install -m 0755 scripts/resolve-overlay.py \
+		debian/rk3588-camera-overlays/usr/lib/rk3588-camera/resolve-overlay.py

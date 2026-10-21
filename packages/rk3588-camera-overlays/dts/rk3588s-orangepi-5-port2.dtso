@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * IMX708 on Orange Pi 5 / 5B CAM2 (Samsung DCPHY0 CSI RX + CSI0).
+ * Orange Pi 5 / 5B CAM2 (port2): Samsung DCPHY0 CSI RX + CSI0 on i2c7.
+ *
+ * Publishes cam_port2_sensor, cam_port2_sensor_ep, cam_port2_csi_ep,
+ * and cam_port2_reg. Shares i2c7 with port1, so the sensor node is named
+ * camera-port2. The DCPHY receiver still needs the patched
+ * phy-rockchip-samsung-dcphy; this overlay does not enable that PHY.
  */
 
 /dts-v1/;
@@ -11,9 +16,9 @@
 #include <dt-bindings/pinctrl/rockchip.h>
 
 &{/} {
-	cam2_regulator: cam2_regulator {
+	cam_port2_reg: cam-port2-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "cam2_regulator";
+		regulator-name = "cam-port2-regulator";
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <1800000>;
 		vin-supply = <&vcc_3v3_s3>;
@@ -28,26 +33,21 @@
 	pinctrl-0 = <&i2c7m0_xfer>;
 	status = "okay";
 
-	imx708: camera-sensor@1a {
-		compatible = "sony,imx708";
-		reg = <0x1a>;
+	cam_port2_sensor: camera-port2 {
+		status = "disabled";
 		assigned-clocks = <&cru CLK_MIPI_CAMARAOUT_M4>;
 		assigned-clock-rates = <24000000>;
 		clocks = <&cru CLK_MIPI_CAMARAOUT_M4>;
-		vdig-supply = <&cam2_regulator>;
-		vana1-supply = <&cam2_regulator>;
-		vana2-supply = <&cam2_regulator>;
-		vddl-supply = <&cam2_regulator>;
-		orientation = <2>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&cam2_rstn &mipim0_camera4_clk>;
 		reset-gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
+
 		port {
-			imx708_output: endpoint {
+			cam_port2_sensor_ep: endpoint {
+				remote-endpoint = <&cam_port2_csi_ep>;
 				data-lanes = <1 2>;
 				clock-noncontinuous;
 				link-frequencies = /bits/ 64 <450000000>;
-				remote-endpoint = <&csi0_input>;
 			};
 		};
 	};
@@ -66,11 +66,11 @@
 };
 
 &csi0_in {
-	csi0_input: endpoint {
+	cam_port2_csi_ep: endpoint {
+		remote-endpoint = <&cam_port2_sensor_ep>;
 		data-lanes = <1 2>;
 		clock-noncontinuous;
 		link-frequencies = /bits/ 64 <450000000>;
-		remote-endpoint = <&imx708_output>;
 	};
 };
 
@@ -79,13 +79,5 @@
 };
 
 &vicap_mmu {
-	status = "okay";
-};
-
-&isp0 {
-	status = "okay";
-};
-
-&isp0_mmu {
 	status = "okay";
 };
