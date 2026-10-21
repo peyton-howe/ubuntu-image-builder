@@ -65,6 +65,7 @@ static const struct rkcif_match_data rk3588_vicap_match_data = {
 	.clks = rk3588_vicap_clks,
 	.clks_num = ARRAY_SIZE(rk3588_vicap_clks),
 	.mipi = &rkcif_rk3588_vicap_mipi_match_data,
+	.mipi_soft_reset = true,
 };
 
 static const struct of_device_id rkcif_plat_of_match[] = {
@@ -277,10 +278,17 @@ static int rkcif_runtime_suspend(struct device *dev)
 	 * Reset CIF (CRU, DMA, FIFOs) to allow a clean resume.
 	 * Since this resets the IOMMU too, we cannot issue this reset when
 	 * resuming.
+	 *
+	 * Not where the capture logic is reset with the soft reset when a
+	 * stream stops (RK3588): pulsing this reset there hung the board,
+	 * silently, a few dozen streams in. Rockchip's driver does not use it
+	 * on RK3588 either.
 	 */
-	reset_control_assert(rkcif->reset);
-	udelay(5);
-	reset_control_deassert(rkcif->reset);
+	if (!rkcif->match_data->mipi_soft_reset) {
+		reset_control_assert(rkcif->reset);
+		udelay(5);
+		reset_control_deassert(rkcif->reset);
+	}
 
 	clk_bulk_disable_unprepare(rkcif->clks_num, rkcif->clks);
 

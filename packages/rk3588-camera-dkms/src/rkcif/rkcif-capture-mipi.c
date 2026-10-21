@@ -7,6 +7,7 @@
  * Copyright (C) 2025 Collabora, Ltd.
  */
 
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 
 #include <media/mipi-csi2.h>
@@ -37,6 +38,8 @@
 #define RK3588_MIPI_CTRL0_PARSE(type) ((type) << 1)
 
 #define RK3588_MIPI_CTRL_CAP_EN       BIT(0)
+/* Rockchip's vendor driver writes 0x000A0000 to reset a MIPI host's capture logic. */
+#define RK3588_MIPI_CTRL_SOFT_RESET   (BIT(19) | BIT(17))
 
 #define RKCIF_MIPI_CTRL0_DT_ID(id)    ((id) << 10)
 #define RKCIF_MIPI_CTRL0_VC_ID(id)    ((id) << 8)
@@ -697,6 +700,24 @@ rkcif_mipi_stream_read(struct rkcif_stream *stream, unsigned int index)
 		return 0;
 
 	return readl(stream->rkcif->base_addr + addr);
+}
+
+/*
+ * Reset the capture logic of a MIPI host with Rockchip's register-level soft
+ * reset. On RK3588 Rockchip's driver does this when it stops streaming, and
+ * only uses the CRU reset (which also resets the AXI interface and the
+ * IOMMU) for error recovery on older chips. It sleeps, so call it from
+ * process context after the capture has stopped. The next start overwrites
+ * the register, which clears the reset bits.
+ */
+void rkcif_mipi_soft_reset(struct rkcif_stream *stream)
+{
+	struct rkcif_interface *interface = stream->interface;
+	u32 val = rkcif_mipi_read(interface, RKCIF_MIPI_CTRL);
+
+	rkcif_mipi_write(interface, RKCIF_MIPI_CTRL,
+			 val | RK3588_MIPI_CTRL_SOFT_RESET);
+	usleep_range(10, 20);
 }
 
 static void rkcif_mipi_queue_buffer(struct rkcif_stream *stream,
