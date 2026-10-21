@@ -10,7 +10,7 @@ was tried that did not help, and what is still not understood.
 | # | Fix | State |
 |---|---|---|
 | 1 | rkcif stream-stop race | committed (`7e77b54`, `1790857`) |
-| 2 | no CRU reset in runtime suspend, soft reset at stop | committed |
+| 2 | no CRU reset in runtime suspend, soft reset at stop | committed; reduces the hang a lot, but one hang was seen afterwards, see "A hang that remains" |
 | 3 | IMX708 minimum idle link time between lines | committed (`ad16019`, `91fadfe`, `cd573bd`) |
 
 ## Symptoms
@@ -107,8 +107,10 @@ With the CRU reset off and the soft reset on, also clean:
   and 1800 to 6000 frame sustained streams in each mode, all at the sensor's
   computed frame rate.
 
-With the CRU reset on, nothing added made a difference, whatever the order. It
-has never hung with the CRU reset off.
+With the CRU reset on, nothing added made a difference, whatever the order.
+With it off, the hang that came every 7 to 38 starts did not recur in about 830
+starts across the diagnostic builds. One hang was seen later on the committed
+code, see "A hang that remains".
 
 **How it is selected.** The tests above ran with module parameters that
 turned each reset on or off. The committed code has no parameters: the match
@@ -128,6 +130,28 @@ as if the gap mattered; they were not caused by it.
 The imx708 driver now picks mode timings from the link and keeps
 `min_line_gap_ns` (default 500) of idle link time per line, on top of an 8%
 margin (`link_margin_pct`). See `6fa8405`, `ad16019`, `91fadfe`, `cd573bd`.
+
+## A hang that remains
+
+On the installed package built from the fix commit (CRU reset skipped, soft
+reset at stop, no debugging code), a libcamera raw loop at full speed hung the
+board silently on its 40th run. That was the 430th sensor start of that boot.
+Nothing was logged: no page fault, stall or error, and the log ends after the
+sensor started, as in every earlier hang.
+
+The same boot had run these clean first: 150 same-layout starts, 140 starts
+that changed mode every time, 60 libcamera runs (at a quarter of full speed
+because `vertical_blanking` was stuck at 3673, see the pitfalls below), 20
+raw-then-libcamera switches, and 39 libcamera runs at full speed.
+
+Two readings fit, and they have not been told apart:
+
+- the hang is still there but rare: it went from one in 7 to 38 starts to
+  perhaps one in a few hundred, and the earlier 830 clean starts were
+  partly luck;
+- the diagnostic builds had logging in the stop path (`stop_debug` and the
+  DMABUF monitor, with extra delay between the source stopping and the soft
+  reset), and removing it changed the timing of a race.
 
 ## Did not help
 
