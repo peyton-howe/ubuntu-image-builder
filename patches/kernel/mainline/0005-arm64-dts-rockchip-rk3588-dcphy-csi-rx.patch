@@ -1,21 +1,17 @@
 From: Peyton Howe <peyton@localhost>
 Subject: [PATCH] arm64: dts: rockchip: enable RK3588 DCPHY CSI RX
 
-Vendor Orange Pi 5/5B routes CAM2/CAM3 through Samsung MIPI DCPHY
-CSI RX (csi2_dcphy + mipi0/1 CSI hosts at 0xfdd10000 / 0xfdd20000).
-
-Mainline already has mipidcphy0/1 at the same MMIO. Switch them to
-two PHY cells so DSI stays TX (PHY_TYPE_DSI) and CSI can take
-PHY_TYPE_CSI, add CSI hosts 0/1, and turn the PHYs on for Orange Pi 5.
-
-Do not port vendor's rockchip,rk3588-csi2-dphy wrapper; the CSI2
-host consumes the DCPHY directly.
+Takes patches 7/8 and 8/8 of the DCPHY RX v5 series (switch the RK3588
+DC-PHYs to two phy cells, add the MIPI CSI-2 receiver nodes and connect them
+to VICAP), then turns the DCPHYs on for Orange Pi 5/5B, whose CAM2/CAM3
+use them. The Orange Pi hunk is not part of the series.
+https://lore.kernel.org/linux-rockchip/20261016-dcphy-rx-v1-v5-0-e63b49eabe2d@gmail.com/
 
 diff --git a/arch/arm64/boot/dts/rockchip/rk3588-base.dtsi b/arch/arm64/boot/dts/rockchip/rk3588-base.dtsi
-index 7669e41a2..ca15933c2 100644
+index 376ad04..30bc69a 100644
 --- a/arch/arm64/boot/dts/rockchip/rk3588-base.dtsi
 +++ b/arch/arm64/boot/dts/rockchip/rk3588-base.dtsi
-@@ -1516,10 +1516,18 @@ vicap_dvp: port@0 {
+@@ -1516,10 +1516,18 @@
  
  			vicap_mipi0: port@1 {
  				reg = <0x1>;
@@ -34,7 +30,7 @@ index 7669e41a2..ca15933c2 100644
  			};
  
  			vicap_mipi2: port@3 {
-@@ -1574,6 +1582,66 @@ vicap_mmu: iommu@fdce0800 {
+@@ -1568,6 +1576,66 @@
  		status = "disabled";
  	};
  
@@ -45,7 +41,7 @@ index 7669e41a2..ca15933c2 100644
 +			     <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH 0>;
 +		interrupt-names = "err1", "err2";
 +		clocks = <&cru PCLK_CSI_HOST_0>;
-+		phys = <&mipidcphy0 PHY_TYPE_DPHY PHY_TYPE_CSI>;
++		phys = <&mipidcphy0 PHY_TYPE_DPHY PHY_DIRECTION_RX>;
 +		power-domains = <&power RK3588_PD_VI>;
 +		resets = <&cru SRST_P_CSI_HOST_0>;
 +		status = "disabled";
@@ -75,7 +71,7 @@ index 7669e41a2..ca15933c2 100644
 +			     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH 0>;
 +		interrupt-names = "err1", "err2";
 +		clocks = <&cru PCLK_CSI_HOST_1>;
-+		phys = <&mipidcphy1 PHY_TYPE_DPHY PHY_TYPE_CSI>;
++		phys = <&mipidcphy1 PHY_TYPE_DPHY PHY_DIRECTION_RX>;
 +		power-domains = <&power RK3588_PD_VI>;
 +		resets = <&cru SRST_P_CSI_HOST_1>;
 +		status = "disabled";
@@ -101,25 +97,25 @@ index 7669e41a2..ca15933c2 100644
  	csi2: csi@fdd30000 {
  		compatible = "rockchip,rk3588-mipi-csi2", "rockchip,rk3568-mipi-csi2";
  		reg = <0x0 0xfdd30000 0x0 0x10000>;
-@@ -1794,7 +1862,7 @@ dsi0: dsi@fde20000 {
+@@ -1788,7 +1856,7 @@
  		resets = <&cru SRST_P_DSIHOST0>;
  		reset-names = "apb";
  		power-domains = <&power RK3588_PD_VOP>;
 -		phys = <&mipidcphy0 PHY_TYPE_DPHY>;
-+		phys = <&mipidcphy0 PHY_TYPE_DPHY PHY_TYPE_DSI>;
++		phys = <&mipidcphy0 PHY_TYPE_DPHY PHY_DIRECTION_TX>;
  		phy-names = "dcphy";
  		rockchip,grf = <&vop_grf>;
  		status = "disabled";
-@@ -1822,7 +1890,7 @@ dsi1: dsi@fde30000 {
+@@ -1816,7 +1884,7 @@
  		resets = <&cru SRST_P_DSIHOST1>;
  		reset-names = "apb";
  		power-domains = <&power RK3588_PD_VOP>;
 -		phys = <&mipidcphy1 PHY_TYPE_DPHY>;
-+		phys = <&mipidcphy1 PHY_TYPE_DPHY PHY_TYPE_DSI>;
++		phys = <&mipidcphy1 PHY_TYPE_DPHY PHY_DIRECTION_TX>;
  		phy-names = "dcphy";
  		rockchip,grf = <&vop_grf>;
  		status = "disabled";
-@@ -3435,7 +3503,7 @@ mipidcphy0: phy@feda0000 {
+@@ -3429,7 +3497,7 @@
  			 <&cru SRST_P_MIPI_DCPHY0_GRF>,
  			 <&cru SRST_S_MIPI_DCPHY0>;
  		reset-names = "m_phy", "apb", "grf", "s_phy";
@@ -128,7 +124,7 @@ index 7669e41a2..ca15933c2 100644
  		status = "disabled";
  	};
  
-@@ -3451,7 +3519,7 @@ mipidcphy1: phy@fedb0000 {
+@@ -3445,7 +3513,7 @@
  			 <&cru SRST_P_MIPI_DCPHY1_GRF>,
  			 <&cru SRST_S_MIPI_DCPHY1>;
  		reset-names = "m_phy", "apb", "grf", "s_phy";

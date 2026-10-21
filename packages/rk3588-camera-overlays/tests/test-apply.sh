@@ -154,13 +154,33 @@ assert prop(opi, "/i2c@7/camera-port1", "reg") == struct.pack(">I", 0x1A)
 assert prop(opi, "/i2c@7/camera-port2", "compatible") == b"sony,imx219\0"
 assert prop(opi, "/i2c@7/camera-port2", "reg") == struct.pack(">I", 0x10)
 assert u64(prop(opi, "/i2c@7/camera-port2/port/endpoint", "link-frequencies")) == 456000000
-assert prop(opi, "/csi@0", "status") == b"okay\0"
+assert prop(opi, "/csi@fdd10000", "status") == b"okay\0"
+assert u64(prop(opi, "/csi@fdd10000/ports/port@0/endpoint", "link-frequencies")) == 456000000
+# csi0 selects DCPHY0's receiver; dsi0 keeps the transmitter with two cells.
+dcphy0 = phandle(opi, "/phy@feda0000")
+assert u32s(prop(opi, "/phy@feda0000", "#phy-cells")) == (2,)
+assert prop(opi, "/phy@feda0000", "status") == b"okay\0"
+assert u32s(prop(opi, "/csi@fdd10000", "phys")) == (dcphy0, 10, 1)
+assert u32s(prop(opi, "/dsi@fde20000", "phys")) == (dcphy0, 10, 0)
+csi0_out = phandle(opi, "/csi@fdd10000/ports/port@1/endpoint")
+vicap0 = phandle(opi, "/vicap/ports/port@1/endpoint")
+assert u32s(prop(opi, "/vicap/ports/port@1/endpoint", "remote-endpoint")) == (csi0_out,)
+assert u32s(prop(opi, "/csi@fdd10000/ports/port@1/endpoint", "remote-endpoint")) == (vicap0,)
+# port2 must leave DCPHY1 alone
+assert u32s(prop(opi, "/phy@fedb0000", "#phy-cells")) == (1,)
 assert prop(opi, "/csi@2", "status") == b"okay\0"
 assert prop(opi, "/i2c@7", "status") == b"okay\0"
 
 opi3 = load("opi3.dtb")
 assert prop(opi3, "/i2c@2/camera-port3", "compatible") == b"sony,imx708\0"
-assert prop(opi3, "/csi@1", "status") == b"okay\0"
+assert prop(opi3, "/csi@fdd20000", "status") == b"okay\0"
+dcphy1 = phandle(opi3, "/phy@fedb0000")
+assert u32s(prop(opi3, "/phy@fedb0000", "#phy-cells")) == (2,)
+assert u32s(prop(opi3, "/csi@fdd20000", "phys")) == (dcphy1, 10, 1)
+assert u32s(prop(opi3, "/dsi@fde30000", "phys")) == (dcphy1, 10, 0)
+assert u32s(prop(opi3, "/vicap/ports/port@2/endpoint", "remote-endpoint")) == (
+    phandle(opi3, "/csi@fdd20000/ports/port@1/endpoint"),
+)
 assert opi3.find("/i2c@7/camera-port1") is None
 
 imx519 = load("imx519.dtb")

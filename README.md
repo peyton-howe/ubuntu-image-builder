@@ -237,9 +237,13 @@ the sensor can resolve `cam_portN_*`. Overlays also need the base DTB to have
 The generated sensor overlay enables the chosen ISP and leaves capture on
 VICAP. It does not wire CSI straight into the ISP (that needed the
 unapplied kernel patch 0003).
-cam2/cam3 on the Orange Pi 5/5B use the DCPHY, which needs a patched
-`phy-rockchip-samsung-dcphy` (kernel patch 0001). That isn't packaged for the
-stock kernel yet.
+The RK3588's two MIPI DCPHYs (`mipidcphy0`/`mipidcphy1`) can receive CSI, but
+Ubuntu's `phy-rockchip-samsung-dcphy` is transmitter-only. `rk3588-camera-dkms`
+replaces it with the patched one from kernel patch 0001 on any board. A camera
+port on a DCPHY then needs a CSI host and a PHY with two phy-cells in its
+overlay. Only the Orange Pi 5/5B port2 (DCPHY0) and port3 (DCPHY1) overlays do
+that so far, using the CSI hosts from patch 0005 that stock DTBs lack. Not
+tested on hardware yet.
 
 ## Custom kernels (vendor / mainline)
 
