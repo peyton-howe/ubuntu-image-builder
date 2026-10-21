@@ -10,7 +10,7 @@ was tried that did not help, and what is still not understood.
 | # | Fix | State |
 |---|---|---|
 | 1 | rkcif stream-stop race | committed (`7e77b54`, `1790857`) |
-| 2 | no CRU reset in runtime suspend, soft reset at stop | validated on hardware, **not committed** |
+| 2 | no CRU reset in runtime suspend, soft reset at stop | committed |
 | 3 | IMX708 minimum idle link time between lines | committed (`ad16019`, `91fadfe`, `cd573bd`) |
 
 ## Symptoms
@@ -46,12 +46,12 @@ before the in-tree module. The fix in `1790857`:
 
 If no frame end arrives within 1 s it stops mid-frame and warns. The interrupt
 path calls a register-only stop helper under a new spinlock (`stop_lock`)
-instead of taking the mutex. `stop_debug=1` logs each step.
+instead of taking the mutex.
 
 Effect: raw `v4l2-ctl` capture went from hanging after 1 to 6 starts to 80 or
 more clean starts. It did not remove all hangs (see fix 2).
 
-## Fix 2: no CRU reset in runtime suspend, soft reset at stop (not committed)
+## Fix 2: no CRU reset in runtime suspend, soft reset at stop (committed)
 
 What was left after fix 1 was a silent hang at the start of a stream after an
 earlier one had stopped. It comes from the hardware reset in
@@ -110,13 +110,11 @@ With the CRU reset off and the soft reset on, also clean:
 With the CRU reset on, nothing added made a difference, whatever the order. It
 has never hung with the CRU reset off.
 
-**Not committed yet.** The change exists as module parameters
-(`suspend_reset`, `stop_soft_reset`, plus unused diagnostics) in the working
-tree. The clean version should make the soft reset the default stop behaviour
-on RK3588, keep the CRU reset for other SoCs through the match data, and drop
-the diagnostic parameters. The README "Known issues" paragraphs about the
-libcamera and raw-to-libcamera hangs should be rewritten or removed when it
-lands.
+**How it is selected.** The tests above ran with module parameters that
+turned each reset on or off. The committed code has no parameters: the match
+data of an SoC sets `mipi_soft_reset` (RK3588 only), which skips the CRU
+reset in `rkcif_runtime_suspend()` and does the soft reset at stop. Other SoCs
+keep the CRU reset.
 
 ## Fix 3: IMX708 idle time between lines (committed)
 

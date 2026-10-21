@@ -6,7 +6,6 @@
  * Copyright (C) 2025 Collabora, Ltd.
  */
 
-#include <linux/module.h>
 #include <linux/pm_runtime.h>
 
 #include <media/v4l2-common.h>
@@ -16,6 +15,7 @@
 #include <media/v4l2-subdev.h>
 #include <media/videobuf2-dma-contig.h>
 
+#include "rkcif-capture-mipi.h"
 #include "rkcif-common.h"
 #include "rkcif-stream.h"
 
@@ -24,10 +24,6 @@
 #define CIF_MIN_HEIGHT	 64
 #define CIF_MAX_WIDTH	 8192
 #define CIF_MAX_HEIGHT	 8192
-
-static bool stop_debug;
-module_param(stop_debug, bool, 0644);
-MODULE_PARM_DESC(stop_debug, "Log each step of stopping a stream");
 
 static inline struct rkcif_buffer *to_rkcif_buffer(struct vb2_v4l2_buffer *vb)
 {
@@ -306,12 +302,26 @@ err_out:
 	return ret;
 }
 
+/* True if another stream on the same interface is still streaming. */
+static bool rkcif_interface_has_other_streams(struct rkcif_stream *stream)
+{
+	struct rkcif_interface *interface = stream->interface;
+
+	for (unsigned int i = 0; i < interface->streams_num; i++) {
+		struct rkcif_stream *other = &interface->streams[i];
+
+		if (other != stream && vb2_is_streaming(&other->buf_queue))
+			return true;
+	}
+
+	return false;
+}
+
 static void rkcif_stream_stop_streaming(struct vb2_queue *queue)
 {
 	struct rkcif_stream *stream = queue->drv_priv;
 	struct rkcif_device *rkcif = stream->rkcif;
 	unsigned long flags;
-	ktime_t start;
 	u64 mask;
 	long ret;
 
@@ -323,7 +333,6 @@ static void rkcif_stream_stop_streaming(struct vb2_queue *queue)
 	 * buffer were then freed and runtime PM dropped under it. On RK3588
 	 * that hung the board after a few start/stop cycles.
 	 */
-	start = ktime_get();
 	spin_lock_irqsave(&stream->stop_lock, flags);
 	stream->stopping = true;
 	spin_unlock_irqrestore(&stream->stop_lock, flags);
@@ -344,16 +353,24 @@ static void rkcif_stream_stop_streaming(struct vb2_queue *queue)
 	if (!ret)
 		dev_warn(rkcif->dev, "stream %d: no frame end within 1 s, capture stopped mid-frame\n",
 			 stream->id);
-	else if (stop_debug)
-		dev_info(rkcif->dev, "stream %d: capture stopped at frame end after %lld us\n",
-			 stream->id, ktime_us_delta(ktime_get(), start));
 
 	/* Now stop the source */
 	mask = BIT_ULL(stream->id);
 	v4l2_subdev_disable_streams(&stream->interface->sd, RKCIF_IF_PAD_SRC,
 				    mask);
-	if (stop_debug)
-		dev_info(rkcif->dev, "stream %d: source stopped\n", stream->id);
+
+	/*
+	 * Reset the host's capture logic now that the DMA is idle, unless
+	 * another stream on the interface is still running. This replaces the
+	 * CRU reset in runtime suspend where that hangs the board (RK3588). It
+	 * also clears the frame address the DMA would otherwise keep from this
+	 * stream: a next stream with a different buffer layout would write its
+	 * first frame to an unmapped address.
+	 */
+	if (rkcif->match_data->mipi_soft_reset &&
+	    stream->interface->type == RKCIF_IF_MIPI &&
+	    !rkcif_interface_has_other_streams(stream))
+		rkcif_mipi_soft_reset(stream);
 
 	/* The DMA is idle: buffers and the dummy buffer can go */
 	rkcif_stream_return_all_buffers(stream, VB2_BUF_STATE_ERROR);
@@ -361,8 +378,6 @@ static void rkcif_stream_stop_streaming(struct vb2_queue *queue)
 	pm_runtime_put(rkcif->dev);
 
 	video_device_pipeline_stop(&stream->vdev);
-	if (stop_debug)
-		dev_info(rkcif->dev, "stream %d: stopped\n", stream->id);
 }
 
 static const struct vb2_ops rkcif_stream_vb2_ops = {

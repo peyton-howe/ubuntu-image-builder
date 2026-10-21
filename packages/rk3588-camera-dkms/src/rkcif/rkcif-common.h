@@ -232,6 +232,13 @@ struct rkcif_dvp_match_data {
 struct rkcif_match_data {
 	const char *const *clks;
 	unsigned int clks_num;
+	/*
+	 * Reset the MIPI host's capture logic with the register soft reset when
+	 * a stream stops, in place of the CRU reset in runtime suspend.
+	 * Rockchip's driver does this on RK3588, where pulsing the CRU reset
+	 * hangs the board a few dozen streams in.
+	 */
+	bool mipi_soft_reset;
 	const struct rkcif_dvp_match_data *dvp;
 	const struct rkcif_mipi_match_data *mipi;
 };
