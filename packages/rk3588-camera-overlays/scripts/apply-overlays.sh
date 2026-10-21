@@ -205,7 +205,7 @@ for name in ${RK3588_CAMERA_OVERLAYS:-}; do
         if [[ ! -f ${f} ]]; then
             echo "WARNING: missing overlay ${f}" >&2
             case "${name}" in
-                *imx708*|*imx219*|*imx519*)
+                *imx708*|*imx219*|*imx519*|*imx415*)
                     echo "Sensor overlays take a port parameter, for example imx708,port0 (see ${CONF})." >&2
                     ;;
             esac

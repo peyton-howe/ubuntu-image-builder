@@ -38,6 +38,9 @@ python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx708.dtbo" "${WORK}/imx708-port3.dtbo" --port 3 --isp 0
 python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx519.dtbo" "${WORK}/imx519-port0.dtbo" --port 0 --isp 0
+python3 "${PKG}/scripts/resolve-overlay.py" \
+    "${WORK}/imx415.dtbo" "${WORK}/imx415-port1-30fps.dtbo" \
+    --port 1 --isp 1 --link-frequency 360000000
 
 apply() {
     local out="$1"
@@ -77,6 +80,10 @@ apply "${WORK}/imx519.dtb" \
     "${WORK}/rk3588-isp.dtbo" \
     "${WORK}/rk3588-rock-5b-plus-port0.dtbo" \
     "${WORK}/imx519-port0.dtbo"
+apply "${WORK}/imx415.dtb" \
+    "${WORK}/rk3588-isp.dtbo" \
+    "${WORK}/rk3588-rock-5b-plus-port1.dtbo" \
+    "${WORK}/imx415-port1-30fps.dtbo"
 python3 - "${PKG}/scripts/resolve-overlay.py" "${WORK}" <<'PY'
 import importlib.util
 import struct
@@ -187,6 +194,16 @@ assert u32s(prop(opi3, "/vicap/ports/port@2/endpoint", "remote-endpoint")) == (
     phandle(opi3, "/csi@fdd20000/ports/port@1/endpoint"),
 )
 assert opi3.find("/i2c@7/camera-port1") is None
+
+imx415 = load("imx415.dtb")
+assert prop(imx415, "/i2c@4/camera-port1", "compatible") == b"sony,imx415\0"
+assert prop(imx415, "/i2c@4/camera-port1", "reg") == struct.pack(">I", 0x1A)
+for ep in ("/i2c@4/camera-port1/port/endpoint", "/csi@4/port/endpoint"):
+    assert u32s(prop(imx415, ep, "data-lanes")) == (1, 2, 3, 4)
+    assert u64(prop(imx415, ep, "link-frequencies")) == 360000000
+    assert imx415.find(ep).get("clock-noncontinuous") is None
+assert prop(imx415, "/isp@fdcc0000", "status") == b"okay\0"
+assert prop(imx415, "/isp@fdcb0000", "status") == b"disabled\0"
 
 imx519 = load("imx519.dtb")
 assert prop(imx519, "/i2c@3/camera-port0", "compatible") == b"sony,imx519\0"

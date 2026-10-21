@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Sony IMX415 (Radxa Camera 4K), attached as imx415,port0.
+ *
+ * Same port labels and parameters as imx708.dtso. The port overlay runs
+ * the sensor clock at 24 MHz, so the mainline imx415 driver picks its mode
+ * from the link frequency:
+ *
+ *   imx415,port0                          720 MHz, 4-lane 1440 Mbps,
+ *                                         3864x2192 at about 60 fps
+ *   imx415,port0,link-frequency=360000000 4-lane 720 Mbps, about 30 fps
+ *
+ * The stock Radxa overlay uses 37.125 MHz and 891 Mbps, which tops out at
+ * 30 fps. The clock lane is continuous, so there is no
+ * clock-noncontinuous here. No imx415 driver is packaged; use the one in
+ * the kernel.
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	fragment@0 {
+		target = <&cam_port_sensor>;
+		__overlay__ {
+			compatible = "sony,imx415";
+			reg = <0x1a>;
+			status = "okay";
+			orientation = <2>; /* External */
+			avdd-supply = <&cam_port_reg>;
+			dvdd-supply = <&cam_port_reg>;
+			ovdd-supply = <&cam_port_reg>;
+		};
+	};
+
+	fragment@1 {
+		target = <&cam_port_sensor_ep>;
+		__overlay__ {
+			data-lanes = <1 2 3 4>;
+			link-frequencies = /bits/ 64 <720000000>;
+		};
+	};
+
+	fragment@2 {
+		target = <&cam_port_csi_ep>;
+		__overlay__ {
+			data-lanes = <1 2 3 4>;
+			link-frequencies = /bits/ 64 <720000000>;
+		};
+	};
+
+#include "sensor-isp.dtsi"
+};
