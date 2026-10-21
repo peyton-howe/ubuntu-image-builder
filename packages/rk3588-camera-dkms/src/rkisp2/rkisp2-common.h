@@ -59,8 +59,8 @@ struct regmap;
 #define RKISP2_DRIVER_NAME			"rkisp2"
 #define RKISP2_BUS_INFO				"platform:" RKISP2_DRIVER_NAME
 
-/* maximum number of clocks */
-#define RKISP2_MAX_BUS_CLK			8
+/* maximum number of clocks (unite lists both ISP cores) */
+#define RKISP2_MAX_BUS_CLK			16
 
 /* IRQ lines */
 enum rkisp2_irq_line {
@@ -137,6 +137,7 @@ enum rkisp2_feature {
  * @features: bitmask of rkisp2_feature features implemented by the ISP
  * @max_width: maximum input frame width
  * @max_height: maximum input frame height
+ * @unite: device owns both ISP register windows
  *
  * This structure contains information about the ISP specific to a particular
  * ISP model, version, or integration in a particular SoC.
@@ -150,6 +151,7 @@ struct rkisp2_info {
 	unsigned int features;
 	unsigned int max_width;
 	unsigned int max_height;
+	bool unite;
 };
 
 /*
@@ -445,6 +447,10 @@ struct rkisp2_debug {
  * struct rkisp2_device - ISP platform device
  *
  * @base_addr:	   base register address
+ * @unite_base:	   second ISP window, when this device is isp-unite
+ * @unite_left_isp: frame end flags of the left core's ISP block that were seen
+ *		   and cleared but whose frame has not been handled yet
+ * @unite_left_mi: same for the left core's MI (output write) block
  * @dev:	   a pointer to the struct device
  * @clk_size:	   number of clocks
  * @clks:	   array of clocks
@@ -470,6 +476,9 @@ struct rkisp2_debug {
  */
 struct rkisp2_device {
 	void __iomem *base_addr;
+	void __iomem *unite_base;
+	u32 unite_left_isp;
+	u32 unite_left_mi;
 	struct device *dev;
 	unsigned int clk_size;
 	struct clk_bulk_data clks[RKISP2_MAX_BUS_CLK];
@@ -519,6 +528,142 @@ static inline void
 rkisp2_write(struct rkisp2_device *rkisp2, unsigned int addr, u32 val)
 {
 	writel(val, rkisp2->base_addr + addr);
+	if (rkisp2->unite_base)
+		writel(val, rkisp2->unite_base + addr);
+}
+
+/*
+ * Dual-ISP ("unite") mode: each ISP core takes half of the frame, plus this
+ * many extra columns on the inner side so that the filters see the same
+ * neighbours as in a single-core run. 128 is Rockchip's value
+ * (RKMOUDLE_UNITE_EXTEND_PIXEL). The left core is the one at base_addr and
+ * the right core is the second window.
+ */
+#define RKISP2_UNITE_EXTEND_PIXEL	128
+
+static inline bool rkisp2_is_unite(const struct rkisp2_device *rkisp2)
+{
+	return !!rkisp2->unite_base;
+}
+
+/*
+ * Where the frame is cut between the two cores: half of the width, rounded up
+ * to 16 pixels. The right core's output starts there, and it has to start on
+ * a 16 byte boundary in the buffer for every pixel format (the luma plane of
+ * NV12, one byte per pixel, is the strictest). Cutting at exactly half leaves
+ * the last pixels of a row unwritten when half the width is not a multiple of
+ * 16, for example 3864.
+ */
+static inline u32 rkisp2_unite_split(u32 width)
+{
+	return ALIGN(width / 2, 16);
+}
+
+/* Columns core 0 or 1 outputs, for a frame that is width wide. */
+static inline u32 rkisp2_core_out_width(const struct rkisp2_device *rkisp2,
+					unsigned int core, u32 width)
+{
+	if (!rkisp2->unite_base)
+		return width;
+
+	return core ? width - rkisp2_unite_split(width) :
+		      rkisp2_unite_split(width);
+}
+
+/* Columns a core takes in: its output plus the overlap on its inner side. */
+static inline u32 rkisp2_core_width(const struct rkisp2_device *rkisp2,
+				    unsigned int core, u32 width)
+{
+	return rkisp2_core_out_width(rkisp2, core, width) +
+	       (rkisp2->unite_base ? RKISP2_UNITE_EXTEND_PIXEL : 0);
+}
+
+static inline void
+rkisp2_write_left(struct rkisp2_device *rkisp2, unsigned int addr, u32 val)
+{
+	writel(val, rkisp2->base_addr + addr);
+}
+
+static inline void
+rkisp2_write_right(struct rkisp2_device *rkisp2, unsigned int addr, u32 val)
+{
+	if (rkisp2->unite_base)
+		writel(val, rkisp2->unite_base + addr);
+}
+
+/* A register that has one value on the left core and another on the right. */
+static inline void
+rkisp2_write_split(struct rkisp2_device *rkisp2, unsigned int addr, u32 left,
+		   u32 right)
+{
+	rkisp2_write_left(rkisp2, addr, left);
+	rkisp2_write_right(rkisp2, addr, right);
+}
+
+static inline unsigned int rkisp2_num_cores(const struct rkisp2_device *rkisp2)
+{
+	return rkisp2->unite_base ? 2 : 1;
+}
+
+/* Core 0 is the left (or only) core and core 1 the right one. */
+static inline u32 rkisp2_read_core(struct rkisp2_device *rkisp2,
+				   unsigned int core, unsigned int addr)
+{
+	return readl((core ? rkisp2->unite_base : rkisp2->base_addr) + addr);
+}
+
+static inline void rkisp2_write_core(struct rkisp2_device *rkisp2,
+				     unsigned int core, unsigned int addr,
+				     u32 val)
+{
+	writel(val, (core ? rkisp2->unite_base : rkisp2->base_addr) + addr);
+}
+
+/*
+ * Measurement grids in unite mode. Rockchip's userspace gives each core its
+ * own parameters; here the IPA gives one set for the whole frame, so each core
+ * measures half of it with cells half as wide. A grid of n columns becomes n
+ * columns on each core, and two neighbouring half cells make one cell of the
+ * grid the IPA asked for. The left core's column k belongs to column k / 2 and
+ * the right core's to column (k + n) / 2. The right core's input starts
+ * RKISP2_UNITE_EXTEND_PIXEL columns before the middle of the frame, so its
+ * window starts that far in.
+ */
+static inline unsigned int rkisp2_unite_col(unsigned int core, unsigned int k,
+					    unsigned int n)
+{
+	return core ? (k + n) / 2 : k / 2;
+}
+
+static inline void rkisp2_unite_window(unsigned int core, u32 h_size,
+				       u32 h_offs, u32 *size, u32 *offs)
+{
+	*size = (h_size / 2) & ~1u;
+	*offs = h_offs / 2 + (core ? RKISP2_UNITE_EXTEND_PIXEL : 0);
+}
+
+/*
+ * Interrupt status. In unite mode the right core finishes last and Rockchip's
+ * driver works from its status, so the interrupt handlers do too: the left
+ * core's flags are only cleared (see rkisp2_unite_take_left()).
+ */
+static inline void __iomem *rkisp2_irq_base(struct rkisp2_device *rkisp2)
+{
+	return rkisp2->unite_base ? rkisp2->unite_base : rkisp2->base_addr;
+}
+
+/* Clear a pending interrupt on the second window after the primary ack. */
+static inline void
+rkisp2_unite_ack(struct rkisp2_device *rkisp2, unsigned int mis, unsigned int icr)
+{
+	u32 status;
+
+	if (!rkisp2->unite_base)
+		return;
+
+	status = readl(rkisp2->unite_base + mis);
+	if (status)
+		writel(status, rkisp2->unite_base + icr);
 }
 
 static inline u32 rkisp2_read(struct rkisp2_device *rkisp2, unsigned int addr)

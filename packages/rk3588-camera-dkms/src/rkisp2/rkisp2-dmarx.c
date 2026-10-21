@@ -244,8 +244,11 @@ static void rkisp2_rawrd_config_mi(struct rkisp2_dmarx_chan *chan)
 	val |= SW_CSI_ID0(dt);
 	rkisp2_write(rkisp2, CSI2RX_DATA_IDS_1, val);
 
-	rkisp2_write(rkisp2, CSI2RX_RAW_RD_PIC_SIZE,
-		     (pix->height << 16) | pix->width);
+	rkisp2_write_split(rkisp2, CSI2RX_RAW_RD_PIC_SIZE,
+			   (pix->height << 16) |
+				rkisp2_core_width(rkisp2, 0, pix->width),
+			   (pix->height << 16) |
+				rkisp2_core_width(rkisp2, 1, pix->width));
 
 	if (chan->cfg->length_reg)
 		rkisp2_write(rkisp2, chan->cfg->length_reg, stride);
@@ -256,9 +259,21 @@ static void rkisp2_rawrd_config_mi(struct rkisp2_dmarx_chan *chan)
 static void rkisp2_rawrd_program_buffer(struct rkisp2_dmarx_chan *chan,
 					struct rkisp2_buffer *buf)
 {
+	struct rkisp2_device *rkisp2 = chan->rkisp2;
+
 	rkisp2_rawrd_select(chan);
-	rkisp2_write(chan->rkisp2, chan->cfg->base_reg,
-		     buf->buff_addr[0]);
+	rkisp2_write_left(rkisp2, chan->cfg->base_reg, buf->buff_addr[0]);
+	if (rkisp2_is_unite(rkisp2)) {
+		/*
+		 * The right core starts the overlap before the cut between the
+		 * cores. Lines keep their full length.
+		 */
+		u32 offs = (rkisp2_unite_split(chan->pix.width) -
+			    RKISP2_UNITE_EXTEND_PIXEL) * chan->fmt->bpp / 8;
+
+		rkisp2_write_right(rkisp2, chan->cfg->base_reg,
+				   buf->buff_addr[0] + offs);
+	}
 }
 
 static void rkisp2_rawrd_update_mi(struct rkisp2_dmarx_chan *chan,

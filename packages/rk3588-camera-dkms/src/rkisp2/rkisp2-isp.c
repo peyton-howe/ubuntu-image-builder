@@ -68,7 +68,9 @@ static void rkisp2_config_ism(struct rkisp2_isp *isp,
 
 	rkisp2_write(rkisp2, RKISP2_CIF_ISP_IS_H_OFFS, 0);
 	rkisp2_write(rkisp2, RKISP2_CIF_ISP_IS_V_OFFS, 0);
-	rkisp2_write(rkisp2, RKISP2_CIF_ISP_IS_H_SIZE, sink_frm->width);
+	rkisp2_write_split(rkisp2, RKISP2_CIF_ISP_IS_H_SIZE,
+			   rkisp2_core_width(rkisp2, 0, sink_frm->width),
+			   rkisp2_core_width(rkisp2, 1, sink_frm->width));
 	rkisp2_write(rkisp2, RKISP2_CIF_ISP_IS_V_SIZE, sink_frm->height);
 
 	/*
@@ -137,14 +139,17 @@ static int rkisp2_config_isp(struct rkisp2_isp *isp,
 	/* Acquisition Size */
 	rkisp2_write(rkisp2, RKISP2_CIF_ISP_ACQ_H_OFFS, 0);
 	rkisp2_write(rkisp2, RKISP2_CIF_ISP_ACQ_V_OFFS, 0);
-	rkisp2_write(rkisp2, RKISP2_CIF_ISP_ACQ_H_SIZE,
-		     acq_mult * sink_frm->width);
+	rkisp2_write_split(rkisp2, RKISP2_CIF_ISP_ACQ_H_SIZE,
+			   acq_mult * rkisp2_core_width(rkisp2, 0, sink_frm->width),
+			   acq_mult * rkisp2_core_width(rkisp2, 1, sink_frm->width));
 	rkisp2_write(rkisp2, RKISP2_CIF_ISP_ACQ_V_SIZE, sink_frm->height);
 
 	/* ISP Out Area */
 	rkisp2_write(rkisp2, RKISP2_CIF_ISP_OUT_H_OFFS, 0);
 	rkisp2_write(rkisp2, RKISP2_CIF_ISP_OUT_V_OFFS, 0);
-	rkisp2_write(rkisp2, RKISP2_CIF_ISP_OUT_H_SIZE, sink_frm->width);
+	rkisp2_write_split(rkisp2, RKISP2_CIF_ISP_OUT_H_SIZE,
+			   rkisp2_core_width(rkisp2, 0, sink_frm->width),
+			   rkisp2_core_width(rkisp2, 1, sink_frm->width));
 	rkisp2_write(rkisp2, RKISP2_CIF_ISP_OUT_V_SIZE, sink_frm->height);
 
 	irq_mask |= RKISP2_CIF_ISP_FRAME | RKISP2_CIF_ISP_V_START |
@@ -799,9 +804,43 @@ irqreturn_t rkisp2_isp_isr(int irq, void *ctx)
 	if (!rkisp2->irqs_enabled)
 		return IRQ_NONE;
 
-	status = rkisp2_read(rkisp2, RKISP2_CIF_ISP_MIS);
-	if (!status)
-		return IRQ_NONE;
+	if (rkisp2->unite_base) {
+		u32 left = readl(rkisp2->base_addr + RKISP2_CIF_ISP_RIS);
+
+		/*
+		 * Work from the right core, which usually finishes last, and
+		 * clear the left core's flags. Remember that the left core's
+		 * frame has ended: its flag can come before the right core's.
+		 */
+		if (left) {
+			writel(left, rkisp2->base_addr + RKISP2_CIF_ISP_ICR);
+			rkisp2->unite_left_isp |= left & RKISP2_CIF_ISP_FRAME;
+		}
+		status = readl(rkisp2->unite_base + RKISP2_CIF_ISP_MIS);
+		if (!status)
+			return left ? IRQ_HANDLED : IRQ_NONE;
+		if ((status & RKISP2_CIF_ISP_FRAME) &&
+		    !(rkisp2->unite_left_isp & RKISP2_CIF_ISP_FRAME)) {
+			/* The left core has to be done too. */
+			if (readl_poll_timeout_atomic(rkisp2->base_addr +
+						      RKISP2_CIF_ISP_RIS,
+						      left,
+						      left & RKISP2_CIF_ISP_FRAME,
+						      10, 1000)) {
+				dev_err_ratelimited(rkisp2->dev,
+						    "left ISP did not finish its frame\n");
+			} else {
+				writel(left, rkisp2->base_addr +
+				       RKISP2_CIF_ISP_ICR);
+			}
+		}
+		if (status & RKISP2_CIF_ISP_FRAME)
+			rkisp2->unite_left_isp &= ~RKISP2_CIF_ISP_FRAME;
+	} else {
+		status = rkisp2_read(rkisp2, RKISP2_CIF_ISP_MIS);
+		if (!status)
+			return IRQ_NONE;
+	}
 
 	/* Vertical sync signal, starting generating new frame */
 	if (status & RKISP2_CIF_ISP_V_START) {
@@ -833,7 +872,7 @@ irqreturn_t rkisp2_isp_isr(int irq, void *ctx)
 		rkisp2_stats_isr_eof(&rkisp2->stats);
 	}
 
-	rkisp2_write(rkisp2, RKISP2_CIF_ISP_ICR, status);
+	writel(status, rkisp2_irq_base(rkisp2) + RKISP2_CIF_ISP_ICR);
 
 	return IRQ_HANDLED;
 }
