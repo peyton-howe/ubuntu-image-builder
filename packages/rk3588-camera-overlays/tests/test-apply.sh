@@ -183,9 +183,10 @@ cp "${WORK}/"*.dtbo "${FAKE}/usr/share/rk3588-camera/overlays/"
 rm -f "${FAKE}/usr/share/rk3588-camera/overlays/imx708-port"*.dtbo \
     "${FAKE}/usr/share/rk3588-camera/overlays/imx219-port"*.dtbo
 cp "${PKG}/scripts/resolve-overlay.py" "${FAKE}/usr/lib/rk3588-camera/"
-printf 'U_BOOT_FDT_OVERLAYS="/lib/firmware/panthor.dtbo /usr/share/rk3588-camera/overlays/old.dtbo"\n' \
+printf 'U_BOOT_FDT_OVERLAYS="/lib/firmware/panthor.dtbo /usr/share/rk3588-camera/overlays/old.dtbo /lib/firmware/rk3588-rock-5b-plus-imx708-cam0-isp.dtbo /lib/firmware/rk3588-rock-5b-plus-imx708-cam0-isp-custom.dtbo"\n' \
     > "${FAKE}/etc/default/u-boot"
 # old.dtbo is not in OVERLAY_DIR, so it must be kept. panthor too.
+# The legacy camera overlay must be removed, but its custom variant kept.
 cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'
 RK3588_CAMERA_OVERLAYS="imx708,port0,4lane,link-frequency=447000000 imx708,port1"
 EOF
@@ -199,6 +200,8 @@ RK3588_BOARD_SHARE="${FAKE}/usr/share" \
     bash "${PKG}/scripts/apply-overlays.sh"
 
 grep -q 'panthor.dtbo' "${FAKE}/etc/default/u-boot"
+grep -q 'old.dtbo' "${FAKE}/etc/default/u-boot"
+grep -Fq 'rk3588-rock-5b-plus-imx708-cam0-isp-custom.dtbo' "${FAKE}/etc/default/u-boot"
 grep -q 'rk3588-isp.dtbo' "${FAKE}/etc/default/u-boot"
 grep -q 'rk3588-rock-5b-plus-port0.dtbo' "${FAKE}/etc/default/u-boot"
 grep -q 'rk3588-rock-5b-plus-port1.dtbo' "${FAKE}/etc/default/u-boot"
@@ -217,6 +220,7 @@ order = ["rk3588-isp.dtbo", "rk3588-rock-5b-plus-port0.dtbo",
 positions = [line.index(name) for name in order[:5]]
 assert positions == sorted(positions), line
 assert "panthor.dtbo" in line
+assert "rk3588-rock-5b-plus-imx708-cam0-isp.dtbo" not in line
 # kept overlays stay ahead of the camera stack
 assert line.index("panthor.dtbo") < line.index("rk3588-isp.dtbo")
 print("apply-overlays.sh checks passed")
@@ -258,6 +262,44 @@ set -e
 test "${status}" -ne 0
 grep -q 'isp0 is assigned to more than one camera' "${WORK}/isp.out"
 cmp "${FAKE}/etc/default/u-boot" "${FAKE}/etc/default/u-boot.good"
+
+# An invalid explicit ISP fails without rewriting the boot line.
+cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'
+RK3588_CAMERA_OVERLAYS="imx708,port0 imx708,port1,isp=2"
+EOF
+set +e
+RK3588_CAMERA_CONF="${FAKE}/etc/rk3588-camera/overlays.conf" \
+RK3588_U_BOOT_DEFAULT="${FAKE}/etc/default/u-boot" \
+RK3588_CAMERA_OVERLAY_DIR="${FAKE}/usr/share/rk3588-camera/overlays" \
+RK3588_CAMERA_GEN_DIR="${FAKE}/var/lib/rk3588-camera" \
+RK3588_CAMERA_RESOLVER="${FAKE}/usr/lib/rk3588-camera/resolve-overlay.py" \
+RK3588_BOARD_SHARE="${FAKE}/usr/share" \
+    bash "${PKG}/scripts/apply-overlays.sh" >"${WORK}/invalid-isp.out" 2>&1
+status=$?
+set -e
+test "${status}" -ne 0
+grep -q 'isp2 is not available (use isp0 or isp1)' "${WORK}/invalid-isp.out"
+cmp "${FAKE}/etc/default/u-boot" "${FAKE}/etc/default/u-boot.good"
+
+# A later explicit isp0 request takes priority over an earlier implicit one.
+cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'
+RK3588_CAMERA_OVERLAYS="imx708,port0 imx708,port1,isp0"
+EOF
+RK3588_CAMERA_CONF="${FAKE}/etc/rk3588-camera/overlays.conf" \
+RK3588_U_BOOT_DEFAULT="${FAKE}/etc/default/u-boot" \
+RK3588_CAMERA_OVERLAY_DIR="${FAKE}/usr/share/rk3588-camera/overlays" \
+RK3588_CAMERA_GEN_DIR="${FAKE}/var/lib/rk3588-camera" \
+RK3588_CAMERA_RESOLVER="${FAKE}/usr/lib/rk3588-camera/resolve-overlay.py" \
+RK3588_BOARD_SHARE="${FAKE}/usr/share" \
+    bash "${PKG}/scripts/apply-overlays.sh"
+grep -q 'imx708-port0-isp1.dtbo' "${FAKE}/etc/default/u-boot"
+grep -q 'imx708-port1-isp0.dtbo' "${FAKE}/etc/default/u-boot"
+apply "${WORK}/rock-explicit-isp.dtb" \
+    "${FAKE}/usr/share/rk3588-camera/overlays/rk3588-isp.dtbo" \
+    "${FAKE}/usr/share/rk3588-camera/overlays/rk3588-rock-5b-plus-port0.dtbo" \
+    "${FAKE}/usr/share/rk3588-camera/overlays/rk3588-rock-5b-plus-port1.dtbo" \
+    "${FAKE}/var/lib/rk3588-camera/imx708-port0-isp1.dtbo" \
+    "${FAKE}/var/lib/rk3588-camera/imx708-port1-isp0.dtbo"
 
 # Reversed list: first entry gets isp0 even when that port is port1.
 cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'

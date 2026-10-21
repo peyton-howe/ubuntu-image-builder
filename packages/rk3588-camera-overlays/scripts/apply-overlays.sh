@@ -8,9 +8,9 @@
 # A sensor is selected the way the Raspberry Pi does it:
 #   imx708,port0
 #   imx708,port1,isp1,link-frequency=447000000
-# The matching per-board port overlay is added automatically. The first
-# camera in the list enables isp0, the second isp1, unless isp0 or isp1
-# is set on that camera. Parameters are baked into a dtbo under
+# The matching per-board port overlay is added automatically. Explicit
+# ISP requests are reserved first; other cameras take the first
+# free ISP in list order. Parameters are baked into a dtbo under
 # /var/lib/rk3588-camera because U-Boot does not apply overlay parameters.
 set -euo pipefail
 
@@ -159,6 +159,11 @@ managed_path() {
     case "${item}" in
         "${GEN_DIR}"/*) return 0 ;;
     esac
+    case "${base}" in
+        rk3588-rock-5b-plus-imx708-cam[01].dtbo|\
+        rk3588-rock-5b-plus-imx708-cam[01]-isp.dtbo|\
+        rk3588s-orangepi-5-cam[123]-imx708.dtbo) return 0 ;;
+    esac
     return 1
 }
 
@@ -218,10 +223,17 @@ for ((i = 0; i < ${#sensor_ports[@]}; i++)); do
     done
 done
 
-# First listed camera gets isp0, the second isp1. An explicit isp0/isp1
-# on a camera takes that instance; two cameras cannot share one.
+# Reserve explicit ISP requests before assigning free ISPs in list order.
+# Two cameras cannot share one.
 
 used_isp=" "
+for isp in "${sensor_isp_req[@]}"; do
+    [[ -n ${isp} ]] || continue
+    [[ ${isp} == 0 || ${isp} == 1 ]] || die "isp${isp} is not available (use isp0 or isp1)"
+    [[ ${used_isp} != *" ${isp} "* ]] || die "isp${isp} is assigned to more than one camera"
+    used_isp+=" ${isp} "
+done
+
 for ((i = 0; i < ${#sensors[@]}; i++)); do
     tag="${sensors[i]}-port${sensor_ports[i]}"
     [[ ${sensor_four[i]} -eq 1 ]] && tag+="-4lane"
@@ -237,10 +249,8 @@ for ((i = 0; i < ${#sensors[@]}; i++)); do
         else
             die "only isp0 and isp1 exist; ${sensors[i]},port${sensor_ports[i]} needs an explicit isp that is still free"
         fi
+        used_isp+=" ${isp} "
     fi
-    [[ ${isp} == 0 || ${isp} == 1 ]] || die "isp${isp} is not available (use isp0 or isp1)"
-    [[ ${used_isp} != *" ${isp} "* ]] || die "isp${isp} is assigned to more than one camera"
-    used_isp+=" ${isp} "
     sensor_isps+=("${isp}")
     tag+="-isp${isp}"
     sensor_tags+=("${tag}")
