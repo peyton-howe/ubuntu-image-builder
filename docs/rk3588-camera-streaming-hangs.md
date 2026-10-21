@@ -15,8 +15,9 @@ was tried that did not help, and what is still not understood.
 
 ## Symptoms
 
-- The board freezes with nothing logged. SSH and the kernel log stream die and a
-  power cycle is needed. The last kernel line is usually `imx708 ...: configured
+- The board freezes with nothing logged. SSH and the kernel log stream die.
+  Some stalls end by themselves after minutes (2.5 and 8.8 minutes were seen);
+  one had not recovered after 17 minutes and needed a power cycle. The last kernel line is usually `imx708 ...: configured
   N lanes`, i.e. the hang comes in the first moments of a stream, after an
   earlier stream was stopped.
 - It is intermittent: after 1 to about 40 start/stop cycles, more often at high
@@ -95,6 +96,8 @@ DMABUFs, 4 buffers, 120 frames per start. Same sensor setup throughout:
 | on | soft reset after the CRU reset, in suspend | 14 |
 | on | DMA idle bit first | 34 |
 | on | DMA idle first, IOMMU re-initialised after | 11 |
+| on | fix 1 only, libcamera runs 3 s apart | stalled on run 3 |
+| on | fix 1 only, libcamera runs 10 s apart | stalled on run 7 |
 | **off** | none | 260 clean |
 | **off** | soft reset at stop | 120 same-layout clean, 60 layout-changing clean |
 
@@ -143,6 +146,11 @@ The same boot had run these clean first: 150 same-layout starts, 140 starts
 that changed mode every time, 60 libcamera runs (at a quarter of full speed
 because `vertical_blanking` was stuck at 3673, see the pitfalls below), 20
 raw-then-libcamera switches, and 39 libcamera runs at full speed.
+
+With a 3 s pause between runs the committed build ran 60 libcamera runs clean.
+A pause does not make the CRU reset safe: with it back on and no soft reset
+(fix 1 only), runs 3 s apart stalled on run 3 and runs 10 s apart on run 7.
+That is why fix 2 stays.
 
 Two readings fit, and they have not been told apart:
 
