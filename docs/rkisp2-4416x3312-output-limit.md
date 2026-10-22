@@ -45,7 +45,7 @@ has the same 4416x3312 as a default (`isp/capture.h`,
 main-path limit in `rkisp_register_stream_vdevs()` with
 `CIF_ISP_INPUT_W/H_MAX_V30` = 4672 x 3504 (`isp/rkisp.h`), or the larger
 "unite" values when both ISPs are used. So on RK3588 the vendor main path
-outputs up to 4672x3504.
+outputs up to 4672x3504 with a single ISP; unite mode has larger limits.
 
 ## What it blocks
 
