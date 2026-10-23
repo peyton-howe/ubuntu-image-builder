@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build rk3588s-orangepi-5b.dtb with our board changes for stock Ubuntu
 # kernels, whose own 5B DTB lacks them: the rk3588s-orangepi-5b.dts hunk of
-# kernel patch 0006 (AP6275P WiFi on pcie2x1l2, BT on uart9). It edits the
+# kernel patch 0010 (AP6275P WiFi on pcie2x1l2, BT on uart9, eMMC). It edits the
 # base DTS rather than adding an overlay, and Ubuntu's 5B DTB carries no
 # __symbols__, so ship a whole DTB, built with -@ so overlays can apply.
 # The ISP nodes are not added here: rk3588-camera-overlays' rk3588-isp.dtbo
@@ -38,12 +38,12 @@ ROCKCHIP=arch/arm64/boot/dts/rockchip
 git -C "${src}" checkout -q -- "${ROCKCHIP}"
 # patch -> the one file whose hunk we take from it
 declare -A HUNKS=(
-    [0006-arm64-dts-rockchip-imx708-camera-overlays.patch]="${DTS}"
+    [0010-arm64-dts-rockchip-orangepi-5b-wifi-bt-emmc.patch]="${DTS}"
 )
 for patch in "${!HUNKS[@]}"; do
     git -C "${src}" apply --include="${HUNKS[$patch]}" "${PATCH_DIR}/${patch}"
 done
-# Board-package-only fixups layered on top of the 0006 hunk.
+# Board-package-only fixups layered on top of the 0010 hunk.
 for frag in "$(dirname "$0")"/rk3588s-orangepi-5b-*.dtsi; do
     cp "${frag}" "${src}/${ROCKCHIP}/"
     echo "#include \"$(basename "${frag}")\"" >> "${src}/${DTS}"

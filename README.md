@@ -119,8 +119,8 @@ its **own DTB**, built by `packages/rk3588-board-orangepi-5b/files/build-dtb.sh`
 - It sparse-fetches the upstream rockchip DTS at `DTS_KERNEL_REF`
   (default `v7.3-rc4`, matching Ubuntu's 7.3 kernel). The fetch uses the
   GitHub mirror, because git.kernel.org ignores partial-clone filters.
-- It applies only the `rk3588s-orangepi-5b.dts` hunk of kernel patch
-  **0006** (the 5B's WiFi on `pcie2x1l2` and Bluetooth on `uart9`). The ISP
+- It applies kernel patch **0010**, the `rk3588s-orangepi-5b.dts` changes (the
+  5B's WiFi on `pcie2x1l2`, Bluetooth on `uart9` and eMMC). The ISP
   nodes come from `rk3588-isp.dtbo` at boot, as on every board (see
   [Cameras](#cameras)).
 - It adds `rk3588s-orangepi-5b-wifi-lpo.dtsi`. The WiFi chip needs the
