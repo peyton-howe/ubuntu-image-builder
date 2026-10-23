@@ -839,6 +839,9 @@ irqreturn_t rkcif_mipi_isr(int irq, void *ctx)
 	irqreturn_t ret = IRQ_NONE;
 	u32 intstat;
 
+	if (!rkcif->match_data->mipi)
+		return ret;
+
 	for (unsigned int i = 0; i < rkcif->match_data->mipi->mipi_num; i++) {
 		enum rkcif_interface_index index = RKCIF_MIPI_BASE + i;
 		struct rkcif_interface *interface = &rkcif->interfaces[index];
