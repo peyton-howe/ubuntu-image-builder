@@ -57,6 +57,9 @@ static int rkisp2_stats_enum_fmt_meta_cap(struct file *file, void *priv,
 		return -EINVAL;
 
 	f->pixelformat = V4L2_META_FMT_RKISP2_STATS;
+	/* See rkisp2_params_enum_fmt_meta_out() */
+	strscpy(f->description, "Rockchip ISP2 3A Statistics",
+		sizeof(f->description));
 
 	return 0;
 }

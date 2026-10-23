@@ -911,6 +911,12 @@ static int rkisp2_params_enum_fmt_meta_out(struct file *file, void *fh,
 		return -EINVAL;
 
 	f->pixelformat = V4L2_META_FMT_RKISP2_PARAMS;
+	/*
+	 * Stock videodev has no description for this fourcc and warns with a
+	 * backtrace on every enumeration. Kernels that know it overwrite this.
+	 */
+	strscpy(f->description, "Rockchip ISP2 3A Parameters",
+		sizeof(f->description));
 
 	return 0;
 }
