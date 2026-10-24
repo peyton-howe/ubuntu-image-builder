@@ -1,5 +1,5 @@
-# DCPHY RX v4, rebased to linux-stable
-# https://lore.kernel.org/linux-rockchip/20260821-dcphy-rx-v1-v4-0-f1797634233d@gmail.com/
+# DCPHY RX v5, rebased to linux-stable
+# https://lore.kernel.org/linux-rockchip/20261016-dcphy-rx-v1-v5-0-e63b49eabe2d@gmail.com/
 0001-phy-rockchip-samsung-dcphy-add-mipi-d-phy-receiver.patch
 # rkisp2 v3, rebased to linux-stable
 # https://lore.kernel.org/linux-media/20260827-rkisp2-v3-0-e91ff0a604d6@ideasonboard.com/

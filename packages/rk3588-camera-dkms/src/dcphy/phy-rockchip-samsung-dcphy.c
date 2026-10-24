@@ -1724,34 +1724,37 @@ static int samsung_mipi_dphy_tx_power_on(struct samsung_mipi_dcphy *samsung)
 	return 0;
 }
 
-static int samsung_mipi_dphy_tx_power_off(struct samsung_mipi_dcphy *samsung)
-{
-	samsung_mipi_dphy_tx_lane_disable(samsung);
-	samsung_mipi_dcphy_pll_disable(samsung);
-
-	return 0;
-}
-
 static int samsung_mipi_dcphy_tx_power_on(struct phy *phy)
 {
 	struct samsung_mipi_dcphy *samsung = phy_get_drvdata(phy);
 
-	/* CPHY part to be implemented later */
-	if (samsung->type != PHY_TYPE_DPHY)
+	switch (samsung->type) {
+	case PHY_TYPE_DPHY:
+		return samsung_mipi_dphy_tx_power_on(samsung);
+	default:
+		/* CPHY part to be implemented later */
 		return -EOPNOTSUPP;
+	}
 
-	return samsung_mipi_dphy_tx_power_on(samsung);
+	return 0;
 }
 
 static int samsung_mipi_dcphy_tx_power_off(struct phy *phy)
 {
 	struct samsung_mipi_dcphy *samsung = phy_get_drvdata(phy);
 
-	/* CPHY part to be implemented later */
-	if (samsung->type != PHY_TYPE_DPHY)
+	switch (samsung->type) {
+	case PHY_TYPE_DPHY:
+		samsung_mipi_dphy_tx_lane_disable(samsung);
+		break;
+	default:
+		/* CPHY part to be implemented later */
 		return -EOPNOTSUPP;
+	}
 
-	return samsung_mipi_dphy_tx_power_off(samsung);
+	samsung_mipi_dcphy_pll_disable(samsung);
+
+	return 0;
 }
 
 static int
@@ -1888,22 +1891,26 @@ static int samsung_mipi_dcphy_rx_power_on(struct phy *phy)
 {
 	struct samsung_mipi_dcphy *samsung = phy_get_drvdata(phy);
 
-	/* CPHY part to be implemented later */
-	if (samsung->type != PHY_TYPE_DPHY)
+	switch (samsung->type) {
+	case PHY_TYPE_DPHY:
+		return samsung_mipi_dphy_rx_power_on(samsung);
+	default:
+		/* CPHY part to be implemented later */
 		return -EOPNOTSUPP;
-
-	return samsung_mipi_dphy_rx_power_on(samsung);
+	}
 }
 
 static int samsung_mipi_dcphy_rx_power_off(struct phy *phy)
 {
 	struct samsung_mipi_dcphy *samsung = phy_get_drvdata(phy);
 
-	/* CPHY part to be implemented later */
-	if (samsung->type != PHY_TYPE_DPHY)
+	switch (samsung->type) {
+	case PHY_TYPE_DPHY:
+		return samsung_mipi_dphy_rx_power_off(samsung);
+	default:
+		/* CPHY part to be implemented later */
 		return -EOPNOTSUPP;
-
-	return samsung_mipi_dphy_rx_power_off(samsung);
+	}
 }
 
 static const struct phy_ops samsung_mipi_dcphy_tx_ops = {
@@ -1937,7 +1944,7 @@ static struct phy *samsung_mipi_dcphy_xlate(struct device *dev,
 {
 	struct samsung_mipi_dcphy *samsung = dev_get_drvdata(dev);
 	/* Device trees without the second cell describe the transmitter. */
-	u32 protocol = PHY_TYPE_DSI;
+	u32 direction = PHY_DIRECTION_TX;
 	u32 type;
 
 	if (args->args_count < 1 || args->args_count > 2) {
@@ -1952,10 +1959,10 @@ static struct phy *samsung_mipi_dcphy_xlate(struct device *dev,
 	}
 
 	if (args->args_count == 2)
-		protocol = args->args[1];
+		direction = args->args[1];
 
-	if (protocol != PHY_TYPE_DSI && protocol != PHY_TYPE_CSI) {
-		dev_err(dev, "invalid protocol %u\n", protocol);
+	if (direction != PHY_DIRECTION_TX && direction != PHY_DIRECTION_RX) {
+		dev_err(dev, "invalid direction %u\n", direction);
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -1971,7 +1978,7 @@ static struct phy *samsung_mipi_dcphy_xlate(struct device *dev,
 	}
 	samsung->type = type;
 
-	return protocol == PHY_TYPE_CSI ? samsung->rx.phy : samsung->tx.phy;
+	return direction == PHY_DIRECTION_RX ? samsung->rx.phy : samsung->tx.phy;
 }
 
 static int samsung_mipi_dcphy_probe(struct platform_device *pdev)
@@ -2036,16 +2043,16 @@ static int samsung_mipi_dcphy_probe(struct platform_device *pdev)
 		return dev_err_probe(dev, PTR_ERR(samsung->grf_apb_rst),
 				     "Failed to get system grf_apb_rst control\n");
 
+	ret = devm_pm_runtime_enable(dev);
+	if (ret)
+		return dev_err_probe(dev, ret, "Failed to enable runtime PM\n");
+
 	samsung->tx.phy = devm_phy_create(dev, NULL, &samsung_mipi_dcphy_tx_ops);
 	if (IS_ERR(samsung->tx.phy))
 		return dev_err_probe(dev, PTR_ERR(samsung->tx.phy),
 				     "Failed to create MIPI DC-PHY transmitter\n");
 
 	phy_set_drvdata(samsung->tx.phy, samsung);
-
-	ret = devm_pm_runtime_enable(dev);
-	if (ret)
-		return dev_err_probe(dev, ret, "Failed to enable runtime PM\n");
 
 	samsung->rx.phy = devm_phy_create(dev, NULL, &samsung_mipi_dcphy_rx_ops);
 	if (IS_ERR(samsung->rx.phy))

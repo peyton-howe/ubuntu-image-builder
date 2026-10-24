@@ -63,16 +63,7 @@
 		status = "disabled";
 	};
 
-	csi0: csi@0 {
-		status = "disabled";
-		csi0_in: port {
-		};
-	};
-	csi1: csi@1 {
-		status = "disabled";
-		csi1_in: port {
-		};
-	};
+	/* Stock DTBs have no csi0/csi1; the port2/port3 overlays add them. */
 	csi2: csi@2 {
 		status = "disabled";
 		csi2_in: port {
@@ -91,8 +82,38 @@
 		status = "disabled";
 	};
 
+	mipidcphy0: phy@feda0000 {
+		#phy-cells = <1>;
+		status = "disabled";
+	};
+	mipidcphy1: phy@fedb0000 {
+		#phy-cells = <1>;
+		status = "disabled";
+	};
+
+	dsi0: dsi@fde20000 {
+		phys = <&mipidcphy0 10>;
+		status = "disabled";
+	};
+	dsi1: dsi@fde30000 {
+		phys = <&mipidcphy1 10>;
+		status = "disabled";
+	};
+
 	vicap: vicap {
 		status = "disabled";
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			vicap_mipi0: port@1 {
+				reg = <1>;
+			};
+			vicap_mipi1: port@2 {
+				reg = <2>;
+			};
+		};
 	};
 	vicap_mmu: vicap-mmu {
 		status = "disabled";

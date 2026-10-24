@@ -10,11 +10,11 @@ Package: rk3588-camera-dkms
 Architecture: all
 Depends: ${misc:Depends}, dkms
 Recommends: linux-headers-generic | linux-headers-virtual | linux-headers-arm64
-Description: DKMS drivers for RK3588 cameras (IMX708, rkisp2)
+Description: DKMS drivers for RK3588 cameras (IMX708, rkisp2, rkcif, DCPHY)
  Out-of-tree modules extracted from the ubuntu-image-builder mainline
- camera patch series: the IMX708 sensor driver and the rkisp2 ISP driver.
- The Samsung DCPHY CSI-RX replacement is staged in the source tree but not
- built yet.
+ camera patch series: the IMX708 sensor driver, the rkisp2 ISP driver, the
+ rkcif capture driver and the Samsung DCPHY CSI receiver. The last two
+ replace Ubuntu's modules of the same name.
  .
  Headers are only recommended: the image build installs headers matching
  each installed kernel, and requiring the linux-headers-generic

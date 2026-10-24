@@ -10,10 +10,21 @@ BUILT_MODULE_NAME[1]="rockchip-isp2"
 BUILT_MODULE_LOCATION[1]="rkisp2"
 DEST_MODULE_LOCATION[1]="/updates/dkms"
 
-# Replaces Ubuntu's in-tree rockchip-cif (VICAP capture).
-BUILT_MODULE_NAME[2]="rockchip-cif"
-BUILT_MODULE_LOCATION[2]="rkcif"
+# Replaces Ubuntu's in-tree module of the same name (depmod searches
+# updates/ first) to add the CSI receiver (the stock module only has the
+# DSI transmitter) for the SoC's MIPI DCPHYs.
+BUILT_MODULE_NAME[2]="phy-rockchip-samsung-dcphy"
+BUILT_MODULE_LOCATION[2]="dcphy"
 DEST_MODULE_LOCATION[2]="/updates/dkms"
+
+# Replaces Ubuntu's in-tree rockchip-cif (VICAP capture).
+BUILT_MODULE_NAME[3]="rockchip-cif"
+BUILT_MODULE_LOCATION[3]="rkcif"
+DEST_MODULE_LOCATION[3]="/updates/dkms"
+
+# Rebuild the kernel's initrd so it does not keep a stale copy of a module this
+# package replaces. $kernelver is expanded by DKMS when it reads this file.
+POST_INSTALL="refresh-initramfs.sh $kernelver"
 
 MAKE[0]="make -C ${kernel_source_dir} M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build"
 CLEAN[0]="make -C ${kernel_source_dir} M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build clean"
