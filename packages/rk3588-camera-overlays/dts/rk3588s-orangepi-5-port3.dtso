@@ -17,6 +17,7 @@
 #include <dt-bindings/clock/rockchip,rk3588-cru.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/media/video-interfaces.h>
 #include <dt-bindings/phy/phy.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include <dt-bindings/power/rk3588-power.h>
@@ -52,6 +53,7 @@
 
 				cam_port3_csi_ep: endpoint {
 					remote-endpoint = <&cam_port3_sensor_ep>;
+					bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
 					data-lanes = <1 2>;
 					link-frequencies = /bits/ 64 <450000000>;
 				};

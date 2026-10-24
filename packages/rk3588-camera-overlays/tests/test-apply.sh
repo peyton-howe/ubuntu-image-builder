@@ -155,6 +155,8 @@ assert prop(opi, "/i2c@7/camera-port2", "compatible") == b"sony,imx219\0"
 assert prop(opi, "/i2c@7/camera-port2", "reg") == struct.pack(">I", 0x10)
 assert u64(prop(opi, "/i2c@7/camera-port2/port/endpoint", "link-frequencies")) == 456000000
 assert prop(opi, "/csi@fdd10000", "status") == b"okay\0"
+assert u32s(prop(opi, "/csi@fdd10000/ports/port@0/endpoint", "bus-type")) == (4,)
+assert u32s(prop(opi, "/csi@fdd10000/ports/port@0/endpoint", "data-lanes")) == (1, 2)
 assert u64(prop(opi, "/csi@fdd10000/ports/port@0/endpoint", "link-frequencies")) == 456000000
 # csi0 selects DCPHY0's receiver; dsi0 keeps the transmitter with two cells.
 dcphy0 = phandle(opi, "/phy@feda0000")
@@ -174,6 +176,9 @@ assert prop(opi, "/i2c@7", "status") == b"okay\0"
 opi3 = load("opi3.dtb")
 assert prop(opi3, "/i2c@2/camera-port3", "compatible") == b"sony,imx708\0"
 assert prop(opi3, "/csi@fdd20000", "status") == b"okay\0"
+assert u32s(prop(opi3, "/csi@fdd20000/ports/port@0/endpoint", "bus-type")) == (4,)
+assert u32s(prop(opi3, "/csi@fdd20000/ports/port@0/endpoint", "data-lanes")) == (1, 2)
+assert u64(prop(opi3, "/csi@fdd20000/ports/port@0/endpoint", "link-frequencies")) == 450000000
 dcphy1 = phandle(opi3, "/phy@fedb0000")
 assert u32s(prop(opi3, "/phy@fedb0000", "#phy-cells")) == (2,)
 assert u32s(prop(opi3, "/csi@fdd20000", "phys")) == (dcphy1, 10, 1)

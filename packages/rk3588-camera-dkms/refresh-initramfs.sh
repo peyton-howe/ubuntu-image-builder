@@ -26,12 +26,12 @@ fi
 
 # DKMS runs POST_INSTALL before its own depmod, so modules.dep does not list
 # the modules yet; dracut and modprobe would both miss them.
-depmod -a "$kver" || true
+depmod -a "$kver" || exit "$?"
 
 if command -v dracut >/dev/null 2>&1; then
-    dracut -f --kver "$kver" || true
+    dracut -f --kver "$kver" || exit "$?"
 elif command -v update-initramfs >/dev/null 2>&1; then
-    update-initramfs -u -k "$kver" || true
+    update-initramfs -u -k "$kver" || exit "$?"
 else
     echo "rk3588-camera: no dracut or update-initramfs; initrd left unchanged" >&2
 fi
