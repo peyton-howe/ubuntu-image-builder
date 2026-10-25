@@ -230,7 +230,7 @@ the sensor can resolve `cam_portN_*`. Overlays also need the base DTB to have
 
 | Board | Base DTB | Camera ports |
 |---|---|---|
-| Orange Pi 5B | Packaged (built with `-@`) | port1 tested on hardware (as the old cam1 IMX708 overlay); port3 (CAM3) tested on hardware; port2 (CAM2) untested |
+| Orange Pi 5B | Packaged (built with `-@`) | port1 tested on hardware (as the old cam1 IMX708 overlay); port2 (CAM2) and port3 (CAM3) tested on hardware |
 | ROCK 5B+ | Ubuntu's (has `__symbols__`, since upstream ships overlays for it) | port0 and port1 together; tested on hardware as the old cam0/cam1 overlays. ISP follows list order now |
 | Orange Pi 5 | Packaged (built with `-@`) | port1/port2/port3 can apply; not tested on hardware |
 
@@ -242,8 +242,8 @@ Ubuntu's `phy-rockchip-samsung-dcphy` is transmitter-only. `rk3588-camera-dkms`
 replaces it with the patched one from kernel patch 0001 on any board. A camera
 port on a DCPHY then needs a CSI host and a PHY with two phy-cells in its
 overlay. Only the Orange Pi 5/5B port2 (DCPHY0) and port3 (DCPHY1) overlays do
-that so far, using the CSI hosts from patch 0005 that stock DTBs lack. CAM3
-was tested on the Orange Pi 5B; CAM2 remains untested.
+that so far, using the CSI hosts from patch 0005 that stock DTBs lack. CAM2
+and CAM3 were both tested on the Orange Pi 5B.
 
 ## Custom kernels (vendor / mainline)
 
