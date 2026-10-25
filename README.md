@@ -200,7 +200,8 @@ knob the Pi has; the imx708 driver rejects it. `orientation` is 0 front,
 
 Sensors shipped: `imx708` (the DKMS driver), `imx219` (mainline binding;
 needs the kernel's imx219 module), `imx519` (Raspberry Pi binding; no driver
-in this repo), `imx415` (Radxa Camera 4K; needs the kernel's imx415 module.
+in this repo), `imx415` (Radxa Camera 4K at 0x1a; Raspberry Pi modules such
+as Arducam's B0569 answer at 0x37, so use `addr=0x37`. Needs the kernel's imx415 module.
 Four lanes at 720 MHz, 3864x2192 at about 60 fps. `link-frequency=360000000`
 gives about 30 fps). Adding another sensor is a new `.dtso` with the same
 `cam_port_*` fixups.

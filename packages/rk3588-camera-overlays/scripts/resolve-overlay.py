@@ -239,7 +239,7 @@ def _fragment_nodes(root):
 
 
 def retarget_overlay(blob, port, isp=None, four_lane=False, link_frequency=None,
-                     rotation=None, orientation=None):
+                     rotation=None, orientation=None, addr=None):
     root, rsv, version = parse_fdt(blob)
     fixups = root.child("__fixups__")
     if fixups is None:
@@ -311,6 +311,12 @@ def retarget_overlay(blob, port, isp=None, four_lane=False, link_frequency=None,
             raise FdtError(f"orientation out of range: {orientation}")
         sensor.set("orientation", struct.pack(">I", orientation))
 
+    if addr is not None:
+        # 7-bit I2C address of the sensor, replacing the overlay's reg.
+        if addr < 0x03 or addr > 0x77:
+            raise FdtError(f"addr must be a 7-bit I2C address, got {addr:#x}")
+        sensor.set("reg", struct.pack(">I", addr))
+
     return emit_fdt(root, rsv, version)
 
 
@@ -324,6 +330,8 @@ def main(argv=None):
     parser.add_argument("--link-frequency", type=int)
     parser.add_argument("--rotation", type=int)
     parser.add_argument("--orientation", type=int)
+    parser.add_argument("--addr", type=lambda s: int(s, 0),
+                        help="sensor I2C address (7-bit, e.g. 0x37)")
     args = parser.parse_args(argv)
     if args.port < 0:
         parser.error("port must be >= 0")
@@ -338,6 +346,7 @@ def main(argv=None):
             link_frequency=args.link_frequency,
             rotation=args.rotation,
             orientation=args.orientation,
+            addr=args.addr,
         )
     except (OSError, FdtError) as exc:
         print(f"resolve-overlay: {exc}", file=sys.stderr)

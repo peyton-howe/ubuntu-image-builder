@@ -41,6 +41,9 @@ python3 "${PKG}/scripts/resolve-overlay.py" \
 python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx415.dtbo" "${WORK}/imx415-port1-30fps.dtbo" \
     --port 1 --isp 1 --link-frequency 360000000
+python3 "${PKG}/scripts/resolve-overlay.py" \
+    "${WORK}/imx415.dtbo" "${WORK}/imx415-port1-addr37.dtbo" \
+    --port 1 --isp 1 --addr 0x37
 
 apply() {
     local out="$1"
@@ -84,6 +87,10 @@ apply "${WORK}/imx415.dtb" \
     "${WORK}/rk3588-isp.dtbo" \
     "${WORK}/rk3588-rock-5b-plus-port1.dtbo" \
     "${WORK}/imx415-port1-30fps.dtbo"
+apply "${WORK}/imx415-addr37.dtb" \
+    "${WORK}/rk3588-isp.dtbo" \
+    "${WORK}/rk3588-rock-5b-plus-port1.dtbo" \
+    "${WORK}/imx415-port1-addr37.dtbo"
 python3 - "${PKG}/scripts/resolve-overlay.py" "${WORK}" <<'PY'
 import importlib.util
 import struct
@@ -204,6 +211,11 @@ for ep in ("/i2c@4/camera-port1/port/endpoint", "/csi@4/port/endpoint"):
     assert imx415.find(ep).get("clock-noncontinuous") is None
 assert prop(imx415, "/isp@fdcc0000", "status") == b"okay\0"
 assert prop(imx415, "/isp@fdcb0000", "status") == b"disabled\0"
+# The overlay's address stays unless addr is given.
+assert prop(imx415, "/i2c@4/camera-port1", "reg") == struct.pack(">I", 0x1A)
+imx415_addr = load("imx415-addr37.dtb")
+assert prop(imx415_addr, "/i2c@4/camera-port1", "reg") == struct.pack(">I", 0x37)
+
 
 imx519 = load("imx519.dtb")
 assert prop(imx519, "/i2c@3/camera-port0", "compatible") == b"sony,imx519\0"
@@ -267,6 +279,45 @@ assert "rk3588-rock-5b-plus-imx708-cam0-isp.dtbo" not in line
 assert line.index("panthor.dtbo") < line.index("rk3588-isp.dtbo")
 print("apply-overlays.sh checks passed")
 PY
+
+# addr takes hex or decimal, is checked, and is part of the file name.
+cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'
+RK3588_CAMERA_OVERLAYS="imx415,port0,addr=0x37"
+EOF
+RK3588_CAMERA_CONF="${FAKE}/etc/rk3588-camera/overlays.conf" \
+RK3588_U_BOOT_DEFAULT="${FAKE}/etc/default/u-boot" \
+RK3588_CAMERA_OVERLAY_DIR="${FAKE}/usr/share/rk3588-camera/overlays" \
+RK3588_CAMERA_GEN_DIR="${FAKE}/var/lib/rk3588-camera" \
+RK3588_CAMERA_RESOLVER="${FAKE}/usr/lib/rk3588-camera/resolve-overlay.py" \
+RK3588_BOARD_SHARE="${FAKE}/usr/share" \
+    bash "${PKG}/scripts/apply-overlays.sh"
+grep -q 'imx415-port0-addr-0x37-isp0.dtbo' "${FAKE}/etc/default/u-boot"
+cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'
+RK3588_CAMERA_OVERLAYS="imx415,port0,addr=55"
+EOF
+RK3588_CAMERA_CONF="${FAKE}/etc/rk3588-camera/overlays.conf" \
+RK3588_U_BOOT_DEFAULT="${FAKE}/etc/default/u-boot" \
+RK3588_CAMERA_OVERLAY_DIR="${FAKE}/usr/share/rk3588-camera/overlays" \
+RK3588_CAMERA_GEN_DIR="${FAKE}/var/lib/rk3588-camera" \
+RK3588_CAMERA_RESOLVER="${FAKE}/usr/lib/rk3588-camera/resolve-overlay.py" \
+RK3588_BOARD_SHARE="${FAKE}/usr/share" \
+    bash "${PKG}/scripts/apply-overlays.sh"
+grep -q 'imx415-port0-addr-0x37-isp0.dtbo' "${FAKE}/etc/default/u-boot"
+cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'
+RK3588_CAMERA_OVERLAYS="imx415,port0,addr=0x80"
+EOF
+set +e
+RK3588_CAMERA_CONF="${FAKE}/etc/rk3588-camera/overlays.conf" \
+RK3588_U_BOOT_DEFAULT="${FAKE}/etc/default/u-boot" \
+RK3588_CAMERA_OVERLAY_DIR="${FAKE}/usr/share/rk3588-camera/overlays" \
+RK3588_CAMERA_GEN_DIR="${FAKE}/var/lib/rk3588-camera" \
+RK3588_CAMERA_RESOLVER="${FAKE}/usr/lib/rk3588-camera/resolve-overlay.py" \
+RK3588_BOARD_SHARE="${FAKE}/usr/share" \
+    bash "${PKG}/scripts/apply-overlays.sh" >"${WORK}/bad-addr.out" 2>&1
+status=$?
+set -e
+test "${status}" -ne 0
+grep -q 'addr must be a 7-bit I2C address' "${WORK}/bad-addr.out"
 
 # Missing port fails without rewriting a good config.
 cp "${FAKE}/etc/default/u-boot" "${FAKE}/etc/default/u-boot.good"

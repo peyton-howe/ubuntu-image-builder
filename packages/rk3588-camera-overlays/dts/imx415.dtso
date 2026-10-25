@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Sony IMX415 (Radxa Camera 4K), attached as imx415,port0.
+ * Sony IMX415, attached as imx415,port0. The address defaults to 0x1a, as
+ * on the Radxa Camera 4K; Raspberry Pi modules use 0x37, so use
+ * imx415,port0,addr=0x37 for those. Arducam's B0569 module for the
+ * Raspberry Pi is one: 0x37, 24 MHz oscillator, four lanes.
  *
  * Same port labels and parameters as imx708.dtso. The port overlay runs
  * the sensor clock at 24 MHz, so the mainline imx415 driver picks its mode

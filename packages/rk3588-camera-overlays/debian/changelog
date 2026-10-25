@@ -14,6 +14,9 @@ rk3588-camera-overlays (0.2.0-1) UNRELEASED; urgency=medium
     This replaces the ROCK 5B+ imx415-cam0/cam1 overlays.
   * Port overlays no longer set clock-noncontinuous; each sensor overlay
     sets it if the sensor needs it.
+  * Add an addr=<0x..> parameter that replaces a sensor's I2C address, as the
+    Raspberry Pi overlays have. imx415,port0,addr=0x37 is for Raspberry Pi
+    modules such as Arducam's.
   * Orange Pi 5 port2/port3 add the csi0/csi1 hosts that stock DTBs lack,
     link them to VICAP, and switch DCPHY0/1 to two phy-cells so the host
     selects the receiver. Before this they referenced &csi0/&csi1, which no

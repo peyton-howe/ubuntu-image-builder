@@ -107,6 +107,17 @@ class ResolveTests(unittest.TestCase):
             root.find("/fragment@1/__overlay__").get("clock-noncontinuous"), b""
         )
 
+    def test_addr_sets_reg(self):
+        out = resolve.retarget_overlay(self.blob(), port=0, isp=0, addr=0x37)
+        root, _, _ = resolve.parse_fdt(out)
+        sensor = root.find("/fragment@0/__overlay__")
+        self.assertEqual(sensor.get("reg"), struct.pack(">I", 0x37))
+
+    def test_addr_rejects_out_of_range(self):
+        for bad in (0, 2, 0x78, 0x100):
+            with self.assertRaises(resolve.FdtError):
+                resolve.retarget_overlay(self.blob(), port=0, isp=0, addr=bad)
+
     def test_port1_leaves_unrelated_fixup(self):
         out = resolve.retarget_overlay(self.blob(), port=1, isp=1)
         root, _, _ = resolve.parse_fdt(out)
