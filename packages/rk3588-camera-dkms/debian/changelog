@@ -1,3 +1,12 @@
+rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
+
+  * Build a replacement imx415 module: the mainline driver (v7.3-rc4) plus a
+    2376 Mbps lane rate, for 3864x2192 at about 90 fps on four lanes with a
+    37.125 MHz sensor clock. It installs under updates/dkms, which depmod
+    prefers over Ubuntu's module. The 720, 891, 1440 Mbps modes are unchanged.
+
+ -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
+
 rk3588-camera-dkms (0.1.3-1) UNRELEASED; urgency=medium
 
   * Replace Ubuntu's rockchip-cif with rkcif v7.3 plus a fixed stream stop.

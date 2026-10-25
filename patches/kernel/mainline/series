@@ -19,3 +19,5 @@
 0006-arm64-dts-rockchip-imx708-camera-overlays.patch
 # IMX415 (Radxa Camera 4K) at 24 MHz: 1440 Mbps ~60 fps, or 720 Mbps ~30 fps
 0008-arm64-dts-rockchip-imx415-4k60-overlays.patch
+# IMX415 2376 Mbps lane rate: 3864x2192 at about 90 fps on four lanes
+0011-media-i2c-imx415-add-2376mbps-lane-rate.patch

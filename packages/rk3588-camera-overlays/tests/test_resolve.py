@@ -108,6 +108,14 @@ class ResolveTests(unittest.TestCase):
             root.find("/fragment@1/__overlay__").get("clock-noncontinuous"), b""
         )
 
+    def test_clock_frequency_sets_assigned_clock_rates(self):
+        out = resolve.retarget_overlay(
+            self.blob(), port=0, isp=0, clock_frequency=37125000
+        )
+        root, _, _ = resolve.parse_fdt(out)
+        sensor = root.find("/fragment@0/__overlay__")
+        self.assertEqual(sensor.get("assigned-clock-rates"), struct.pack(">I", 37125000))
+
     def test_addr_sets_reg(self):
         out = resolve.retarget_overlay(self.blob(), port=0, isp=0, addr=0x37)
         root, _, _ = resolve.parse_fdt(out)
@@ -138,6 +146,10 @@ class ResolveTests(unittest.TestCase):
                     root, _, _ = resolve.parse_fdt(dst.read_bytes())
                     sensor = root.find("/fragment@0/__overlay__")
                     self.assertEqual(sensor.get("reg"), struct.pack(">I", expected))
+
+    def test_clock_frequency_rejects_zero(self):
+        with self.assertRaises(resolve.FdtError):
+            resolve.retarget_overlay(self.blob(), port=0, isp=0, clock_frequency=0)
 
     def test_port1_leaves_unrelated_fixup(self):
         out = resolve.retarget_overlay(self.blob(), port=1, isp=1)

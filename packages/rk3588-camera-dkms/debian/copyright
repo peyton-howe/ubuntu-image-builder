@@ -6,6 +6,10 @@ Files: src/imx708/*
 Copyright: 2020-2022 Raspberry Pi Ltd
 License: GPL-2.0-only
 
+Files: src/imx415/*
+Copyright: 2023 WolfVision GmbH
+License: GPL-2.0-only
+
 Files: src/rkisp2/*
 Copyright: Ideas on Board Oy / Paul Elder and contributors
 License: GPL-2.0-only

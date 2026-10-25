@@ -1,0 +1,112 @@
+From: Peyton Howe <peyton@localhost>
+Subject: [PATCH] media: i2c: imx415: add a 2376 Mbps lane rate
+
+The driver already has clock parameters for 2376 Mbps (for 27, 37.125 and
+74.25 MHz clocks) but no mode that uses them. Add the D-PHY timing registers
+and a four-lane HMAX minimum so a device tree with link-frequencies of
+1188000000 and a 37.125 MHz clock gets 3864x2192 at about 90 fps.
+
+Register values are from the Rockchip BSP driver's 4K90 mode
+(bambooCZ/rk3588-imx415-4k60), where the sensor streams at 90.03 fps on four
+lanes with both RK3588 ISPs. Mainline's own clock parameters for this rate
+agree with that driver's SYS_MODE and INCKSEL values. Only four lanes have
+been tried.
+
+--- a/drivers/media/i2c/imx415.c
++++ b/drivers/media/i2c/imx415.c
+@@ -2,8 +2,7 @@
+ /*
+  * Driver for the Sony IMX415 CMOS Image Sensor.
+  *
+- * Copyright (C) 2023 WolfVision GmbH.
+- */
++ * Copyright (C) 2023 WolfVision GmbH. */
+ 
+ #include <linux/clk.h>
+ #include <linux/gpio/consumer.h>
+@@ -109,7 +108,7 @@
+  */
+ static const s64 link_freq_menu_items[] = {
+ 	594000000 / 2,	720000000 / 2,	891000000 / 2,
+-	1440000000 / 2, 1485000000 / 2,
++	1440000000 / 2, 1485000000 / 2, 2376000000 / 2,
+ };
+ 
+ struct imx415_clk_params {
+@@ -491,6 +490,23 @@
+ 	{ IMX415_TLPX, 0x002F },
+ };
+ 
++/*
++ * 2376 Mbps CSI configuration. Values from the Rockchip BSP driver's 4K90
++ * mode (bambooCZ/rk3588-imx415-4k60), where the sensor delivers 3864x2192 at
++ * 90 fps on four lanes.
++ */
++static const struct cci_reg_sequence imx415_linkrate_2376mbps[] = {
++	{ IMX415_TCLKPOST, 0x00E7 },
++	{ IMX415_TCLKPREPARE, 0x008F },
++	{ IMX415_TCLKTRAIL, 0x008F },
++	{ IMX415_TCLKZERO, 0x027F },
++	{ IMX415_THSPREPARE, 0x0097 },
++	{ IMX415_THSZERO, 0x010F },
++	{ IMX415_THSTRAIL, 0x0097 },
++	{ IMX415_THSEXIT, 0x00F7 },
++	{ IMX415_TLPX, 0x007F },
++};
++
+ struct imx415_mode_reg_list {
+ 	u32 num_of_regs;
+ 	const struct cci_reg_sequence *regs;
+@@ -499,6 +515,7 @@
+ struct imx415_mode {
+ 	u64 lane_rate;
+ 	u32 hmax_min[2];
++	u32 vblank_def;		/* 0: IMX415_PIXEL_ARRAY_VBLANK */
+ 	struct imx415_mode_reg_list reg_list;
+ };
+ 
+@@ -528,6 +545,24 @@
+ 			.regs = imx415_linkrate_891mbps,
+ 		},
+ 	},
++	{
++		/*
++		 * HMAX 352 is a 4.741 us line. The four-lane payload alone
++		 * needs about 302 counts, but the Rockchip driver found that
++		 * HMAX below 350 reads out garbage, so 352 is the floor. The
++		 * default VBLANK is 151, the Rockchip driver's 4K90 value (VMAX
++		 * 2343, 90.0 fps); the control still goes down to 58, which is
++		 * about 93.7 fps. The two-lane HMAX is twice the four-lane one,
++		 * as for the other lane rates, and has not been tried.
++		 */
++		.lane_rate = 2376000000,
++		.hmax_min = { 704, 352 },
++		.vblank_def = 151,
++		.reg_list = {
++			.num_of_regs = ARRAY_SIZE(imx415_linkrate_2376mbps),
++			.regs = imx415_linkrate_2376mbps,
++		},
++	},
+ };
+ 
+ static const char *const imx415_test_pattern_menu[] = {
+@@ -779,8 +814,8 @@
+ 	struct v4l2_ctrl *ctrl;
+ 	const struct imx415_mode *cur_mode = &supported_modes[sensor->cur_mode];
+ 	u64 lane_rate = cur_mode->lane_rate;
+-	u32 exposure_max = IMX415_PIXEL_ARRAY_HEIGHT +
+-			   IMX415_PIXEL_ARRAY_VBLANK -
++	u32 vblank_def = cur_mode->vblank_def ?: IMX415_PIXEL_ARRAY_VBLANK;
++	u32 exposure_max = IMX415_PIXEL_ARRAY_HEIGHT + vblank_def -
+ 			   IMX415_EXPOSURE_OFFSET;
+ 	u32 hblank_min, hblank_max;
+ 	unsigned int i;
+@@ -832,7 +867,7 @@
+ 					   V4L2_CID_VBLANK,
+ 					   IMX415_PIXEL_ARRAY_VBLANK,
+ 					   IMX415_VMAX_MAX - IMX415_PIXEL_ARRAY_HEIGHT,
+-					   1, IMX415_PIXEL_ARRAY_VBLANK);
++					   1, vblank_def);
+ 
+ 	v4l2_ctrl_new_std(&sensor->ctrls, NULL, V4L2_CID_PIXEL_RATE,
+ 			  sensor->pixel_rate, sensor->pixel_rate, 1,

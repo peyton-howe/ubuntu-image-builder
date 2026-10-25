@@ -42,6 +42,9 @@ python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx415.dtbo" "${WORK}/imx415-port1-30fps.dtbo" \
     --port 1 --isp 1 --link-frequency 360000000
 python3 "${PKG}/scripts/resolve-overlay.py" \
+    "${WORK}/imx415.dtbo" "${WORK}/imx415-port1-4k90.dtbo" \
+    --port 1 --isp 1 --link-frequency 1188000000 --clock-frequency 37125000
+python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx415.dtbo" "${WORK}/imx415-port1-addr37.dtbo" \
     --port 1 --isp 1 --addr 0x37
 
@@ -87,6 +90,10 @@ apply "${WORK}/imx415.dtb" \
     "${WORK}/rk3588-isp.dtbo" \
     "${WORK}/rk3588-rock-5b-plus-port1.dtbo" \
     "${WORK}/imx415-port1-30fps.dtbo"
+apply "${WORK}/imx415-4k90.dtb" \
+    "${WORK}/rk3588-isp.dtbo" \
+    "${WORK}/rk3588-rock-5b-plus-port1.dtbo" \
+    "${WORK}/imx415-port1-4k90.dtbo"
 apply "${WORK}/imx415-addr37.dtb" \
     "${WORK}/rk3588-isp.dtbo" \
     "${WORK}/rk3588-rock-5b-plus-port1.dtbo" \
@@ -211,11 +218,20 @@ for ep in ("/i2c@4/camera-port1/port/endpoint", "/csi@4/port/endpoint"):
     assert imx415.find(ep).get("clock-noncontinuous") is None
 assert prop(imx415, "/isp@fdcc0000", "status") == b"okay\0"
 assert prop(imx415, "/isp@fdcb0000", "status") == b"disabled\0"
+# Without clock-frequency the port's 24 MHz stays.
+assert u32s(prop(imx415, "/i2c@4/camera-port1", "assigned-clock-rates")) == (24000000,)
+
 # The overlay's address stays unless addr is given.
 assert prop(imx415, "/i2c@4/camera-port1", "reg") == struct.pack(">I", 0x1A)
 imx415_addr = load("imx415-addr37.dtb")
 assert prop(imx415_addr, "/i2c@4/camera-port1", "reg") == struct.pack(">I", 0x37)
 
+imx415_4k90 = load("imx415-4k90.dtb")
+# clock-frequency replaces the port's rate; 1188 MHz is 2376 Mbps per lane.
+assert u32s(prop(imx415_4k90, "/i2c@4/camera-port1", "assigned-clock-rates")) == (37125000,)
+for ep in ("/i2c@4/camera-port1/port/endpoint", "/csi@4/port/endpoint"):
+    assert u32s(prop(imx415_4k90, ep, "data-lanes")) == (1, 2, 3, 4)
+    assert u64(prop(imx415_4k90, ep, "link-frequencies")) == 1188000000
 
 imx519 = load("imx519.dtb")
 assert prop(imx519, "/i2c@3/camera-port0", "compatible") == b"sony,imx519\0"
@@ -279,6 +295,20 @@ assert "rk3588-rock-5b-plus-imx708-cam0-isp.dtbo" not in line
 assert line.index("panthor.dtbo") < line.index("rk3588-isp.dtbo")
 print("apply-overlays.sh checks passed")
 PY
+
+# clock-frequency is passed to the resolver and is part of the file name.
+cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'
+RK3588_CAMERA_OVERLAYS="imx415,port0,link-frequency=1188000000,clock-frequency=37125000"
+EOF
+RK3588_CAMERA_CONF="${FAKE}/etc/rk3588-camera/overlays.conf" \
+RK3588_U_BOOT_DEFAULT="${FAKE}/etc/default/u-boot" \
+RK3588_CAMERA_OVERLAY_DIR="${FAKE}/usr/share/rk3588-camera/overlays" \
+RK3588_CAMERA_GEN_DIR="${FAKE}/var/lib/rk3588-camera" \
+RK3588_CAMERA_RESOLVER="${FAKE}/usr/lib/rk3588-camera/resolve-overlay.py" \
+RK3588_BOARD_SHARE="${FAKE}/usr/share" \
+    bash "${PKG}/scripts/apply-overlays.sh"
+grep -q 'imx415-port0-link-1188000000-clk-37125000-isp0.dtbo' "${FAKE}/etc/default/u-boot"
+test -f "${FAKE}/var/lib/rk3588-camera/imx415-port0-link-1188000000-clk-37125000-isp0.dtbo"
 
 # addr takes hex or decimal, is checked, and is part of the file name.
 for addr_case in 0x37:0x37 0X37:0x37 55:0x37 055:0x37 008:0x8 003:0x3 0119:0x77; do

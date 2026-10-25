@@ -22,6 +22,11 @@ BUILT_MODULE_NAME[3]="rockchip-cif"
 BUILT_MODULE_LOCATION[3]="rkcif"
 DEST_MODULE_LOCATION[3]="/updates/dkms"
 
+# Replaces Ubuntu's in-tree imx415 to add the 2376 Mbps lane rate (4K90).
+BUILT_MODULE_NAME[4]="imx415"
+BUILT_MODULE_LOCATION[4]="imx415"
+DEST_MODULE_LOCATION[4]="/updates/dkms"
+
 # Rebuild the kernel's initrd so it does not keep a stale copy of a module this
 # package replaces. $kernelver is expanded by DKMS when it reads this file.
 POST_INSTALL="refresh-initramfs.sh $kernelver"

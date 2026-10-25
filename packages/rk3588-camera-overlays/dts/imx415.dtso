@@ -12,11 +12,17 @@
  *   imx415,port0                          720 MHz, 4-lane 1440 Mbps,
  *                                         3864x2192 at about 60 fps
  *   imx415,port0,link-frequency=360000000 4-lane 720 Mbps, about 30 fps
+ *   imx415,port0,link-frequency=1188000000,clock-frequency=37125000
+ *                                         4-lane 2376 Mbps, about 90 fps
+ *
+ * The 2376 Mbps mode needs a 37.125 MHz sensor clock (the driver has no
+ * 24 MHz parameters for it) and the imx415 module from rk3588-camera-dkms,
+ * which adds that lane rate to the kernel's driver.
  *
  * The stock Radxa overlay uses 37.125 MHz and 891 Mbps, which tops out at
  * 30 fps. The clock lane is continuous, so there is no
- * clock-noncontinuous here. No imx415 driver is packaged; use the one in
- * the kernel.
+ * clock-noncontinuous here. The 720 and 360 MHz modes work with the imx415
+ * module in the kernel.
  */
 
 /dts-v1/;
