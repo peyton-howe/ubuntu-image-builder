@@ -4,8 +4,12 @@
  *
  * Publishes cam_port2_sensor, cam_port2_sensor_ep, cam_port2_csi_ep,
  * and cam_port2_reg. Shares i2c7 with port1, so the sensor node is named
- * camera-port2. The DCPHY receiver still needs the patched
- * phy-rockchip-samsung-dcphy; this overlay does not enable that PHY.
+ * camera-port2.
+ *
+ * Also adds the csi0 host from kernel patch 0005, which stock DTBs lack,
+ * and switches DCPHY0 to two phy-cells so that host can select the
+ * receiver. That needs the DCPHY module from rk3588-camera-dkms: the stock
+ * module has no receiver and rejects two cells.
  */
 
 /dts-v1/;
@@ -13,7 +17,12 @@
 
 #include <dt-bindings/clock/rockchip,rk3588-cru.h>
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/media/video-interfaces.h>
+#include <dt-bindings/phy/phy.h>
 #include <dt-bindings/pinctrl/rockchip.h>
+#include <dt-bindings/power/rk3588-power.h>
+#include <dt-bindings/reset/rockchip,rk3588-cru.h>
 
 &{/} {
 	cam_port2_reg: cam-port2-regulator {
@@ -22,6 +31,43 @@
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <1800000>;
 		vin-supply = <&vcc_3v3_s3>;
+	};
+
+	csi0: csi@fdd10000 {
+		compatible = "rockchip,rk3588-mipi-csi2", "rockchip,rk3568-mipi-csi2";
+		reg = <0x0 0xfdd10000 0x0 0x10000>;
+		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH 0>,
+			     <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH 0>;
+		interrupt-names = "err1", "err2";
+		clocks = <&cru PCLK_CSI_HOST_0>;
+		phys = <&mipidcphy0 PHY_TYPE_DPHY PHY_DIRECTION_RX>;
+		power-domains = <&power RK3588_PD_VI>;
+		resets = <&cru SRST_P_CSI_HOST_0>;
+		status = "okay";
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			csi0_in: port@0 {
+				reg = <0>;
+
+				cam_port2_csi_ep: endpoint {
+					remote-endpoint = <&cam_port2_sensor_ep>;
+					bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+					data-lanes = <1 2>;
+					link-frequencies = /bits/ 64 <450000000>;
+				};
+			};
+
+			csi0_out: port@1 {
+				reg = <1>;
+
+				csi0_output: endpoint {
+					remote-endpoint = <&vicap_mipi0_input>;
+				};
+			};
+		};
 	};
 };
 
@@ -61,16 +107,20 @@
 	};
 };
 
-&csi0 {
+/* Two cells: mode, then transmitter (DSI) or receiver (CSI). */
+&mipidcphy0 {
+	#phy-cells = <2>;
 	status = "okay";
 };
 
-&csi0_in {
-	cam_port2_csi_ep: endpoint {
-		remote-endpoint = <&cam_port2_sensor_ep>;
-		data-lanes = <1 2>;
-		clock-noncontinuous;
-		link-frequencies = /bits/ 64 <450000000>;
+/* dsi0 is parsed with the PHY's #phy-cells even while disabled. */
+&dsi0 {
+	phys = <&mipidcphy0 PHY_TYPE_DPHY PHY_DIRECTION_TX>;
+};
+
+&vicap_mipi0 {
+	vicap_mipi0_input: endpoint {
+		remote-endpoint = <&csi0_output>;
 	};
 };
 

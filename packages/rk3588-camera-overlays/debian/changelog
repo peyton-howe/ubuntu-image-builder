@@ -7,6 +7,10 @@ rk3588-camera-overlays (0.2.0-1) UNRELEASED; urgency=medium
   * The first camera in overlays.conf enables isp0 and the second isp1.
     isp0 or isp1 on a camera overrides that. Port overlays no longer
     pick an ISP.
+  * Orange Pi 5 port2/port3 add the csi0/csi1 hosts that stock DTBs lack,
+    link them to VICAP, and switch DCPHY0/1 to two phy-cells so the host
+    selects the receiver. Before this they referenced &csi0/&csi1, which no
+    stock DTB defines. Needs the DCPHY module from rk3588-camera-dkms.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 

@@ -1,11 +1,18 @@
 From: Jason Yang <jason98166@gmail.com>
 Subject: [PATCH] phy: rockchip-samsung-dcphy: add MIPI D-PHY receiver
 
-Rebased onto linux-stable v7.2.6 from lore series v4:
-https://lore.kernel.org/linux-rockchip/20260821-dcphy-rx-v1-v4-0-f1797634233d@gmail.com/
+Rebased onto linux-stable v7.2.10 from lore series v5 (patches 1-6):
+https://lore.kernel.org/linux-rockchip/20261016-dcphy-rx-v1-v5-0-e63b49eabe2d@gmail.com/
+
+Includes the series' prerequisite, commit 261e84f9278f ("phy:
+rockchip-samsung-dcphy: Enable runtime PM at PHY core level") from phy/next,
+which is not in v7.2.10.
+
+The second phy cell selects the transmitter (PHY_DIRECTION_TX, 0) or the
+receiver (PHY_DIRECTION_RX, 1).
 
 diff --git a/Documentation/devicetree/bindings/phy/rockchip,rk3588-mipi-dcphy.yaml b/Documentation/devicetree/bindings/phy/rockchip,rk3588-mipi-dcphy.yaml
-index c8ff5ba22..595a71a51 100644
+index c8ff5ba..6e8cc56 100644
 --- a/Documentation/devicetree/bindings/phy/rockchip,rk3588-mipi-dcphy.yaml
 +++ b/Documentation/devicetree/bindings/phy/rockchip,rk3588-mipi-dcphy.yaml
 @@ -20,11 +20,25 @@ properties:
@@ -16,22 +23,22 @@ index c8ff5ba22..595a71a51 100644
 +    enum: [1, 2]
      description: |
 -      Argument is mode to operate in. Supported modes are:
-+      A single cell selects the mode to operate in and refers to the
-+      transmitter:
++      The first cell selects the mode to operate in:
          - PHY_TYPE_DPHY
          - PHY_TYPE_CPHY
 +
-+      Two cells select the mode and then the transmitter (DSI) or the
-+      receiver (CSI), so that both can be described as independent
-+      consumers of the same PHY:
-+        - PHY_TYPE_DPHY PHY_TYPE_DSI
-+        - PHY_TYPE_DPHY PHY_TYPE_CSI
-+        - PHY_TYPE_CPHY PHY_TYPE_DSI
-+        - PHY_TYPE_CPHY PHY_TYPE_CSI
++      A single cell refers to the transmitter and is kept for existing
++      device trees.
 +
-+      The transmitter (DSI) and the receiver (CSI) cannot operate in
-+      different modes, so when both are described, the first cell must
-+      match in both consumers.
++      The second cell selects the transmitter or the receiver, so that a
++      MIPI DSI host and a MIPI CSI-2 host can be described as independent
++      consumers of the same PHY node:
++        - PHY_DIRECTION_TX
++        - PHY_DIRECTION_RX
++
++      The transmitter and the receiver cannot operate in different modes,
++      so when both are described, the first cell must match in both
++      consumers.
 +
        See include/dt-bindings/phy/phy.h for constants.
  
@@ -45,7 +52,7 @@ index c8ff5ba22..595a71a51 100644
        };
      };
 diff --git a/drivers/phy/rockchip/phy-rockchip-samsung-dcphy.c b/drivers/phy/rockchip/phy-rockchip-samsung-dcphy.c
-index 18f5f582d..0044f2e78 100644
+index 18f5f58..54a7af6 100644
 --- a/drivers/phy/rockchip/phy-rockchip-samsung-dcphy.c
 +++ b/drivers/phy/rockchip/phy-rockchip-samsung-dcphy.c
 @@ -244,6 +244,63 @@
@@ -551,39 +558,28 @@ index 18f5f582d..0044f2e78 100644
  
  	reset_control_deassert(samsung->m_phy_rst);
  
-@@ -1358,41 +1724,34 @@ static int samsung_mipi_dphy_power_on(struct samsung_mipi_dcphy *samsung)
+@@ -1358,17 +1724,13 @@ static int samsung_mipi_dphy_power_on(struct samsung_mipi_dcphy *samsung)
  	return 0;
  }
  
 -static int samsung_mipi_dcphy_power_on(struct phy *phy)
-+static int samsung_mipi_dphy_tx_power_off(struct samsung_mipi_dcphy *samsung)
++static int samsung_mipi_dcphy_tx_power_on(struct phy *phy)
  {
--	struct samsung_mipi_dcphy *samsung = phy_get_drvdata(phy);
-+	samsung_mipi_dphy_tx_lane_disable(samsung);
-+	samsung_mipi_dcphy_pll_disable(samsung);
+ 	struct samsung_mipi_dcphy *samsung = phy_get_drvdata(phy);
  
 -	reset_control_assert(samsung->apb_rst);
 -	udelay(1);
 -	reset_control_deassert(samsung->apb_rst);
-+	return 0;
-+}
- 
--	switch (samsung->type) {
--	case PHY_TYPE_DPHY:
+-
+ 	switch (samsung->type) {
+ 	case PHY_TYPE_DPHY:
 -		return samsung_mipi_dphy_power_on(samsung);
--	default:
--		/* CPHY part to be implemented later */
-+static int samsung_mipi_dcphy_tx_power_on(struct phy *phy)
-+{
-+	struct samsung_mipi_dcphy *samsung = phy_get_drvdata(phy);
-+
-+	/* CPHY part to be implemented later */
-+	if (samsung->type != PHY_TYPE_DPHY)
++		return samsung_mipi_dphy_tx_power_on(samsung);
+ 	default:
+ 		/* CPHY part to be implemented later */
  		return -EOPNOTSUPP;
--	}
- 
--	return 0;
-+	return samsung_mipi_dphy_tx_power_on(samsung);
+@@ -1377,13 +1739,13 @@ static int samsung_mipi_dcphy_power_on(struct phy *phy)
+ 	return 0;
  }
  
 -static int samsung_mipi_dcphy_power_off(struct phy *phy)
@@ -591,25 +587,14 @@ index 18f5f582d..0044f2e78 100644
  {
  	struct samsung_mipi_dcphy *samsung = phy_get_drvdata(phy);
  
--	switch (samsung->type) {
--	case PHY_TYPE_DPHY:
+ 	switch (samsung->type) {
+ 	case PHY_TYPE_DPHY:
 -		samsung_mipi_dphy_lane_disable(samsung);
--		break;
--	default:
--		/* CPHY part to be implemented later */
-+	/* CPHY part to be implemented later */
-+	if (samsung->type != PHY_TYPE_DPHY)
- 		return -EOPNOTSUPP;
--	}
--
--	samsung_mipi_dcphy_pll_disable(samsung);
- 
--	return 0;
-+	return samsung_mipi_dphy_tx_power_off(samsung);
- }
- 
- static int
-@@ -1482,13 +1841,13 @@ samsung_mipi_dcphy_pll_calc_rate(struct samsung_mipi_dcphy *samsung,
++		samsung_mipi_dphy_tx_lane_disable(samsung);
+ 		break;
+ 	default:
+ 		/* CPHY part to be implemented later */
+@@ -1482,13 +1844,13 @@ samsung_mipi_dcphy_pll_calc_rate(struct samsung_mipi_dcphy *samsung,
  	}
  }
  
@@ -626,7 +611,7 @@ index 18f5f582d..0044f2e78 100644
  
  	samsung_mipi_dcphy_pll_calc_rate(samsung, target_rate);
  	opts->mipi_dphy.hs_clk_rate = samsung->pll.rate;
-@@ -1512,10 +1871,54 @@ static int samsung_mipi_dcphy_exit(struct phy *phy)
+@@ -1512,10 +1874,58 @@ static int samsung_mipi_dcphy_exit(struct phy *phy)
  	return 0;
  }
  
@@ -651,22 +636,26 @@ index 18f5f582d..0044f2e78 100644
 +{
 +	struct samsung_mipi_dcphy *samsung = phy_get_drvdata(phy);
 +
-+	/* CPHY part to be implemented later */
-+	if (samsung->type != PHY_TYPE_DPHY)
++	switch (samsung->type) {
++	case PHY_TYPE_DPHY:
++		return samsung_mipi_dphy_rx_power_on(samsung);
++	default:
++		/* CPHY part to be implemented later */
 +		return -EOPNOTSUPP;
-+
-+	return samsung_mipi_dphy_rx_power_on(samsung);
++	}
 +}
 +
 +static int samsung_mipi_dcphy_rx_power_off(struct phy *phy)
 +{
 +	struct samsung_mipi_dcphy *samsung = phy_get_drvdata(phy);
 +
-+	/* CPHY part to be implemented later */
-+	if (samsung->type != PHY_TYPE_DPHY)
++	switch (samsung->type) {
++	case PHY_TYPE_DPHY:
++		return samsung_mipi_dphy_rx_power_off(samsung);
++	default:
++		/* CPHY part to be implemented later */
 +		return -EOPNOTSUPP;
-+
-+	return samsung_mipi_dphy_rx_power_off(samsung);
++	}
 +}
 +
 +static const struct phy_ops samsung_mipi_dcphy_tx_ops = {
@@ -685,12 +674,12 @@ index 18f5f582d..0044f2e78 100644
  	.init = samsung_mipi_dcphy_init,
  	.exit = samsung_mipi_dcphy_exit,
  	.owner	   = THIS_MODULE,
-@@ -1533,19 +1936,42 @@ static struct phy *samsung_mipi_dcphy_xlate(struct device *dev,
+@@ -1533,19 +1943,42 @@ static struct phy *samsung_mipi_dcphy_xlate(struct device *dev,
  					    const struct of_phandle_args *args)
  {
  	struct samsung_mipi_dcphy *samsung = dev_get_drvdata(dev);
 +	/* Device trees without the second cell describe the transmitter. */
-+	u32 protocol = PHY_TYPE_DSI;
++	u32 direction = PHY_DIRECTION_TX;
 +	u32 type;
  
 -	if (args->args_count != 1) {
@@ -709,11 +698,11 @@ index 18f5f582d..0044f2e78 100644
 +	}
 +
 +	if (args->args_count == 2)
-+		protocol = args->args[1];
++		direction = args->args[1];
  
 -	samsung->type = args->args[0];
-+	if (protocol != PHY_TYPE_DSI && protocol != PHY_TYPE_CSI) {
-+		dev_err(dev, "invalid protocol %u\n", protocol);
++	if (direction != PHY_DIRECTION_TX && direction != PHY_DIRECTION_RX) {
++		dev_err(dev, "invalid direction %u\n", direction);
 +		return ERR_PTR(-EINVAL);
 +	}
  
@@ -730,29 +719,31 @@ index 18f5f582d..0044f2e78 100644
 +	}
 +	samsung->type = type;
 +
-+	return protocol == PHY_TYPE_CSI ? samsung->rx.phy : samsung->tx.phy;
++	return direction == PHY_DIRECTION_RX ? samsung->rx.phy : samsung->tx.phy;
  }
  
  static int samsung_mipi_dcphy_probe(struct platform_device *pdev)
-@@ -1610,16 +2036,24 @@ static int samsung_mipi_dcphy_probe(struct platform_device *pdev)
+@@ -1610,16 +2043,24 @@ static int samsung_mipi_dcphy_probe(struct platform_device *pdev)
  		return dev_err_probe(dev, PTR_ERR(samsung->grf_apb_rst),
  				     "Failed to get system grf_apb_rst control\n");
  
 -	samsung->phy = devm_phy_create(dev, NULL, &samsung_mipi_dcphy_ops);
 -	if (IS_ERR(samsung->phy))
 -		return dev_err_probe(dev, PTR_ERR(samsung->phy), "Failed to create MIPI DC-PHY\n");
-+	samsung->tx.phy = devm_phy_create(dev, NULL, &samsung_mipi_dcphy_tx_ops);
-+	if (IS_ERR(samsung->tx.phy))
-+		return dev_err_probe(dev, PTR_ERR(samsung->tx.phy),
-+				     "Failed to create MIPI DC-PHY transmitter\n");
- 
+-
 -	phy_set_drvdata(samsung->phy, samsung);
-+	phy_set_drvdata(samsung->tx.phy, samsung);
- 
+-
  	ret = devm_pm_runtime_enable(dev);
  	if (ret)
  		return dev_err_probe(dev, ret, "Failed to enable runtime PM\n");
  
++	samsung->tx.phy = devm_phy_create(dev, NULL, &samsung_mipi_dcphy_tx_ops);
++	if (IS_ERR(samsung->tx.phy))
++		return dev_err_probe(dev, PTR_ERR(samsung->tx.phy),
++				     "Failed to create MIPI DC-PHY transmitter\n");
++
++	phy_set_drvdata(samsung->tx.phy, samsung);
++
 +	samsung->rx.phy = devm_phy_create(dev, NULL, &samsung_mipi_dcphy_rx_ops);
 +	if (IS_ERR(samsung->rx.phy))
 +		return dev_err_probe(dev, PTR_ERR(samsung->rx.phy),
@@ -763,7 +754,7 @@ index 18f5f582d..0044f2e78 100644
  	phy_provider = devm_of_phy_provider_register(dev, samsung_mipi_dcphy_xlate);
  	if (IS_ERR(phy_provider))
  		return dev_err_probe(dev, PTR_ERR(phy_provider),
-@@ -1656,6 +2090,12 @@ static __maybe_unused int samsung_mipi_dcphy_runtime_resume(struct device *dev)
+@@ -1656,6 +2097,12 @@ static __maybe_unused int samsung_mipi_dcphy_runtime_resume(struct device *dev)
  		return ret;
  	}
  
@@ -777,15 +768,14 @@ index 18f5f582d..0044f2e78 100644
  }
  
 diff --git a/include/dt-bindings/phy/phy.h b/include/dt-bindings/phy/phy.h
-index 979b5dfd8..8ee3f88e6 100644
+index 979b5df..9ead74d 100644
 --- a/include/dt-bindings/phy/phy.h
 +++ b/include/dt-bindings/phy/phy.h
-@@ -24,6 +24,8 @@
- #define PHY_TYPE_CPHY		11
- #define PHY_TYPE_USXGMII	12
- #define PHY_TYPE_XAUI		13
-+#define PHY_TYPE_DSI		14
-+#define PHY_TYPE_CSI		15
- 
- #define PHY_POL_NORMAL		0
+@@ -29,4 +29,7 @@
  #define PHY_POL_INVERT		1
+ #define PHY_POL_AUTO		2
+ 
++#define PHY_DIRECTION_TX	0
++#define PHY_DIRECTION_RX	1
++
+ #endif /* _DT_BINDINGS_PHY */

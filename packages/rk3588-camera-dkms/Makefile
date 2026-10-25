@@ -3,7 +3,5 @@
 
 obj-m += imx708/
 obj-m += rkisp2/
+obj-m += dcphy/
 obj-m += rkcif/
-
-# Staged — uncomment together with dkms.conf entries:
-# obj-m += dcphy/

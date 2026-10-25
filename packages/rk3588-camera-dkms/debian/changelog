@@ -10,6 +10,13 @@ rk3588-camera-dkms (0.1.3-1) UNRELEASED; urgency=medium
     capture logic when a stream stops instead, as Rockchip's driver does on
     RK3588. The soft reset also clears the frame address the DMA would keep
     from the previous stream. Other SoCs keep the CRU reset.
+  * Build the DCPHY replacement module (phy-rockchip-samsung-dcphy, DCPHY RX
+    v5), which adds CSI reception to the SoC's MIPI DCPHYs. It installs under
+    updates/dkms, which depmod prefers over Ubuntu's transmitter-only module.
+    dcphy-compat.h supplies PHY_DIRECTION_TX/PHY_DIRECTION_RX for stock headers.
+  * After installing, run depmod and rebuild that kernel's initrd. The initrd
+    otherwise keeps the stock DCPHY module, which loads first and rejects the
+    receiver's second phy cell, so the CSI host never binds.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
