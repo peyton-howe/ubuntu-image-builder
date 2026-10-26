@@ -205,7 +205,9 @@ as Arducam's B0569 answer at 0x37, so use `addr=0x37`. Needs the kernel's imx415
 Four lanes at 720 MHz, 3864x2192 at about 60 fps. `link-frequency=360000000`
 gives about 30 fps. With `rk3588-camera-dkms`'s imx415 module,
 `link-frequency=1188000000,clock-frequency=37125000` gives about 90 fps at
-2376 Mbps per lane). Adding another sensor is a new `.dtso` with the same
+2376 Mbps per lane on a module with a 27, 37.125 or 74.25 MHz oscillator. A
+24 MHz module can try the same rate outside Sony's data sheet by leaving out
+`clock-frequency` and loading the module with `allow_24mhz_2376=1`). Adding another sensor is a new `.dtso` with the same
 `cam_port_*` fixups.
 
 `apply-overlays.sh` treats `overlays.conf` as the full camera list: it

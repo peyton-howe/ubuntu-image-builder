@@ -146,7 +146,8 @@ imx415_note = (
     ' *\n'
     ' * rk3588-camera-dkms: out-of-tree copy of drivers/media/i2c/imx415.c from\n'
     ' * v7.3-rc4 with a 2376 Mbps lane rate added (see imx415_linkrate_2376mbps),\n'
-    ' * for 3864x2192 at about 90 fps on four lanes with a 37.125 MHz clock.\n'
+    ' * for 3864x2192 at about 90 fps on four lanes with a 37.125 MHz clock, and an\n'
+    ' * opt-in 24 MHz / 2376 Mbps row (allow_24mhz_2376) outside the data sheet.\n'
 )
 imx415_dst.parent.mkdir(parents=True, exist_ok=True)
 if imx415_src.is_file():

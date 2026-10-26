@@ -4,7 +4,9 @@ Subject: [PATCH] media: i2c: imx415: add a 2376 Mbps lane rate
 The driver already has clock parameters for 2376 Mbps (for 27, 37.125 and
 74.25 MHz clocks) but no mode that uses them. Add the D-PHY timing registers
 and a four-lane HMAX minimum so a device tree with link-frequencies of
-1188000000 and a 37.125 MHz clock gets 3864x2192 at about 90 fps.
+1188000000 and a 37.125 MHz clock gets 3864x2192 at about 90 fps. The mode
+defaults to 151 lines of vertical blanking, the Rockchip driver's 4K90 value
+(90.0 fps).
 
 Register values are from the Rockchip BSP driver's 4K90 mode
 (bambooCZ/rk3588-imx415-4k60), where the sensor streams at 90.03 fps on four
@@ -12,19 +14,14 @@ lanes with both RK3588 ISPs. Mainline's own clock parameters for this rate
 agree with that driver's SYS_MODE and INCKSEL values. Only four lanes have
 been tried.
 
+Also add a 24 MHz row for the same rate, extrapolated from the existing 24 MHz
+and 27 MHz rows. It is not in the data sheet, so it is off unless the
+allow_24mhz_2376 module parameter is set, and the driver warns when it is
+used. Tried on one module (see the comment in the patch).
+
 --- a/drivers/media/i2c/imx415.c
 +++ b/drivers/media/i2c/imx415.c
-@@ -2,8 +2,7 @@
- /*
-  * Driver for the Sony IMX415 CMOS Image Sensor.
-  *
-- * Copyright (C) 2023 WolfVision GmbH.
-- */
-+ * Copyright (C) 2023 WolfVision GmbH. */
- 
- #include <linux/clk.h>
- #include <linux/gpio/consumer.h>
-@@ -109,7 +108,7 @@
+@@ -109,12 +109,13 @@
   */
  static const s64 link_freq_menu_items[] = {
  	594000000 / 2,	720000000 / 2,	891000000 / 2,
@@ -33,10 +30,58 @@ been tried.
  };
  
  struct imx415_clk_params {
-@@ -491,6 +490,23 @@
- 	{ IMX415_TLPX, 0x002F },
+ 	u64 lane_rate;
+ 	u64 inck;
++	bool experimental;	/* not in the data sheet, needs allow_24mhz_2376 */
+ 	struct cci_reg_sequence regs[IMX415_NUM_CLK_PARAM_REGS];
  };
  
+@@ -249,6 +250,39 @@
+ 		.regs[3] = { IMX415_INCKSEL1, 0x00 },
+ 		.regs[4] = { IMX415_INCKSEL2, 0x23 },
+ 		.regs[5] = { IMX415_INCKSEL3, 0x0B4 },
++		.regs[6] = { IMX415_INCKSEL4, 0x0FC },
++		.regs[7] = { IMX415_INCKSEL5, 0x23 },
++		.regs[8] = { IMX415_INCKSEL6, 0x1 },
++		.regs[9] = { IMX415_INCKSEL7, 0x0 },
++		.regs[10] = { IMX415_TXCLKESC_FREQ, 0x0600 },
++	},
++	{
++		/*
++		 * Not in the data sheet, so off unless allow_24mhz_2376 is set.
++		 * 2376 Mbps is exactly 24 MHz x 99, and the 24 MHz rows follow
++		 * the 27 MHz rows' INCKSEL3 pattern (3 x the multiplier at the
++		 * high rates: 60 x 3 = 0xB4 for 1440 Mbps, 88 x 3 = 0x108 for
++		 * 27 MHz / 2376 Mbps), so INCKSEL3 = 99 x 3 = 0x129. SYS_MODE
++		 * only depends on the lane rate (0 for 2376 Mbps); the rest is
++		 * the 24 MHz / 1440 Mbps row.
++		 *
++		 * Measured on one module (Arducam B0569, 24 MHz oscillator,
++		 * four lanes, ROCK 5B+ CAM0): 3864x2192 at 93.75 fps, which is
++		 * a 74.25 MHz internal pixel clock, so the PLL did lock at
++		 * 2376 Mbps; 3000 frames without a sequence gap; every frame
++		 * of a 300 frame test pattern capture identical. Only minutes
++		 * at room temperature on one unit; nothing says it holds over
++		 * temperature, supply or part variation.
++		 */
++		.lane_rate = 2376000000UL,
++		.inck = 24000000,
++		.experimental = true,
++		.regs[0] = { IMX415_BCWAIT_TIME, 0x054 },
++		.regs[1] = { IMX415_CPWAIT_TIME, 0x03B },
++		.regs[2] = { IMX415_SYS_MODE, 0x0 },
++		.regs[3] = { IMX415_INCKSEL1, 0x00 },
++		.regs[4] = { IMX415_INCKSEL2, 0x23 },
++		.regs[5] = { IMX415_INCKSEL3, 0x129 },
+ 		.regs[6] = { IMX415_INCKSEL4, 0x0FC },
+ 		.regs[7] = { IMX415_INCKSEL5, 0x23 },
+ 		.regs[8] = { IMX415_INCKSEL6, 0x1 },
+@@ -489,6 +523,23 @@
+ 	{ IMX415_THSTRAIL, 0x003F },
+ 	{ IMX415_THSEXIT, 0x005F },
+ 	{ IMX415_TLPX, 0x002F },
++};
++
 +/*
 + * 2376 Mbps CSI configuration. Values from the Rockchip BSP driver's 4K90
 + * mode (bambooCZ/rk3588-imx415-4k60), where the sensor delivers 3864x2192 at
@@ -52,12 +97,10 @@ been tried.
 +	{ IMX415_THSTRAIL, 0x0097 },
 +	{ IMX415_THSEXIT, 0x00F7 },
 +	{ IMX415_TLPX, 0x007F },
-+};
-+
+ };
+ 
  struct imx415_mode_reg_list {
- 	u32 num_of_regs;
- 	const struct cci_reg_sequence *regs;
-@@ -499,6 +515,7 @@
+@@ -499,6 +550,7 @@
  struct imx415_mode {
  	u64 lane_rate;
  	u32 hmax_min[2];
@@ -65,7 +108,7 @@ been tried.
  	struct imx415_mode_reg_list reg_list;
  };
  
-@@ -528,6 +545,24 @@
+@@ -528,6 +580,24 @@
  			.regs = imx415_linkrate_891mbps,
  		},
  	},
@@ -90,7 +133,7 @@ been tried.
  };
  
  static const char *const imx415_test_pattern_menu[] = {
-@@ -779,8 +814,8 @@
+@@ -779,8 +849,8 @@
  	struct v4l2_ctrl *ctrl;
  	const struct imx415_mode *cur_mode = &supported_modes[sensor->cur_mode];
  	u64 lane_rate = cur_mode->lane_rate;
@@ -101,7 +144,7 @@ been tried.
  			   IMX415_EXPOSURE_OFFSET;
  	u32 hblank_min, hblank_max;
  	unsigned int i;
-@@ -832,7 +867,7 @@
+@@ -832,7 +902,7 @@
  					   V4L2_CID_VBLANK,
  					   IMX415_PIXEL_ARRAY_VBLANK,
  					   IMX415_VMAX_MAX - IMX415_PIXEL_ARRAY_HEIGHT,
@@ -110,3 +153,62 @@ been tried.
  
  	v4l2_ctrl_new_std(&sensor->ctrls, NULL, V4L2_CID_PIXEL_RATE,
  			  sensor->pixel_rate, sensor->pixel_rate, 1,
+@@ -1207,7 +1277,13 @@
+ 	cci_write(sensor->regmap, IMX415_MODE, IMX415_MODE_STANDBY, &ret);
+ 	return ret;
+ }
++
++static bool allow_24mhz_2376;
++module_param(allow_24mhz_2376, bool, 0444);
++MODULE_PARM_DESC(allow_24mhz_2376,
++		 "allow 2376 Mbps with a 24 MHz clock, a combination outside the data sheet (default off)");
+ 
++/* 0 if usable, -EPERM if the row exists but needs the opt-in, else -EINVAL */
+ static int imx415_check_inck(unsigned long inck, u64 link_frequency)
+ {
+ 	unsigned int i;
+@@ -1220,8 +1296,9 @@
+ 
+ 	if (i == ARRAY_SIZE(imx415_clk_params))
+ 		return -EINVAL;
+-	else
+-		return 0;
++	if (imx415_clk_params[i].experimental && !allow_24mhz_2376)
++		return -EPERM;
++	return 0;
+ }
+ 
+ static int imx415_parse_hw_config(struct imx415 *sensor)
+@@ -1288,7 +1365,12 @@
+ 	 */
+ 	inck = clk_get_rate(sensor->clk);
+ 	for (i = 0; i < bus_cfg.nr_of_link_frequencies; ++i) {
+-		if (imx415_check_inck(inck, bus_cfg.link_frequencies[i])) {
++		ret = imx415_check_inck(inck, bus_cfg.link_frequencies[i]);
++		if (ret == -EPERM)
++			dev_warn(sensor->dev,
++				 "%llu Mbps with a %lu Hz clock is outside the data sheet; load the module with allow_24mhz_2376=1 to use it\n",
++				 bus_cfg.link_frequencies[i] * 2 / 1000000, inck);
++		if (ret) {
+ 			dev_dbg(sensor->dev,
+ 				"INCK %lu Hz not supported for this link freq",
+ 				inck);
+@@ -1337,6 +1419,18 @@
+ 		goto done_endpoint_free;
+ 	}
+ 
++	if (sensor->clk_params->experimental) {
++		/*
++		 * The internal pixel clock follows the lane rate (2376 Mbps /
++		 * 32 = 74.25 MHz), not the oscillator, whatever the 24 MHz
++		 * rows normally imply.
++		 */
++		sensor->pixel_rate = IMX415_PIXEL_RATE_74_25MHZ;
++		dev_warn(sensor->dev,
++			 "%llu Mbps with a %lu Hz clock is outside the data sheet; validated only on Arducam B0569\n",
++			 lane_rate / 1000000, inck);
++	}
++
+ 	ret = 0;
+ 	dev_dbg(sensor->dev, "clock: %lu Hz, lane_rate: %llu bps, lanes: %d\n",
+ 		inck, lane_rate, sensor->num_data_lanes);

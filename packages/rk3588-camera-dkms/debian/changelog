@@ -4,6 +4,10 @@ rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
     2376 Mbps lane rate, for 3864x2192 at about 90 fps on four lanes with a
     37.125 MHz sensor clock. It installs under updates/dkms, which depmod
     prefers over Ubuntu's module. The 720, 891, 1440 Mbps modes are unchanged.
+  * imx415: allow 2376 Mbps with a 24 MHz clock, a combination outside the
+    data sheet, when the module is loaded with allow_24mhz_2376=1. It is off by
+    default and the driver warns when it is used. The mode defaults to 151
+    lines of vertical blanking (90.0 fps). Tried on one Arducam B0569 module.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
