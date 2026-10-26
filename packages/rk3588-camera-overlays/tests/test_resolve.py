@@ -2,6 +2,7 @@
 
 import importlib.util
 import struct
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -106,6 +107,37 @@ class ResolveTests(unittest.TestCase):
         self.assertEqual(
             root.find("/fragment@1/__overlay__").get("clock-noncontinuous"), b""
         )
+
+    def test_addr_sets_reg(self):
+        out = resolve.retarget_overlay(self.blob(), port=0, isp=0, addr=0x37)
+        root, _, _ = resolve.parse_fdt(out)
+        sensor = root.find("/fragment@0/__overlay__")
+        self.assertEqual(sensor.get("reg"), struct.pack(">I", 0x37))
+
+    def test_addr_rejects_out_of_range(self):
+        for bad in (0, 2, 0x78, 0x100):
+            with self.assertRaises(resolve.FdtError):
+                resolve.retarget_overlay(self.blob(), port=0, isp=0, addr=bad)
+
+    def test_main_addr_parsing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            src = Path(directory) / "sensor.dtbo"
+            dst = Path(directory) / "resolved.dtbo"
+            src.write_bytes(self.blob())
+            for value, expected in (
+                ("55", 55), ("055", 55), ("008", 8),
+                ("003", 3), ("0119", 119),
+                ("0x37", 55), ("0X37", 55),
+                ("0o67", 55), ("0b110111", 55),
+            ):
+                with self.subTest(addr=value):
+                    self.assertEqual(resolve.main([
+                        str(src), str(dst), "--port", "0", "--isp", "0",
+                        "--addr", value,
+                    ]), 0)
+                    root, _, _ = resolve.parse_fdt(dst.read_bytes())
+                    sensor = root.find("/fragment@0/__overlay__")
+                    self.assertEqual(sensor.get("reg"), struct.pack(">I", expected))
 
     def test_port1_leaves_unrelated_fixup(self):
         out = resolve.retarget_overlay(self.blob(), port=1, isp=1)

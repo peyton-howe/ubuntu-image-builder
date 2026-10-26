@@ -1,12 +1,22 @@
 rk3588-camera-overlays (0.2.0-1) UNRELEASED; urgency=medium
 
   * Split camera overlays the way the Raspberry Pi does: one dtbo per
-    board CSI port, and one dtbo per sensor (imx708, imx219, imx519).
+    board CSI port, and one dtbo per sensor (imx708, imx219, imx519,
+    imx415).
     Select a camera with imx708,port0. 4lane, link-frequency, rotation,
     and orientation are baked in by apply-overlays.sh.
   * The first camera in overlays.conf enables isp0 and the second isp1.
     isp0 or isp1 on a camera overrides that. Port overlays no longer
     pick an ISP.
+  * Add imx415 (Radxa Camera 4K) at 24 MHz. The default 720 MHz link
+    frequency selects 4-lane 1440 Mbps, 3864x2192 at about 60 fps, and
+    link-frequency=360000000 selects 4-lane 720 Mbps, about 30 fps.
+    This replaces the ROCK 5B+ imx415-cam0/cam1 overlays.
+  * Port overlays no longer set clock-noncontinuous; each sensor overlay
+    sets it if the sensor needs it.
+  * Add an addr=<0x..> parameter that replaces a sensor's I2C address, as the
+    Raspberry Pi overlays have. imx415,port0,addr=0x37 is for Raspberry Pi
+    modules such as Arducam's.
   * Orange Pi 5 port2/port3 add the csi0/csi1 hosts that stock DTBs lack,
     link them to VICAP, and switch DCPHY0/1 to two phy-cells so the host
     selects the receiver. Before this they referenced &csi0/&csi1, which no

@@ -8,6 +8,7 @@
 # A sensor is selected the way the Raspberry Pi does it:
 #   imx708,port0
 #   imx708,port1,isp1,link-frequency=447000000
+#   imx415,port0,addr=0x37
 # The matching per-board port overlay is added automatically. Explicit
 # ISP requests are reserved first; other cameras take the first
 # free ISP in list order. Parameters are baked into a dtbo under
@@ -76,12 +77,12 @@ detect_board() {
 }
 
 # spec is sensor,param,param... with no spaces (Pi dtoverlay syntax).
-# On success, sets SPEC_SENSOR SPEC_PORT SPEC_FOUR SPEC_LINK SPEC_ROT
-# SPEC_ORI SPEC_ISP.
+# On success, sets SPEC_SENSOR SPEC_PORT SPEC_FOUR SPEC_LINK SPEC_ADDR
+# SPEC_ROT SPEC_ORI SPEC_ISP.
 parse_spec() {
     local spec="$1"
     local -a parts
-    local tok key val
+    local tok key val addr
     IFS=',' read -ra parts <<< "${spec}"
     [[ ${#parts[@]} -ge 1 && -n ${parts[0]} ]] || die "empty overlay spec"
     SPEC_SENSOR="${parts[0]}"
@@ -89,6 +90,7 @@ parse_spec() {
     SPEC_ISP=""
     SPEC_FOUR=0
     SPEC_LINK=""
+    SPEC_ADDR=""
     SPEC_ROT=""
     SPEC_ORI=""
     [[ ${SPEC_SENSOR} =~ ^[A-Za-z0-9][A-Za-z0-9_+-]*$ ]] \
@@ -123,6 +125,17 @@ parse_spec() {
             link-frequency)
                 is_uint "${val}" || die "link-frequency must be Hz, got '${val}'"
                 SPEC_LINK="${val}"
+                ;;
+            addr)
+                [[ ${val} =~ ^(0[xX][0-9a-fA-F]+|[0-9]+)$ ]] \
+                    || die "addr must be an I2C address such as 0x37, got '${val}'"
+                addr="${val}"
+                if is_uint "${val}"; then
+                    addr="$((10#${val}))"
+                fi
+                (( addr >= 3 && addr <= 119 )) \
+                    || die "addr must be a 7-bit I2C address (0x03 to 0x77), got '${val}'"
+                SPEC_ADDR="$(printf '0x%x' "$((addr))")"
                 ;;
             rotation)
                 is_uint "${val}" || die "rotation must be a number of degrees, got '${val}'"
@@ -173,6 +186,7 @@ declare -a sensor_ports=()
 declare -a sensor_isp_req=()
 declare -a sensor_four=()
 declare -a sensor_link=()
+declare -a sensor_addr=()
 declare -a sensor_rot=()
 declare -a sensor_ori=()
 declare -a sensor_args=()
@@ -196,6 +210,7 @@ for name in ${RK3588_CAMERA_OVERLAYS:-}; do
         sensor_isp_req+=("${SPEC_ISP}")
         sensor_four+=("${SPEC_FOUR}")
         sensor_link+=("${SPEC_LINK}")
+        sensor_addr+=("${SPEC_ADDR}")
         sensor_rot+=("${SPEC_ROT}")
         sensor_ori+=("${SPEC_ORI}")
     else
@@ -205,7 +220,7 @@ for name in ${RK3588_CAMERA_OVERLAYS:-}; do
         if [[ ! -f ${f} ]]; then
             echo "WARNING: missing overlay ${f}" >&2
             case "${name}" in
-                *imx708*|*imx219*|*imx519*)
+                *imx708*|*imx219*|*imx519*|*imx415*)
                     echo "Sensor overlays take a port parameter, for example imx708,port0 (see ${CONF})." >&2
                     ;;
             esac
@@ -238,6 +253,7 @@ for ((i = 0; i < ${#sensors[@]}; i++)); do
     tag="${sensors[i]}-port${sensor_ports[i]}"
     [[ ${sensor_four[i]} -eq 1 ]] && tag+="-4lane"
     [[ -n ${sensor_link[i]} ]] && tag+="-link-${sensor_link[i]}"
+    [[ -n ${sensor_addr[i]} ]] && tag+="-addr-${sensor_addr[i]}"
     [[ -n ${sensor_rot[i]} ]] && tag+="-rot-${sensor_rot[i]}"
     [[ -n ${sensor_ori[i]} ]] && tag+="-ori-${sensor_ori[i]}"
     isp="${sensor_isp_req[i]}"
@@ -257,6 +273,7 @@ for ((i = 0; i < ${#sensors[@]}; i++)); do
     args=(--port "${sensor_ports[i]}" --isp "${isp}")
     [[ ${sensor_four[i]} -eq 1 ]] && args+=(--four-lane)
     [[ -n ${sensor_link[i]} ]] && args+=(--link-frequency "${sensor_link[i]}")
+    [[ -n ${sensor_addr[i]} ]] && args+=(--addr "${sensor_addr[i]}")
     [[ -n ${sensor_rot[i]} ]] && args+=(--rotation "${sensor_rot[i]}")
     [[ -n ${sensor_ori[i]} ]] && args+=(--orientation "${sensor_ori[i]}")
     sensor_args+=("${args[*]}")
