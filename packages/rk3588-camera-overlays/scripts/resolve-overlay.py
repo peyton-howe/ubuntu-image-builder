@@ -330,7 +330,7 @@ def main(argv=None):
     parser.add_argument("--link-frequency", type=int)
     parser.add_argument("--rotation", type=int)
     parser.add_argument("--orientation", type=int)
-    parser.add_argument("--addr", type=lambda s: int(s, 0),
+    parser.add_argument("--addr", type=lambda s: int(s, 10 if s.isdigit() else 0),
                         help="sensor I2C address (7-bit, e.g. 0x37)")
     args = parser.parse_args(argv)
     if args.port < 0:

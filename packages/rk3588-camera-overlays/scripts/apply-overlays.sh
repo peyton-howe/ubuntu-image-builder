@@ -82,7 +82,7 @@ detect_board() {
 parse_spec() {
     local spec="$1"
     local -a parts
-    local tok key val
+    local tok key val addr
     IFS=',' read -ra parts <<< "${spec}"
     [[ ${#parts[@]} -ge 1 && -n ${parts[0]} ]] || die "empty overlay spec"
     SPEC_SENSOR="${parts[0]}"
@@ -129,9 +129,13 @@ parse_spec() {
             addr)
                 [[ ${val} =~ ^(0[xX][0-9a-fA-F]+|[0-9]+)$ ]] \
                     || die "addr must be an I2C address such as 0x37, got '${val}'"
-                (( val >= 3 && val <= 119 )) \
+                addr="${val}"
+                if is_uint "${val}"; then
+                    addr="$((10#${val}))"
+                fi
+                (( addr >= 3 && addr <= 119 )) \
                     || die "addr must be a 7-bit I2C address (0x03 to 0x77), got '${val}'"
-                SPEC_ADDR="$(printf '0x%x' "$((val))")"
+                SPEC_ADDR="$(printf '0x%x' "$((addr))")"
                 ;;
             rotation)
                 is_uint "${val}" || die "rotation must be a number of degrees, got '${val}'"
