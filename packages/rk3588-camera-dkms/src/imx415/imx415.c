@@ -764,6 +764,15 @@ static int imx415_set_testpattern(struct imx415 *sensor, int val)
 	return ret;
 }
 
+/* SHR0 = VMAX - exposure, and it can not go below IMX415_EXPOSURE_OFFSET. */
+static int imx415_write_shr0(struct imx415 *sensor, unsigned int exposure,
+			     unsigned int vmax)
+{
+	exposure = min(exposure, vmax - IMX415_EXPOSURE_OFFSET);
+
+	return cci_write(sensor->regmap, IMX415_SHR0, vmax - exposure, NULL);
+}
+
 static int imx415_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct imx415 *sensor = container_of(ctrl->handler, struct imx415,
@@ -781,10 +790,17 @@ static int imx415_s_ctrl(struct v4l2_ctrl *ctrl)
 	if (ctrl->id == V4L2_CID_VBLANK) {
 		exposure_max = format->height + ctrl->val -
 			       IMX415_EXPOSURE_OFFSET;
+		/*
+		 * The default has to stay inside the new range, or the update
+		 * is refused with -ERANGE and the old maximum stays. That would
+		 * let an exposure through that leaves SHR0 below its minimum
+		 * once VBLANK is below the default of a mode.
+		 */
 		__v4l2_ctrl_modify_range(sensor->exposure,
 					 sensor->exposure->minimum,
 					 exposure_max, sensor->exposure->step,
-					 sensor->exposure->default_value);
+					 min_t(s64, sensor->exposure->default_value,
+					       exposure_max));
 	}
 
 	if (!pm_runtime_get_if_in_use(sensor->dev))
@@ -792,22 +808,23 @@ static int imx415_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	switch (ctrl->id) {
 	case V4L2_CID_VBLANK:
-		ret = cci_write(sensor->regmap, IMX415_VMAX,
-				format->height + ctrl->val, NULL);
+		vmax = format->height + ctrl->val;
+		ret = cci_write(sensor->regmap, IMX415_VMAX, vmax, NULL);
 		if (ret)
 			break;
 		/*
-		 * Exposure is set based on VMAX which has just changed, so
-		 * program exposure register as well
+		 * Exposure is set based on VMAX which has just changed (and
+		 * VBLANK's current value is not the new one yet), so program
+		 * the exposure register as well.
 		 */
-		ctrl = sensor->exposure;
-		fallthrough;
+		ret = imx415_write_shr0(sensor, sensor->exposure->cur.val,
+					vmax);
+		break;
 	case V4L2_CID_EXPOSURE:
-		/* clamp the exposure value to VMAX. */
 		vmax = format->height + sensor->vblank->cur.val;
-		ctrl->val = min_t(int, ctrl->val, vmax);
-		ret = cci_write(sensor->regmap, IMX415_SHR0,
-				vmax - ctrl->val, NULL);
+		/* clamp the exposure value to what SHR0 can express. */
+		ctrl->val = min_t(int, ctrl->val, vmax - IMX415_EXPOSURE_OFFSET);
+		ret = imx415_write_shr0(sensor, ctrl->val, vmax);
 		break;
 
 	case V4L2_CID_ANALOGUE_GAIN:

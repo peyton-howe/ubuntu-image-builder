@@ -19,6 +19,16 @@ and 27 MHz rows. It is not in the data sheet, so it is off unless the
 allow_24mhz_2376 module parameter is set, and the driver warns when it is
 used. Tried on one module (see the comment in the patch).
 
+The mode's VBLANK default is above the control's minimum, which exposes a bug
+the existing modes do not reach. When VBLANK is lowered, imx415_s_ctrl()
+shrinks the exposure range but passes the old default, which is above the new
+maximum. __v4l2_ctrl_modify_range() refuses that with -ERANGE, the driver
+ignores the error and the old maximum stays, so an exposure is accepted that
+leaves SHR0 (VMAX - exposure) at 0, below the sensor's minimum. The image comes
+out almost black. Keep the default inside the new range, clamp the exposure to
+VMAX - IMX415_EXPOSURE_OFFSET when SHR0 is written, and use the new VMAX, not
+the control's previous value, when VBLANK itself changes.
+
 --- a/drivers/media/i2c/imx415.c
 +++ b/drivers/media/i2c/imx415.c
 @@ -109,12 +109,13 @@
@@ -133,7 +143,76 @@ used. Tried on one module (see the comment in the patch).
  };
  
  static const char *const imx415_test_pattern_menu[] = {
-@@ -779,8 +849,8 @@
+@@ -689,6 +759,15 @@
+ 	return ret;
+ }
+ 
++/* SHR0 = VMAX - exposure, and it can not go below IMX415_EXPOSURE_OFFSET. */
++static int imx415_write_shr0(struct imx415 *sensor, unsigned int exposure,
++			     unsigned int vmax)
++{
++	exposure = min(exposure, vmax - IMX415_EXPOSURE_OFFSET);
++
++	return cci_write(sensor->regmap, IMX415_SHR0, vmax - exposure, NULL);
++}
++
+ static int imx415_s_ctrl(struct v4l2_ctrl *ctrl)
+ {
+ 	struct imx415 *sensor = container_of(ctrl->handler, struct imx415,
+@@ -706,10 +785,17 @@
+ 	if (ctrl->id == V4L2_CID_VBLANK) {
+ 		exposure_max = format->height + ctrl->val -
+ 			       IMX415_EXPOSURE_OFFSET;
++		/*
++		 * The default has to stay inside the new range, or the update
++		 * is refused with -ERANGE and the old maximum stays. That would
++		 * let an exposure through that leaves SHR0 below its minimum
++		 * once VBLANK is below the default of a mode.
++		 */
+ 		__v4l2_ctrl_modify_range(sensor->exposure,
+ 					 sensor->exposure->minimum,
+ 					 exposure_max, sensor->exposure->step,
+-					 sensor->exposure->default_value);
++					 min_t(s64, sensor->exposure->default_value,
++					       exposure_max));
+ 	}
+ 
+ 	if (!pm_runtime_get_if_in_use(sensor->dev))
+@@ -717,22 +803,23 @@
+ 
+ 	switch (ctrl->id) {
+ 	case V4L2_CID_VBLANK:
+-		ret = cci_write(sensor->regmap, IMX415_VMAX,
+-				format->height + ctrl->val, NULL);
++		vmax = format->height + ctrl->val;
++		ret = cci_write(sensor->regmap, IMX415_VMAX, vmax, NULL);
+ 		if (ret)
+ 			break;
+ 		/*
+-		 * Exposure is set based on VMAX which has just changed, so
+-		 * program exposure register as well
++		 * Exposure is set based on VMAX which has just changed (and
++		 * VBLANK's current value is not the new one yet), so program
++		 * the exposure register as well.
+ 		 */
+-		ctrl = sensor->exposure;
+-		fallthrough;
++		ret = imx415_write_shr0(sensor, sensor->exposure->cur.val,
++					vmax);
++		break;
+ 	case V4L2_CID_EXPOSURE:
+-		/* clamp the exposure value to VMAX. */
+ 		vmax = format->height + sensor->vblank->cur.val;
+-		ctrl->val = min_t(int, ctrl->val, vmax);
+-		ret = cci_write(sensor->regmap, IMX415_SHR0,
+-				vmax - ctrl->val, NULL);
++		/* clamp the exposure value to what SHR0 can express. */
++		ctrl->val = min_t(int, ctrl->val, vmax - IMX415_EXPOSURE_OFFSET);
++		ret = imx415_write_shr0(sensor, ctrl->val, vmax);
+ 		break;
+ 
+ 	case V4L2_CID_ANALOGUE_GAIN:
+@@ -779,8 +866,8 @@
  	struct v4l2_ctrl *ctrl;
  	const struct imx415_mode *cur_mode = &supported_modes[sensor->cur_mode];
  	u64 lane_rate = cur_mode->lane_rate;
@@ -144,7 +223,7 @@ used. Tried on one module (see the comment in the patch).
  			   IMX415_EXPOSURE_OFFSET;
  	u32 hblank_min, hblank_max;
  	unsigned int i;
-@@ -832,7 +902,7 @@
+@@ -832,7 +919,7 @@
  					   V4L2_CID_VBLANK,
  					   IMX415_PIXEL_ARRAY_VBLANK,
  					   IMX415_VMAX_MAX - IMX415_PIXEL_ARRAY_HEIGHT,
@@ -153,21 +232,20 @@ used. Tried on one module (see the comment in the patch).
  
  	v4l2_ctrl_new_std(&sensor->ctrls, NULL, V4L2_CID_PIXEL_RATE,
  			  sensor->pixel_rate, sensor->pixel_rate, 1,
-@@ -1207,7 +1277,13 @@
- 	cci_write(sensor->regmap, IMX415_MODE, IMX415_MODE_STANDBY, &ret);
+@@ -1208,6 +1295,12 @@
  	return ret;
  }
-+
+ 
 +static bool allow_24mhz_2376;
 +module_param(allow_24mhz_2376, bool, 0444);
 +MODULE_PARM_DESC(allow_24mhz_2376,
 +		 "allow 2376 Mbps with a 24 MHz clock, a combination outside the data sheet (default off)");
- 
++
 +/* 0 if usable, -EPERM if the row exists but needs the opt-in, else -EINVAL */
  static int imx415_check_inck(unsigned long inck, u64 link_frequency)
  {
  	unsigned int i;
-@@ -1220,8 +1296,9 @@
+@@ -1220,8 +1313,9 @@
  
  	if (i == ARRAY_SIZE(imx415_clk_params))
  		return -EINVAL;
@@ -179,7 +257,7 @@ used. Tried on one module (see the comment in the patch).
  }
  
  static int imx415_parse_hw_config(struct imx415 *sensor)
-@@ -1288,7 +1365,12 @@
+@@ -1288,7 +1382,12 @@
  	 */
  	inck = clk_get_rate(sensor->clk);
  	for (i = 0; i < bus_cfg.nr_of_link_frequencies; ++i) {
@@ -193,7 +271,7 @@ used. Tried on one module (see the comment in the patch).
  			dev_dbg(sensor->dev,
  				"INCK %lu Hz not supported for this link freq",
  				inck);
-@@ -1337,6 +1419,18 @@
+@@ -1337,6 +1436,18 @@
  		goto done_endpoint_free;
  	}
  

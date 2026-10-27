@@ -8,6 +8,10 @@ rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
     data sheet, when the module is loaded with allow_24mhz_2376=1. It is off by
     default and the driver warns when it is used. The mode defaults to 151
     lines of vertical blanking (90.0 fps). Tried on one Arducam B0569 module.
+  * imx415: lowering VBLANK below a mode's default left the exposure range
+    unchanged, so an exposure was accepted that put SHR0 below its minimum
+    and the image came out almost black. Fix the range update, and clamp the
+    exposure to VMAX - 8 when SHR0 is written.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
