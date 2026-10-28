@@ -18,7 +18,7 @@ if [ -z "$kver" ]; then
 fi
 
 ours=0
-for m in imx708 phy-rockchip-samsung-dcphy rockchip-cif rockchip-isp2; do
+for m in imx708 imx415 phy-rockchip-samsung-dcphy rockchip-cif rockchip-isp2; do
     for ext in ko ko.zst ko.xz; do
         [ -e "/lib/modules/$kver/updates/dkms/$m.$ext" ] && ours=1
     done

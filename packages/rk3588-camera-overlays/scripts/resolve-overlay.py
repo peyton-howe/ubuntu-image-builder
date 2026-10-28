@@ -239,7 +239,8 @@ def _fragment_nodes(root):
 
 
 def retarget_overlay(blob, port, isp=None, four_lane=False, link_frequency=None,
-                     rotation=None, orientation=None, addr=None):
+                     rotation=None, orientation=None, clock_frequency=None,
+                     addr=None):
     root, rsv, version = parse_fdt(blob)
     fixups = root.child("__fixups__")
     if fixups is None:
@@ -317,6 +318,13 @@ def retarget_overlay(blob, port, isp=None, four_lane=False, link_frequency=None,
             raise FdtError(f"addr must be a 7-bit I2C address, got {addr:#x}")
         sensor.set("reg", struct.pack(">I", addr))
 
+    if clock_frequency is not None:
+        # The port overlay sets assigned-clocks and a default rate on the
+        # sensor node; this replaces the rate when the overlays are merged.
+        if clock_frequency <= 0 or clock_frequency > 0xFFFFFFFF:
+            raise FdtError(f"clock-frequency out of range: {clock_frequency}")
+        sensor.set("assigned-clock-rates", struct.pack(">I", clock_frequency))
+
     return emit_fdt(root, rsv, version)
 
 
@@ -332,6 +340,8 @@ def main(argv=None):
     parser.add_argument("--orientation", type=int)
     parser.add_argument("--addr", type=lambda s: int(s, 10 if s.isdigit() else 0),
                         help="sensor I2C address (7-bit, e.g. 0x37)")
+    parser.add_argument("--clock-frequency", type=int,
+                        help="sensor input clock in Hz (replaces the port's rate)")
     args = parser.parse_args(argv)
     if args.port < 0:
         parser.error("port must be >= 0")
@@ -346,6 +356,7 @@ def main(argv=None):
             link_frequency=args.link_frequency,
             rotation=args.rotation,
             orientation=args.orientation,
+            clock_frequency=args.clock_frequency,
             addr=args.addr,
         )
     except (OSError, FdtError) as exc:

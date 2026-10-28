@@ -22,6 +22,7 @@ override_dh_auto_install:
 	cp -a src/dcphy $(DEST)/dcphy
 	cp -a src/rkcif $(DEST)/rkcif
 	install -m 0755 refresh-initramfs.sh $(DEST)/refresh-initramfs.sh
+	cp -a src/imx415 $(DEST)/imx415
 	# Working copy of dkms.conf next to sources (dh_dkms also installs one)
 	cp -a debian/rk3588-camera-dkms.dkms $(DEST)/dkms.conf
 	sed -i 's/#MODULE_VERSION#/$(VERSION)/' $(DEST)/dkms.conf

@@ -8,6 +8,7 @@
 # A sensor is selected the way the Raspberry Pi does it:
 #   imx708,port0
 #   imx708,port1,isp1,link-frequency=447000000
+#   imx415,port0,link-frequency=1188000000,clock-frequency=37125000
 #   imx415,port0,addr=0x37
 # The matching per-board port overlay is added automatically. Explicit
 # ISP requests are reserved first; other cameras take the first
@@ -77,8 +78,8 @@ detect_board() {
 }
 
 # spec is sensor,param,param... with no spaces (Pi dtoverlay syntax).
-# On success, sets SPEC_SENSOR SPEC_PORT SPEC_FOUR SPEC_LINK SPEC_ADDR
-# SPEC_ROT SPEC_ORI SPEC_ISP.
+# On success, sets SPEC_SENSOR SPEC_PORT SPEC_FOUR SPEC_LINK SPEC_CLK
+# SPEC_ADDR SPEC_ROT SPEC_ORI SPEC_ISP.
 parse_spec() {
     local spec="$1"
     local -a parts
@@ -90,6 +91,7 @@ parse_spec() {
     SPEC_ISP=""
     SPEC_FOUR=0
     SPEC_LINK=""
+    SPEC_CLK=""
     SPEC_ADDR=""
     SPEC_ROT=""
     SPEC_ORI=""
@@ -136,6 +138,10 @@ parse_spec() {
                 (( addr >= 3 && addr <= 119 )) \
                     || die "addr must be a 7-bit I2C address (0x03 to 0x77), got '${val}'"
                 SPEC_ADDR="$(printf '0x%x' "$((addr))")"
+                ;;
+            clock-frequency)
+                is_uint "${val}" || die "clock-frequency must be Hz, got '${val}'"
+                SPEC_CLK="${val}"
                 ;;
             rotation)
                 is_uint "${val}" || die "rotation must be a number of degrees, got '${val}'"
@@ -186,6 +192,7 @@ declare -a sensor_ports=()
 declare -a sensor_isp_req=()
 declare -a sensor_four=()
 declare -a sensor_link=()
+declare -a sensor_clk=()
 declare -a sensor_addr=()
 declare -a sensor_rot=()
 declare -a sensor_ori=()
@@ -210,6 +217,7 @@ for name in ${RK3588_CAMERA_OVERLAYS:-}; do
         sensor_isp_req+=("${SPEC_ISP}")
         sensor_four+=("${SPEC_FOUR}")
         sensor_link+=("${SPEC_LINK}")
+        sensor_clk+=("${SPEC_CLK}")
         sensor_addr+=("${SPEC_ADDR}")
         sensor_rot+=("${SPEC_ROT}")
         sensor_ori+=("${SPEC_ORI}")
@@ -253,6 +261,7 @@ for ((i = 0; i < ${#sensors[@]}; i++)); do
     tag="${sensors[i]}-port${sensor_ports[i]}"
     [[ ${sensor_four[i]} -eq 1 ]] && tag+="-4lane"
     [[ -n ${sensor_link[i]} ]] && tag+="-link-${sensor_link[i]}"
+    [[ -n ${sensor_clk[i]} ]] && tag+="-clk-${sensor_clk[i]}"
     [[ -n ${sensor_addr[i]} ]] && tag+="-addr-${sensor_addr[i]}"
     [[ -n ${sensor_rot[i]} ]] && tag+="-rot-${sensor_rot[i]}"
     [[ -n ${sensor_ori[i]} ]] && tag+="-ori-${sensor_ori[i]}"
@@ -273,6 +282,7 @@ for ((i = 0; i < ${#sensors[@]}; i++)); do
     args=(--port "${sensor_ports[i]}" --isp "${isp}")
     [[ ${sensor_four[i]} -eq 1 ]] && args+=(--four-lane)
     [[ -n ${sensor_link[i]} ]] && args+=(--link-frequency "${sensor_link[i]}")
+    [[ -n ${sensor_clk[i]} ]] && args+=(--clock-frequency "${sensor_clk[i]}")
     [[ -n ${sensor_addr[i]} ]] && args+=(--addr "${sensor_addr[i]}")
     [[ -n ${sensor_rot[i]} ]] && args+=(--rotation "${sensor_rot[i]}")
     [[ -n ${sensor_ori[i]} ]] && args+=(--orientation "${sensor_ori[i]}")

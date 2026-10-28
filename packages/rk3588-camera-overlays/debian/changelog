@@ -17,6 +17,10 @@ rk3588-camera-overlays (0.2.0-1) UNRELEASED; urgency=medium
   * Add an addr=<0x..> parameter that replaces a sensor's I2C address, as the
     Raspberry Pi overlays have. imx415,port0,addr=0x37 is for Raspberry Pi
     modules such as Arducam's.
+  * Add a clock-frequency=<Hz> parameter that replaces the port's 24 MHz
+    sensor clock for one camera. imx415,port0,link-frequency=1188000000,
+    clock-frequency=37125000 selects 4-lane 2376 Mbps, about 90 fps, with
+    the imx415 module from rk3588-camera-dkms.
   * Orange Pi 5 port2/port3 add the csi0/csi1 hosts that stock DTBs lack,
     link them to VICAP, and switch DCPHY0/1 to two phy-cells so the host
     selects the receiver. Before this they referenced &csi0/&csi1, which no
