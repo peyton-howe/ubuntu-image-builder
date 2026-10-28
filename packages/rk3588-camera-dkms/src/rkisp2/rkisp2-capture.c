@@ -1117,6 +1117,13 @@ rkisp2_fill_pixfmt(const struct rkisp2_capture *cap,
 	stride = clamp(DIV_ROUND_UP(plane_y->bytesperline, info->bpp[0]),
 		       pixm->width, 65536U);
 
+	/*
+	 * Pad lines to 64 bytes. Importers of the buffer such as Mesa's Vulkan
+	 * WSI refuse a pitch that is not aligned ("WSI pitch not properly
+	 * aligned"), and for example 3864 pixels of UYVY, 7728 bytes, is not.
+	 */
+	stride = ALIGN(stride * info->bpp[0], 64) / info->bpp[0];
+
 	plane_y->bytesperline = stride * info->bpp[0];
 	plane_y->sizeimage = plane_y->bytesperline * pixm->height;
 

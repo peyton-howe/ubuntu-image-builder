@@ -12,6 +12,11 @@ rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
     unchanged, so an exposure was accepted that put SHR0 below its minimum
     and the image came out almost black. Fix the range update, and clamp the
     exposure to VMAX - 8 when SHR0 is written.
+  * rkisp2: pad the lines of the processed output to 64 bytes. A 3864 pixel
+    wide UYVY frame has 7728 bytes per line, and Mesa's Vulkan WSI refuses to
+    present a buffer with a pitch that is not aligned (one error per frame in
+    a GTK dmabuf preview of the IMX415). Sizes that already are aligned do not
+    change.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
