@@ -1062,7 +1062,12 @@ static int rkisp2_pipeline_stream_enable(struct rkisp2_capture *cap)
 			.pad = RKISP2_ISP_PAD_SINK_VIDEO_DMA_0,
 		};
 
-		ret = v4l2_subdev_call(&rkisp2->isp.sd, pad, get_fmt, NULL, &fmt);
+		/*
+		 * get_fmt needs the subdev's state, and v4l2_subdev_get_fmt()
+		 * fails with -EINVAL (and warns) when given none.
+		 */
+		ret = v4l2_subdev_call_state_active(&rkisp2->isp.sd, pad,
+						    get_fmt, &fmt);
 		if (ret)
 			return ret;
 		if (fmt.format.width != cap->pix.fmt.width ||
@@ -1206,6 +1211,13 @@ rkisp2_fill_pixfmt(const struct rkisp2_capture *cap,
 	 */
 	stride = clamp(DIV_ROUND_UP(plane_y->bytesperline, info->bpp[0]),
 		       pixm->width, 65536U);
+
+	/*
+	 * Pad lines to 64 bytes. Importers of the buffer such as Mesa's Vulkan
+	 * WSI refuse a pitch that is not aligned ("WSI pitch not properly
+	 * aligned"), and for example 3864 pixels of UYVY, 7728 bytes, is not.
+	 */
+	stride = ALIGN(stride * info->bpp[0], 64) / info->bpp[0];
 
 	plane_y->bytesperline = stride * info->bpp[0];
 	plane_y->sizeimage = plane_y->bytesperline * pixm->height;
@@ -1381,6 +1393,32 @@ static int rkisp2_enum_framesizes(struct file *file, void *fh,
 	return 0;
 }
 
+/*
+ * In unite mode the main path cannot scale. Setting its format to another size
+ * than the ISP's input would only fail at the first buffer queue (vb2 delays
+ * start_streaming() until then), where applications such as libcamera log the
+ * error and wait for frames forever. Return the unscaled size instead, as
+ * S_FMT does for a size it cannot do, so that the application sees it at once.
+ */
+static void rkisp2_unite_unscaled_size(struct rkisp2_capture *cap,
+				       struct v4l2_pix_format_mplane *pix)
+{
+	struct rkisp2_device *rkisp2 = cap->rkisp2;
+	struct v4l2_subdev_format fmt = {
+		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+		.pad = RKISP2_ISP_PAD_SINK_VIDEO_DMA_0,
+	};
+
+	if (!rkisp2_is_unite(rkisp2) || cap->id != RKISP2_MAINPATH)
+		return;
+
+	if (v4l2_subdev_call_state_active(&rkisp2->isp.sd, pad, get_fmt, &fmt))
+		return;
+
+	pix->width = fmt.format.width;
+	pix->height = fmt.format.height;
+}
+
 static int rkisp2_s_fmt_vid_cap_mplane(struct file *file,
 				       void *priv, struct v4l2_format *f)
 {
@@ -1391,6 +1429,7 @@ static int rkisp2_s_fmt_vid_cap_mplane(struct file *file,
 	if (vb2_is_busy(&node->buf_queue))
 		return -EBUSY;
 
+	rkisp2_unite_unscaled_size(cap, &f->fmt.pix_mp);
 	rkisp2_set_fmt(cap, &f->fmt.pix_mp);
 
 	return 0;
