@@ -88,14 +88,8 @@ isp_body = '\n'.join(isp_nodes).strip('\n')
 ''')
 print('overlays: rk3588-isp.dtso (from 0002)')
 
-# IMX708
-imx = extract_new_files(patch_dir / '0004-media-i2c-imx708.patch', want_suffixes=['.c'])
-imx_dir = repo / 'packages/rk3588-camera-dkms/src/imx708'
-imx_dir.mkdir(parents=True, exist_ok=True)
-for rel, content in imx.items():
-    if rel.endswith('imx708.c'):
-        (imx_dir / 'imx708.c').write_text(content)
-        print('dkms: imx708/imx708.c')
+# The DKMS imx708 driver is maintained in place (4 lanes, link-rate timings), not patch 0004.
+print('dkms: imx708/imx708.c left as maintained in the DKMS package')
 
 # rkisp2
 rk = extract_new_files(patch_dir / '0002-media-rockchip-rkisp2.patch',

@@ -10,10 +10,13 @@
  *
  *   imx708,port0
  *   imx708,port1,link-frequency=447000000
+ *   imx708,port0,4lane,link-frequency=549000000
  *
  * The shipped imx708 driver accepts link frequencies 447000000, 450000000
- * (the default), and 453000000, and only two data lanes. 4lane is still
- * accepted here so the same knob works for sensors that use four lanes.
+ * (the default), 453000000, 549000000, 750000000 and 960000000, and two or
+ * four data lanes. Four lanes at 549000000 or 750000000 have the bandwidth
+ * for its faster mode timings. Keep lanes at or below 1.5 Gbps (750000000):
+ * faster needs D-PHY deskew calibration, which the driver does not enable.
  * resolve-overlay.py rewrites every data-lanes and link-frequencies
  * property in the overlay when those parameters are set.
  */
