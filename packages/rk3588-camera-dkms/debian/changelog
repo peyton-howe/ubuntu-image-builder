@@ -29,6 +29,10 @@ rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
   * rkisp2: the check that rejects a scaled main-path output in unite mode
     called get_fmt without the subdev's state, which fails with -EINVAL, so
     no unite stream could start. Pass the active state.
+  * rkisp2: in unite mode, setting the main path's format to a size other than
+    the ISP's input returns the unscaled size. The rejection at stream start
+    only happens at the first buffer queue, where libcamera logs the error and
+    waits for frames forever; now the configure step fails at once.
   * rkisp2: pad the lines of the processed output to 64 bytes. A 3864 pixel
     wide UYVY frame has 7728 bytes per line, and Mesa's Vulkan WSI refuses to
     present a buffer with a pitch that is not aligned (one error per frame in

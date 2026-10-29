@@ -1393,6 +1393,32 @@ static int rkisp2_enum_framesizes(struct file *file, void *fh,
 	return 0;
 }
 
+/*
+ * In unite mode the main path cannot scale. Setting its format to another size
+ * than the ISP's input would only fail at the first buffer queue (vb2 delays
+ * start_streaming() until then), where applications such as libcamera log the
+ * error and wait for frames forever. Return the unscaled size instead, as
+ * S_FMT does for a size it cannot do, so that the application sees it at once.
+ */
+static void rkisp2_unite_unscaled_size(struct rkisp2_capture *cap,
+				       struct v4l2_pix_format_mplane *pix)
+{
+	struct rkisp2_device *rkisp2 = cap->rkisp2;
+	struct v4l2_subdev_format fmt = {
+		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+		.pad = RKISP2_ISP_PAD_SINK_VIDEO_DMA_0,
+	};
+
+	if (!rkisp2_is_unite(rkisp2) || cap->id != RKISP2_MAINPATH)
+		return;
+
+	if (v4l2_subdev_call_state_active(&rkisp2->isp.sd, pad, get_fmt, &fmt))
+		return;
+
+	pix->width = fmt.format.width;
+	pix->height = fmt.format.height;
+}
+
 static int rkisp2_s_fmt_vid_cap_mplane(struct file *file,
 				       void *priv, struct v4l2_format *f)
 {
@@ -1403,6 +1429,7 @@ static int rkisp2_s_fmt_vid_cap_mplane(struct file *file,
 	if (vb2_is_busy(&node->buf_queue))
 		return -EBUSY;
 
+	rkisp2_unite_unscaled_size(cap, &f->fmt.pix_mp);
 	rkisp2_set_fmt(cap, &f->fmt.pix_mp);
 
 	return 0;
