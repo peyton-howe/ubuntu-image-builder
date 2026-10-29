@@ -1062,7 +1062,12 @@ static int rkisp2_pipeline_stream_enable(struct rkisp2_capture *cap)
 			.pad = RKISP2_ISP_PAD_SINK_VIDEO_DMA_0,
 		};
 
-		ret = v4l2_subdev_call(&rkisp2->isp.sd, pad, get_fmt, NULL, &fmt);
+		/*
+		 * get_fmt needs the subdev's state, and v4l2_subdev_get_fmt()
+		 * fails with -EINVAL (and warns) when given none.
+		 */
+		ret = v4l2_subdev_call_state_active(&rkisp2->isp.sd, pad,
+						    get_fmt, &fmt);
 		if (ret)
 			return ret;
 		if (fmt.format.width != cap->pix.fmt.width ||

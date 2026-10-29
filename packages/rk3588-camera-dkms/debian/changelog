@@ -25,8 +25,10 @@ rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
     half of the frame with half-width cells) and their results are put back
     together for the IPA. Scaling the output and horizontal cropping are not
     supported in this mode, which is for streams that do not fit on one core,
-    at the sensor's size; the driver warns once when the main path would be
-    scaled.
+    at the sensor's size; the driver rejects a scaled main-path output.
+  * rkisp2: the check that rejects a scaled main-path output in unite mode
+    called get_fmt without the subdev's state, which fails with -EINVAL, so
+    no unite stream could start. Pass the active state.
   * rkisp2: pad the lines of the processed output to 64 bytes. A 3864 pixel
     wide UYVY frame has 7728 bytes per line, and Mesa's Vulkan WSI refuses to
     present a buffer with a pitch that is not aligned (one error per frame in
