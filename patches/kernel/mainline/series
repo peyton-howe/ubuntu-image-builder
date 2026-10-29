@@ -23,3 +23,4 @@
 0008-arm64-dts-rockchip-imx415-4k60-overlays.patch
 # IMX415 2376 Mbps lane rate: 3864x2192 at about 90 fps on four lanes
 0011-media-i2c-imx415-add-2376mbps-lane-rate.patch
+0012-media-i2c-imx415-add-the-native-size-selection-target.patch

@@ -1,0 +1,22 @@
+From: Peyton Howe <peyton@localhost>
+Subject: [PATCH] media: i2c: imx415: add the native size selection target
+
+libcamera reads V4L2_SEL_TGT_NATIVE_SIZE to learn the size of the pixel array
+and logs "Unable to get rectangle 3 on pad 0/0" and "The sensor kernel driver
+needs to be fixed" every time a camera is opened without it (the property then
+defaults to the active area).
+
+The driver already reports its pixel array for the crop, crop default and crop
+bounds targets. Report the same rectangle for the native size, which the
+selection API defines as the sensor's pixel array with top and left at zero.
+
+--- a/drivers/media/i2c/imx415.c
++++ b/drivers/media/i2c/imx415.c
+@@ -1136,6 +1136,7 @@
+ 	case V4L2_SEL_TGT_CROP:
+ 	case V4L2_SEL_TGT_CROP_DEFAULT:
+ 	case V4L2_SEL_TGT_CROP_BOUNDS:
++	case V4L2_SEL_TGT_NATIVE_SIZE:
+ 		sel->r.top = IMX415_PIXEL_ARRAY_TOP;
+ 		sel->r.left = IMX415_PIXEL_ARRAY_LEFT;
+ 		sel->r.width = IMX415_PIXEL_ARRAY_WIDTH;

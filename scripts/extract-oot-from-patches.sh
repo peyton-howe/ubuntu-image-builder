@@ -138,8 +138,9 @@ if dcphy_src.is_file():
 else:
     print('dkms: dcphy source missing — build mainline kernel once or vendor the .c')
 
-# IMX415 (patch 0011 adds the 2376 Mbps lane rate). The DKMS copy carries a
-# header note saying it is an out-of-tree copy.
+# IMX415 (patch 0011 adds the 2376 Mbps lane rate, 0012 the native size
+# target). The DKMS copy carries a header note saying it is an out-of-tree
+# copy.
 imx415_src = repo / 'build/kernel/linux-mainline/drivers/media/i2c/imx415.c'
 imx415_dst = repo / 'packages/rk3588-camera-dkms/src/imx415/imx415.c'
 imx415_note = (
@@ -147,7 +148,8 @@ imx415_note = (
     ' * rk3588-camera-dkms: out-of-tree copy of drivers/media/i2c/imx415.c from\n'
     ' * v7.3-rc4 with a 2376 Mbps lane rate added (see imx415_linkrate_2376mbps),\n'
     ' * for 3864x2192 at about 90 fps on four lanes with a 37.125 MHz clock, and an\n'
-    ' * opt-in 24 MHz / 2376 Mbps row (allow_24mhz_2376) outside the data sheet.\n'
+    ' * opt-in 24 MHz / 2376 Mbps row (allow_24mhz_2376) outside the data sheet,\n'
+    ' * and the native size selection target.\n'
 )
 imx415_dst.parent.mkdir(parents=True, exist_ok=True)
 if imx415_src.is_file():

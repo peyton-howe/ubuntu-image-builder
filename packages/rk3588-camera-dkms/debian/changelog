@@ -12,6 +12,9 @@ rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
     unchanged, so an exposure was accepted that put SHR0 below its minimum
     and the image came out almost black. Fix the range update, and clamp the
     exposure to VMAX - 8 when SHR0 is written.
+  * imx415: report the pixel array for the native size selection target too.
+    libcamera logs an error about the missing target every time it opens the
+    camera.
   * Bind rockchip,rk3588-isp-unite and run both ISP cores on one camera.
     Each core takes half of the frame (cut at half the width rounded up to
     16 pixels, so that the right core's output starts on a 16 byte boundary)

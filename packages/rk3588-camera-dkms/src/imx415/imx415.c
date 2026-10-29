@@ -7,7 +7,8 @@
  * rk3588-camera-dkms: out-of-tree copy of drivers/media/i2c/imx415.c from
  * v7.3-rc4 with a 2376 Mbps lane rate added (see imx415_linkrate_2376mbps),
  * for 3864x2192 at about 90 fps on four lanes with a 37.125 MHz clock, and an
- * opt-in 24 MHz / 2376 Mbps row (allow_24mhz_2376) outside the data sheet.
+ * opt-in 24 MHz / 2376 Mbps row (allow_24mhz_2376) outside the data sheet,
+ * and the native size selection target.
  */
 
 #include <linux/clk.h>
@@ -1141,6 +1142,7 @@ static int imx415_get_selection(struct v4l2_subdev *sd,
 	case V4L2_SEL_TGT_CROP:
 	case V4L2_SEL_TGT_CROP_DEFAULT:
 	case V4L2_SEL_TGT_CROP_BOUNDS:
+	case V4L2_SEL_TGT_NATIVE_SIZE:
 		sel->r.top = IMX415_PIXEL_ARRAY_TOP;
 		sel->r.left = IMX415_PIXEL_ARRAY_LEFT;
 		sel->r.width = IMX415_PIXEL_ARRAY_WIDTH;
