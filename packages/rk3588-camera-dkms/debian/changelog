@@ -27,8 +27,9 @@ rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
     supported in this mode, which is for streams that do not fit on one core,
     at the sensor's size; the driver rejects a scaled main-path output.
   * rkisp2: the check that rejects a scaled main-path output in unite mode
-    called get_fmt without the subdev's state, which fails with -EINVAL, so
-    no unite stream could start. Pass the active state.
+    called the ISP subdev's get_fmt with a NULL state. A subdev with an active
+    state expects the caller to pass it; Ubuntu's 7.3.0-9 tolerates the NULL,
+    other kernels may not. Pass the active state.
   * rkisp2: in unite mode, setting the main path's format to a size other than
     the ISP's input returns the unscaled size. The rejection at stream start
     only happens at the first buffer queue, where libcamera logs the error and
