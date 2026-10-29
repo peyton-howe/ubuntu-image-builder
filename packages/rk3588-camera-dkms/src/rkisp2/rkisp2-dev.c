@@ -214,10 +214,39 @@ static const struct rkisp2_info rk3588_isp_info = {
 	.max_height = 3504,
 };
 
+static const char * const rk3588_isp_unite_clks[] = {
+	"aclk_isp0",
+	"hclk_isp0",
+	"clk_isp_core0",
+	"clk_isp_core_marvin0",
+	"clk_isp_core_vicap0",
+	"aclk_isp1",
+	"hclk_isp1",
+	"clk_isp_core1",
+	"clk_isp_core_marvin1",
+	"clk_isp_core_vicap1",
+};
+
+static const struct rkisp2_info rk3588_isp_unite_info = {
+	.clks = rk3588_isp_unite_clks,
+	.clk_size = ARRAY_SIZE(rk3588_isp_unite_clks),
+	.isrs = rk3588_isp_isrs,
+	.isr_size = ARRAY_SIZE(rk3588_isp_isrs),
+	.isp_ver = RKISP3_V0,
+	.features = RKISP2_FEATURE_DUAL_CROP,
+	.max_width = 4672,
+	.max_height = 3504,
+	.unite = true,
+};
+
 static const struct of_device_id rkisp2_of_match[] = {
 	{
 		.compatible = "rockchip,rk3588-isp",
 		.data = &rk3588_isp_info,
+	},
+	{
+		.compatible = "rockchip,rk3588-isp-unite",
+		.data = &rk3588_isp_unite_info,
 	},
 	{},
 };
@@ -252,6 +281,13 @@ static int rkisp2_probe(struct platform_device *pdev)
 	rkisp2->base_addr = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(rkisp2->base_addr))
 		return PTR_ERR(rkisp2->base_addr);
+
+	if (info->unite) {
+		rkisp2->unite_base = devm_platform_ioremap_resource(pdev, 1);
+		if (IS_ERR(rkisp2->unite_base))
+			return PTR_ERR(rkisp2->unite_base);
+		dev_info(dev, "ISP unite: programming both ISP register windows\n");
+	}
 
 	for (unsigned int il = 0; il < ARRAY_SIZE(rkisp2->irqs); ++il)
 		rkisp2->irqs[il] = -1;

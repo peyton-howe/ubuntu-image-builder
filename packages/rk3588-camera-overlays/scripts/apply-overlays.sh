@@ -10,9 +10,11 @@
 #   imx708,port1,isp1,link-frequency=447000000
 #   imx415,port0,link-frequency=1188000000,clock-frequency=37125000
 #   imx415,port0,addr=0x37
+#   imx708,port0,unite
 # The matching per-board port overlay is added automatically. Explicit
 # ISP requests are reserved first; other cameras take the first
-# free ISP in list order. Parameters are baked into a dtbo under
+# free ISP in list order. unite gives that one camera both ISPs
+# (isp_unite) and rejects a second camera. Parameters are baked into a dtbo under
 # /var/lib/rk3588-camera because U-Boot does not apply overlay parameters.
 set -euo pipefail
 
@@ -79,7 +81,7 @@ detect_board() {
 
 # spec is sensor,param,param... with no spaces (Pi dtoverlay syntax).
 # On success, sets SPEC_SENSOR SPEC_PORT SPEC_FOUR SPEC_LINK SPEC_CLK
-# SPEC_ADDR SPEC_ROT SPEC_ORI SPEC_ISP.
+# SPEC_ADDR SPEC_ROT SPEC_ORI SPEC_ISP SPEC_UNITE.
 parse_spec() {
     local spec="$1"
     local -a parts
@@ -95,6 +97,7 @@ parse_spec() {
     SPEC_ADDR=""
     SPEC_ROT=""
     SPEC_ORI=""
+    SPEC_UNITE=0
     [[ ${SPEC_SENSOR} =~ ^[A-Za-z0-9][A-Za-z0-9_+-]*$ ]] \
         || die "bad sensor name '${SPEC_SENSOR}' in '${spec}'"
     local i
@@ -162,6 +165,15 @@ parse_spec() {
                 [[ -z ${SPEC_ISP} ]] || die "more than one isp in '${spec}'"
                 SPEC_ISP="${val}"
                 ;;
+            unite)
+                if [[ -z ${val} || ${val} == on || ${val} == 1 ]]; then
+                    SPEC_UNITE=1
+                elif [[ ${val} == off || ${val} == 0 ]]; then
+                    SPEC_UNITE=0
+                else
+                    die "bad unite value '${val}' in '${spec}'"
+                fi
+                ;;
             *)
                 die "unknown parameter '${key}' in '${spec}'"
                 ;;
@@ -199,6 +211,7 @@ declare -a sensor_ori=()
 declare -a sensor_args=()
 declare -a sensor_tags=()
 declare -a sensor_isps=()
+declare -a sensor_unite=()
 
 board=""
 need_board=0
@@ -221,6 +234,7 @@ for name in ${RK3588_CAMERA_OVERLAYS:-}; do
         sensor_addr+=("${SPEC_ADDR}")
         sensor_rot+=("${SPEC_ROT}")
         sensor_ori+=("${SPEC_ORI}")
+        sensor_unite+=("${SPEC_UNITE}")
     else
         [[ ${name} =~ ^[A-Za-z0-9][A-Za-z0-9_+-]*$ ]] \
             || die "bad overlay name '${name}'"
@@ -248,6 +262,14 @@ done
 
 # Reserve explicit ISP requests before assigning free ISPs in list order.
 # Two cameras cannot share one.
+# unite takes both cores for the one listed camera.
+unite_count=0
+for ((i = 0; i < ${#sensors[@]}; i++)); do
+    [[ ${sensor_unite[i]} -eq 1 ]] && unite_count=$((unite_count + 1))
+done
+if [[ ${unite_count} -gt 0 && ${#sensors[@]} -ne 1 ]]; then
+    die "unite uses both ISPs; only one camera can be listed"
+fi
 
 used_isp=" "
 for isp in "${sensor_isp_req[@]}"; do
@@ -265,6 +287,24 @@ for ((i = 0; i < ${#sensors[@]}; i++)); do
     [[ -n ${sensor_addr[i]} ]] && tag+="-addr-${sensor_addr[i]}"
     [[ -n ${sensor_rot[i]} ]] && tag+="-rot-${sensor_rot[i]}"
     [[ -n ${sensor_ori[i]} ]] && tag+="-ori-${sensor_ori[i]}"
+    if [[ ${sensor_unite[i]} -eq 1 ]]; then
+        if [[ -n ${sensor_isp_req[i]} ]]; then
+            die "unite uses both ISPs; drop isp${sensor_isp_req[i]} from ${sensors[i]},port${sensor_ports[i]}"
+        fi
+        used_isp+=" 0  1 "
+        sensor_isps+=("unite")
+        tag+="-unite"
+        sensor_tags+=("${tag}")
+        args=(--port "${sensor_ports[i]}" --unite)
+        [[ ${sensor_four[i]} -eq 1 ]] && args+=(--four-lane)
+        [[ -n ${sensor_link[i]} ]] && args+=(--link-frequency "${sensor_link[i]}")
+        [[ -n ${sensor_clk[i]} ]] && args+=(--clock-frequency "${sensor_clk[i]}")
+        [[ -n ${sensor_addr[i]} ]] && args+=(--addr "${sensor_addr[i]}")
+        [[ -n ${sensor_rot[i]} ]] && args+=(--rotation "${sensor_rot[i]}")
+        [[ -n ${sensor_ori[i]} ]] && args+=(--orientation "${sensor_ori[i]}")
+        sensor_args+=("${args[*]}")
+        continue
+    fi
     isp="${sensor_isp_req[i]}"
     if [[ -z ${isp} ]]; then
         if [[ ${used_isp} != *" 0 "* ]]; then
@@ -371,7 +411,8 @@ for item in ${existing}; do
 done
 
 # Unrelated overlays stay in front. Then isp (stock DTBs have no isp
-# labels), the port overlays (they publish cam_portN_*), and the sensors.
+# labels), isp-unite when a camera asked for it, the port overlays
+# (they publish cam_portN_*), and the sensors.
 merged=()
 for item in "${kept[@]:-}"; do
     [[ -z ${item} ]] && continue
@@ -382,6 +423,11 @@ camera_selected=0
 if [[ ${camera_selected} -eq 1 ]]; then
     isp="${OVERLAY_DIR}/rk3588-isp.dtbo"
     [[ -f ${isp} ]] && merged+=("${isp}")
+    if [[ ${unite_count} -gt 0 ]]; then
+        unite_dtbo="${OVERLAY_DIR}/rk3588-isp-unite.dtbo"
+        [[ -f ${unite_dtbo} ]] || die "missing ${unite_dtbo}"
+        merged+=("${unite_dtbo}")
+    fi
 fi
 for item in "${port_files[@]:-}" "${resolved[@]:-}" "${literals[@]:-}"; do
     [[ -z ${item} ]] && continue

@@ -185,6 +185,38 @@ static void rkisp2_resizer_config_dcrop(struct rkisp2_resizer *rsz,
 	rkisp2_write(rkisp2, config->dual_crop.ctrl, ctrl);
 }
 
+/*
+ * Unite mode: each core's output has the overlap columns on its inner side
+ * and the dual crop is what removes them. The left core keeps the first half
+ * and the right core skips the overlap and keeps the rest.
+ */
+static void rkisp2_resizer_config_dcrop_unite(struct rkisp2_resizer *rsz,
+					      bool is_raw,
+					      const struct v4l2_rect *crop)
+{
+	struct rkisp2_device *rkisp2 = rsz->rkisp2;
+	const struct rkisp2_resizer_config *config = rsz->config;
+	u32 mask = config->dual_crop.yuvmode_mask |
+		   config->dual_crop.rawmode_mask;
+	u32 left_w = rkisp2_unite_split(crop->width);
+	u32 ctrl = rkisp2_read(rkisp2, config->dual_crop.ctrl);
+
+	rkisp2_write_left(rkisp2, config->dual_crop.h_offset, crop->left);
+	rkisp2_write_left(rkisp2, config->dual_crop.h_size, left_w);
+	rkisp2_write_right(rkisp2, config->dual_crop.h_offset,
+			   RKISP2_UNITE_EXTEND_PIXEL);
+	rkisp2_write_right(rkisp2, config->dual_crop.h_size,
+			   crop->width - left_w);
+	rkisp2_write(rkisp2, config->dual_crop.v_offset, crop->top);
+	rkisp2_write(rkisp2, config->dual_crop.v_size, crop->height);
+
+	ctrl &= ~mask;
+	ctrl |= is_raw ? config->dual_crop.rawmode_mask :
+			 config->dual_crop.yuvmode_mask;
+	ctrl |= RKISP2_CIF_DUAL_CROP_CFG_UPD;
+	rkisp2_write(rkisp2, config->dual_crop.ctrl, ctrl);
+}
+
 static void rkisp2_resizer_disable_rsz(struct rkisp2_resizer *rsz)
 {
 	struct rkisp2_device *rkisp2 = rsz->rkisp2;
@@ -338,6 +370,7 @@ void rkisp2_resizer_configure(struct rkisp2_resizer *rsz,
 			      struct v4l2_rect *crop)
 {
 	bool is_raw = v4l2_is_format_bayer(rsz->source_fmt_info);
+	struct v4l2_rect full;
 
 	dev_dbg(rsz->rkisp2->dev,
 		"%s: path %d sink (%d,%d)/%dx%d, crop (%d,%d)/%dx%d, source (%d,%d)/%dx%d\n",
@@ -349,19 +382,38 @@ void rkisp2_resizer_configure(struct rkisp2_resizer *rsz,
 		rsz->source_size.width, rsz->source_size.height);
 
 	/* Apparently dual crop works on raw (untested) but resizer does not */
-	if (rkisp2_has_feature(rsz->rkisp2, DUAL_CROP)) {
+	if (rkisp2_is_unite(rsz->rkisp2)) {
+		full = *crop;
+
+		if (crop->left || crop->width != rsz->sink_size.width) {
+			dev_dbg(rsz->rkisp2->dev,
+				"unite: horizontal crop is not supported, using the full width\n");
+			full.left = 0;
+			full.width = rsz->sink_size.width;
+		}
+		crop = &full;
+		if (rsz->id == RKISP2_MAINPATH &&
+		    (crop->width != rsz->source_size.width ||
+		     crop->height != rsz->source_size.height)) {
+			dev_err_ratelimited(rsz->rkisp2->dev,
+					    "unite: scaling the main-path output is not supported\n");
+			return;
+		}
+		rkisp2_resizer_config_dcrop_unite(rsz, is_raw, crop);
+	} else if (rkisp2_has_feature(rsz->rkisp2, DUAL_CROP)) {
 		if (rkisp2_rect_equals(crop, &rsz->sink_size))
 			rkisp2_resizer_disable_dcrop(rsz);
 		else
 			rkisp2_resizer_config_dcrop(rsz, is_raw, crop);
 	}
 
-	if (crop->width == rsz->source_size.width && crop->height == rsz->source_size.height)
+	if (crop->width == rsz->source_size.width && crop->height == rsz->source_size.height) {
 		rkisp2_resizer_disable_rsz(rsz);
-	else
+	} else {
 		rkisp2_resizer_config_rsz(rsz, crop,
 					  &rsz->source_size,
 					  &rsz->source_format);
+	}
 }
 
 void rkisp2_resizer_pre_configure(struct rkisp2_device *rkisp2,

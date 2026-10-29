@@ -8,6 +8,8 @@ rk3588-camera-overlays (0.2.0-1) UNRELEASED; urgency=medium
   * The first camera in overlays.conf enables isp0 and the second isp1.
     isp0 or isp1 on a camera overrides that. Port overlays no longer
     pick an ISP.
+  * unite on one camera enables the dual-ISP device (both register
+    windows and both IOMMUs) and rejects a second camera.
   * Add imx415 (Radxa Camera 4K) at 24 MHz. The default 720 MHz link
     frequency selects 4-lane 1440 Mbps, 3864x2192 at about 60 fps, and
     link-frequency=360000000 selects 4-lane 720 Mbps, about 30 fps.

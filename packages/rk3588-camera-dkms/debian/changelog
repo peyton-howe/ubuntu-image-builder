@@ -12,6 +12,21 @@ rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
     unchanged, so an exposure was accepted that put SHR0 below its minimum
     and the image came out almost black. Fix the range update, and clamp the
     exposure to VMAX - 8 when SHR0 is written.
+  * Bind rockchip,rk3588-isp-unite and run both ISP cores on one camera.
+    Each core takes half of the frame (cut at half the width rounded up to
+    16 pixels, so that the right core's output starts on a 16 byte boundary)
+    plus 128 overlap columns on its inner side: it reads its part from memory
+    (the right core starts 128 pixels before the cut), writes its part of
+    each output line, and its dual crop removes the overlap. Interrupts
+    follow the right core and the left core's flags are cleared separately,
+    but a frame is handled only once both cores have flagged its end, so a
+    buffer is never handed on with part of it still being written. The AE,
+    histogram and AWB windows are split between the cores (each measures
+    half of the frame with half-width cells) and their results are put back
+    together for the IPA. Scaling the output and horizontal cropping are not
+    supported in this mode, which is for streams that do not fit on one core,
+    at the sensor's size; the driver warns once when the main path would be
+    scaled.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 

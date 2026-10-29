@@ -233,11 +233,41 @@ static void rkisp2_stats_get_rawae_lite(struct rkisp2_stats *stats,
 		return;
 	stats->icr |= ISP2X_3A_RAWAE_CH0;
 
-	for (i = 0; i < RKISP2_ISP_AE_MEAN_MAX_LITE; i++) {
-		val = rkisp2_read(rkisp2, ISP_RAWAE_LITE_RO_MEAN(i));
-		ae_lite->exp_mean_r[i] = ISP3X_RAWAE_LITE_RO_MEAN_R(val);
-		ae_lite->exp_mean_g[i] = ISP3X_RAWAE_LITE_RO_MEAN_G(val);
-		ae_lite->exp_mean_b[i] = ISP3X_RAWAE_LITE_RO_MEAN_B(val);
+	if (rkisp2_is_unite(rkisp2)) {
+		/*
+		 * Each core measured half of the frame with half cells. Two
+		 * half cells make one cell of the 5x5 grid: average them.
+		 */
+		u32 sum_r[RKISP2_ISP_AE_MEAN_MAX_LITE] = { };
+		u32 sum_g[RKISP2_ISP_AE_MEAN_MAX_LITE] = { };
+		u32 sum_b[RKISP2_ISP_AE_MEAN_MAX_LITE] = { };
+		unsigned int core;
+
+		for (core = 0; core < 2; core++) {
+			for (i = 0; i < RKISP2_ISP_AE_MEAN_MAX_LITE; i++) {
+				unsigned int dst = (i / 5) * 5 +
+					rkisp2_unite_col(core, i % 5, 5);
+
+				val = rkisp2_read_core(rkisp2, core,
+						       ISP_RAWAE_LITE_RO_MEAN(i));
+				sum_r[dst] += ISP3X_RAWAE_LITE_RO_MEAN_R(val);
+				sum_g[dst] += ISP3X_RAWAE_LITE_RO_MEAN_G(val);
+				sum_b[dst] += ISP3X_RAWAE_LITE_RO_MEAN_B(val);
+			}
+		}
+
+		for (i = 0; i < RKISP2_ISP_AE_MEAN_MAX_LITE; i++) {
+			ae_lite->exp_mean_r[i] = sum_r[i] / 2;
+			ae_lite->exp_mean_g[i] = sum_g[i] / 2;
+			ae_lite->exp_mean_b[i] = sum_b[i] / 2;
+		}
+	} else {
+		for (i = 0; i < RKISP2_ISP_AE_MEAN_MAX_LITE; i++) {
+			val = rkisp2_read(rkisp2, ISP_RAWAE_LITE_RO_MEAN(i));
+			ae_lite->exp_mean_r[i] = ISP3X_RAWAE_LITE_RO_MEAN_R(val);
+			ae_lite->exp_mean_g[i] = ISP3X_RAWAE_LITE_RO_MEAN_G(val);
+			ae_lite->exp_mean_b[i] = ISP3X_RAWAE_LITE_RO_MEAN_B(val);
+		}
 	}
 
 	/*
@@ -252,7 +282,7 @@ static void rkisp2_stats_hist_read(struct rkisp2_stats *stats, u32 reg_base,
 				   enum rkisp2_stats_block_type type)
 {
 	struct rkisp2_device *rkisp2 = stats->rkisp2;
-	unsigned int i;
+	unsigned int i, core;
 	u32 val, done;
 	unsigned int ctrl = reg_base + ISP_RAWHIST_BIG_CTRL;
 	union rkisp2_stats_block *block;
@@ -268,7 +298,9 @@ static void rkisp2_stats_hist_read(struct rkisp2_stats *stats, u32 reg_base,
 	 * TODO Figure out how the done bit works (it doesn't seem to ever be
 	 * set)
 	 */
-	done = rkisp2_read(rkisp2, ctrl) & ISP_RAWHIST_CTRL_MEAS_DONE;
+	done = ISP_RAWHIST_CTRL_MEAS_DONE;
+	for (core = 0; core < rkisp2_num_cores(rkisp2); core++)
+		done &= rkisp2_read_core(rkisp2, core, ctrl);
 	hist->done = done ? 1 : 0;
 	if (!done)
 		return;
@@ -276,9 +308,14 @@ static void rkisp2_stats_hist_read(struct rkisp2_stats *stats, u32 reg_base,
 	rkisp2_write(rkisp2, reg_base + ISP_RAWHIST_BIG_HRAM_CTRL,
 		     ISP_RAWHIST_RAM_OFFSET(0));
 
-	for (i = 0; i < RKISP2_ISP_HIST_BIN_N_MAX; i++) {
-		val = rkisp2_read(rkisp2, reg_base + ISP_RAWHIST_BIG_RO_BASE_BIN);
-		hist->hist_bins[i] = val;
+	/* The cores measured half of the frame each: add the bins. */
+	memset(hist->hist_bins, 0, sizeof(hist->hist_bins));
+	for (core = 0; core < rkisp2_num_cores(rkisp2); core++) {
+		for (i = 0; i < RKISP2_ISP_HIST_BIN_N_MAX; i++) {
+			val = rkisp2_read_core(rkisp2, core,
+					       reg_base + ISP_RAWHIST_BIG_RO_BASE_BIN);
+			hist->hist_bins[i] += val;
+		}
 	}
 
 	/* Set the done bit */
@@ -330,7 +367,7 @@ static void rkisp2_stats_get_rawawb(struct rkisp2_stats *stats,
 	union rkisp2_stats_block *block;
 	struct rkisp2_stats_awb *awb;
 	unsigned int ctrl = ISP21_RAWAWB_CTRL;
-	unsigned int i;
+	unsigned int i, core;
 	u32 val1, val2;
 	u32 done;
 
@@ -346,20 +383,40 @@ static void rkisp2_stats_get_rawawb(struct rkisp2_stats *stats,
 
 	rkisp2->debug.stats3a_awb_count++;
 
-	done = rkisp2_read(rkisp2, ctrl) & ISP3X_RAWAWB_CTRL_MEAS_DONE;
+	done = ISP3X_RAWAWB_CTRL_MEAS_DONE;
+	for (core = 0; core < rkisp2_num_cores(rkisp2); core++)
+		done &= rkisp2_read_core(rkisp2, core, ctrl);
 	awb->done = done ? 1 : 0;
 	if (!done)
 		return;
 
 	rkisp2->debug.stats3a_awb_done_count++;
 
-	for (i = 0; i < RKISP2_ISP_AWB_COUNTS_SIZE; i++) {
-		val1 = rkisp2_read(rkisp2, ISP21_RAWAWB_RAM_DATA_BASE);
-		val2 = rkisp2_read(rkisp2, ISP21_RAWAWB_RAM_DATA_BASE);
-		awb->counts_r[i] = (val2 >> 4) & 0x3ffff;
-		awb->counts_g[i] = (val1 >> 18) | ((val2 & 0xf) << 14);
-		awb->counts_b[i] = val1 & 0x3ffff;
-		awb->counts_w[i] = val2 >> 22;
+	/*
+	 * In unite mode each core counted half of the frame with half cells,
+	 * and two half cells make one cell of the 15x15 grid: add them.
+	 */
+	memset(awb->counts_r, 0, sizeof(awb->counts_r));
+	memset(awb->counts_g, 0, sizeof(awb->counts_g));
+	memset(awb->counts_b, 0, sizeof(awb->counts_b));
+	memset(awb->counts_w, 0, sizeof(awb->counts_w));
+	for (core = 0; core < rkisp2_num_cores(rkisp2); core++) {
+		for (i = 0; i < RKISP2_ISP_AWB_COUNTS_SIZE; i++) {
+			unsigned int dst = i;
+
+			if (rkisp2_is_unite(rkisp2))
+				dst = (i / 15) * 15 +
+				      rkisp2_unite_col(core, i % 15, 15);
+
+			val1 = rkisp2_read_core(rkisp2, core,
+						ISP21_RAWAWB_RAM_DATA_BASE);
+			val2 = rkisp2_read_core(rkisp2, core,
+						ISP21_RAWAWB_RAM_DATA_BASE);
+			awb->counts_r[dst] += (val2 >> 4) & 0x3ffff;
+			awb->counts_g[dst] += (val1 >> 18) | ((val2 & 0xf) << 14);
+			awb->counts_b[dst] += val1 & 0x3ffff;
+			awb->counts_w[dst] += val2 >> 22;
+		}
 	}
 
 	/*
@@ -432,7 +489,9 @@ static void rkisp2_stats_send_measurement_3a(struct rkisp2_stats *stats, u32 sta
 irqreturn_t rkisp2_stats_isr_eof(struct rkisp2_stats *stats)
 {
 	struct rkisp2_device *rkisp2 = stats->rkisp2;
-	u32 status = rkisp2_read(rkisp2, ISP_ISP3A_MIS);
+	/* In unite mode the right core finishes last: work from its status. */
+	u32 status = rkisp2_read_core(rkisp2, rkisp2_num_cores(rkisp2) - 1,
+				      ISP_ISP3A_MIS);
 
 	spin_lock(&stats->lock);
 	rkisp2_stats_send_measurement_3a(stats, status);

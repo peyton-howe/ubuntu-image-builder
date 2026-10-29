@@ -161,7 +161,7 @@ A port overlay turns the connector on (I2C, clock, reset, regulator, CSI
 host) and publishes `cam_portN_*` labels. A sensor overlay describes the
 chip and attaches to whichever port you name. It also enables one ISP.
 U-Boot does not apply Raspberry Pi overlay parameters, so
-`apply-overlays.sh` bakes `portN`, `ispN`, `4lane`, `link-frequency`,
+`apply-overlays.sh` bakes `portN`, `ispN`, `unite`, `4lane`, `link-frequency`,
 `rotation`, and `orientation` into a dtbo under `/var/lib/rk3588-camera/`
 and points `U_BOOT_FDT_OVERLAYS` at it. It also selects the port overlay
 for the installed board package.
@@ -186,12 +186,35 @@ Two cameras, or a Pi-style link-frequency override:
 RK3588_CAMERA_OVERLAYS="imx708,port1 imx708,port2"
 RK3588_CAMERA_OVERLAYS="imx708,port0,link-frequency=447000000"
 RK3588_CAMERA_OVERLAYS="imx708,port1,isp1"
+RK3588_CAMERA_OVERLAYS="imx415,port0,addr=0x37,link-frequency=1188000000,unite"
 ```
+
+The unite example uses a 24 MHz IMX415 module and requires loading the
+`imx415` module with `allow_24mhz_2376=1`.
 
 The first camera in that list enables isp0 and its IOMMU. The second
 enables isp1. `isp0` or `isp1` on a camera overrides that. Two cameras
 cannot share an ISP. On an Orange Pi 5B, `imx708,port1 imx708,port2`
 puts CAM1 on isp0 and CAM2 on isp1.
+
+`unite` gives that one camera both ISPs. `apply-overlays.sh` loads
+`rk3588-isp-unite.dtbo` after `rk3588-isp.dtbo`. The generated sensor
+dtbo enables `isp-unite` (registers at `0xfdcb0000` and `0xfdcc0000`)
+and its IOMMU, and leaves `isp0` and `isp1` disabled. A second camera
+on the same line is rejected, and so is `isp0` or `isp1` next to
+`unite`. This follows Rockchip's dual-ISP overlay (the 4k90
+`rock-5b-radxa-camera-4k-unite.dts` case: one device, both cores).
+`rkisp2` binds `rockchip,rk3588-isp-unite` and programs the two cores
+together. Each core takes part of the frame, cut at half of the width
+rounded up to 16 pixels, plus 128 overlap columns on its inner side.
+Capture stays on VICAP into one buffer; the two cores then read their
+parts of it from memory and write their parts of the output buffer, and
+the driver puts the AE, histogram and AWB statistics of the two cores
+back together for the IPA. The vendor rkcif `TOISP_UNITE` line split is
+not used. Scaling the output and horizontal cropping are not supported in
+this mode, which is for streams that do not fit on one core, so use the
+sensor's size (the driver rejects scaled main-path output at stream start).
+Tried with an IMX415 at 3864x2192, about 94 fps, on a ROCK 5B+.
 
 `link-frequency` is in Hz. The imx708 driver accepts 447000000, 450000000
 (the default), and 453000000, and only two data lanes. `4lane` is the same
@@ -216,11 +239,13 @@ keeps unrelated overlays. To switch cameras, edit the conf and re-run the
 script. To disable them, set `RK3588_CAMERA_OVERLAYS=""` and re-run.
 
 After reboot, `cat /proc/device-tree/isp@fdcb0000/status` should print
-`okay`. The pipeline uses two media devices: `rockchip-cif` captures from the
-sensor into memory, and `rkisp2` reads the frames back through
-`rkisp2_rawrd0` for processing. Processed images need a libcamera build with
-the rkisp2 pipeline handler, which Ubuntu's libcamera doesn't have yet. Build
-it yourself for now. The upstream rkisp2 branch
+`okay` for isp0 setups. For unite setups, check
+`cat /proc/device-tree/isp-unite@fdcb0000/status` for `okay` instead;
+`isp@fdcb0000` remains disabled. The pipeline uses two media devices:
+`rockchip-cif` captures from the sensor into memory, and `rkisp2` reads the
+frames back through `rkisp2_rawrd0` for processing. Processed images need a
+libcamera build with the rkisp2 pipeline handler, which Ubuntu's libcamera
+doesn't have yet. Build it yourself for now. The upstream rkisp2 branch
 (`git.ideasonboard.com/epaul/libcamera`, `epaul/dev/rkisp2/upstream-v3`) only
 matches cameras on the csi2 port, so ROCK 5B+ cam1 (csi4) needs a libcamera
 patch until that's fixed upstream; it also creates one camera per pipeline
@@ -229,7 +254,7 @@ shipped in this repo.
 
 Stock kernels' DTBs don't have the ISP nodes the camera overlays reference
 (they come from kernel patch 0002), so `apply-overlays.sh` always puts
-`rk3588-isp.dtbo` first. Port
+`rk3588-isp.dtbo` first. `unite` adds `rk3588-isp-unite.dtbo` next. Port
 overlays come after that, then the sensor. U-Boot
 applies overlays in order and merges each one's labels into the base DTB, so
 the sensor can resolve `cam_portN_*`. Overlays also need the base DTB to have
