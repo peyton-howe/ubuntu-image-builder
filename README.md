@@ -216,9 +216,29 @@ this mode, which is for streams that do not fit on one core, so use the
 sensor's size (the driver rejects scaled main-path output at stream start).
 Tried with an IMX415 at 3864x2192, about 94 fps, on a ROCK 5B+.
 
-`link-frequency` is in Hz. The imx708 driver accepts 447000000, 450000000
-(the default), and 453000000, and only two data lanes. `4lane` is the same
-knob the Pi has; the imx708 driver rejects it. `orientation` is 0 front,
+`link-frequency` is in Hz. The imx708 driver takes two or four data lanes
+(`4lane`, the same knob the Pi has) and these link frequencies: 447000000,
+450000000 (the default), 453000000, 549000000, 750000000 and 960000000.
+Keep it at or below 750000000: faster lanes need D-PHY deskew calibration
+from the sensor, which this driver does not enable, and it warns at probe.
+
+Each mode has a fallback timing (the Pi's) and faster ones for link
+frequencies of 447 (the 450 MHz default), 549, 750 and 960 MHz, each with a timing for two lanes and one
+for four. Four lanes carry twice the data at a given frequency, so they run
+the same pixel rate with half the line length. Default frame rates (4608x2592,
+2304x1296, 1536x864):
+
+| Link | 2 lanes | 4 lanes |
+|---|---|---|
+| below 447 MHz (fallback) | 14, 30, 30 | 14, 30, 30 |
+| 447 to 453 MHz (default 450) | 14, 30, 30 | 27, 30, 30 |
+| 549 MHz | 16.5, 65, 30 | 30, 120, 30 |
+| 750 MHz | 22.6, 89.5, 30 | 45, 179, 30 |
+| 960 MHz | 30, 30, 30 | 60, 60, 30 |
+
+Lowering VBLANK reaches higher rates (for 4 lanes at 450 MHz up to 108 fps for
+2304x1296 and 182 fps for 1536x864; up to 182 fps for 1536x864 and 116 and 233
+fps for 2304x1296 at 960 MHz). HDR stays at 30 fps. `orientation` is 0 front,
 1 rear, 2 external (default 2).
 
 Sensors shipped: `imx708` (the DKMS driver), `imx219` (mainline binding;
