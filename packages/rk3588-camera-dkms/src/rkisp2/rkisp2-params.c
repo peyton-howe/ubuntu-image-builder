@@ -583,10 +583,27 @@ static void rkisp2_params_crop_init(struct rkisp2_params *params)
 	__rkisp2_params_crop(params, &arg, V4L2_ISP_PARAMS_FL_BLOCK_ENABLE);
 }
 
+/*
+ * Weight n of a grid with n_cols columns, for one core. On a single core it
+ * is the weight the IPA gave; in unite mode a core's cell takes the weight of
+ * the grid cell it is half of (see rkisp2_unite_col()).
+ */
+static u8 rkisp2_hist_weight(struct rkisp2_device *rkisp2, unsigned int core,
+			     const __u8 *weights, unsigned int n,
+			     unsigned int n_cols)
+{
+	if (!rkisp2_is_unite(rkisp2))
+		return weights[n];
+
+	return weights[(n / n_cols) * n_cols +
+		       rkisp2_unite_col(core, n % n_cols, n_cols)];
+}
+
 static void rkisp2_params_ae_lite(struct rkisp2_params *params,
 				  union rkisp2_params_block block)
 {
 	const struct rkisp2_params_ae_lite *arg = block.ae_lite;
+	unsigned int core;
 	u32 control;
 
 	if (block.header->flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE) {
@@ -603,13 +620,21 @@ static void rkisp2_params_ae_lite(struct rkisp2_params *params,
 	 * \todo clamp these: width and height must be even, min size is 16x4,
 	 * and total height must be < frame height
 	 */
-	rkisp2_write(params->rkisp2, ISP_RAWAE_LITE_BLK_SIZ,
-		     ISP3X_RAWAE_LITE_H(arg->meas_window.h_size) |
-		     ISP3X_RAWAE_LITE_V(arg->meas_window.v_size));
+	for (core = 0; core < rkisp2_num_cores(params->rkisp2); core++) {
+		u32 h_size = arg->meas_window.h_size;
+		u32 h_offs = arg->meas_window.h_offs;
 
-	rkisp2_write(params->rkisp2, ISP_RAWAE_LITE_OFFSET,
-		     ISP3X_RAWAE_LITE_H(arg->meas_window.h_offs) |
-		     ISP3X_RAWAE_LITE_V(arg->meas_window.v_offs));
+		if (rkisp2_is_unite(params->rkisp2))
+			rkisp2_unite_window(core, h_size, h_offs,
+					    &h_size, &h_offs);
+
+		rkisp2_write_core(params->rkisp2, core, ISP_RAWAE_LITE_BLK_SIZ,
+				  ISP3X_RAWAE_LITE_H(h_size) |
+				  ISP3X_RAWAE_LITE_V(arg->meas_window.v_size));
+		rkisp2_write_core(params->rkisp2, core, ISP_RAWAE_LITE_OFFSET,
+				  ISP3X_RAWAE_LITE_H(h_offs) |
+				  ISP3X_RAWAE_LITE_V(arg->meas_window.v_offs));
+	}
 
 	control = arg->window_num ? ISP3X_RAWAE_LITE_WNDNUM : 0;
 	control |= ISP3X_RAWAE_LITE_EN;
@@ -624,7 +649,7 @@ static void rkisp2_params_hist_lite(struct rkisp2_params *params,
 				    union rkisp2_params_block block)
 {
 	const struct rkisp2_params_hist_lite *arg = block.hist_lite;
-	unsigned int i;
+	unsigned int i, core;
 	u32 control;
 
 	if (block.header->flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE) {
@@ -636,29 +661,49 @@ static void rkisp2_params_hist_lite(struct rkisp2_params *params,
 	if (!(block.header->flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE))
 		return;
 
-	rkisp2_write(params->rkisp2, ISP_RAWHIST_LITE_SIZE,
-		     ISP_RAWHIST_H_SIZE(arg->meas_window.h_size) |
-		     ISP_RAWHIST_V_SIZE(arg->meas_window.v_size));
-
-	rkisp2_write(params->rkisp2, ISP_RAWHIST_LITE_OFFS,
-		     ISP_RAWHIST_H_OFFS(arg->meas_window.h_offs) |
-		     ISP_RAWHIST_V_OFFS(arg->meas_window.v_offs));
-
 	rkisp2_write(params->rkisp2, ISP_RAWHIST_LITE_RAW2Y_CC,
 		     ISP_RAWHIST_RAW2Y_CC_RCC(arg->coeffs.r) |
 		     ISP_RAWHIST_RAW2Y_CC_GCC(arg->coeffs.g) |
 		     ISP_RAWHIST_RAW2Y_CC_BCC(arg->coeffs.b));
 
-	for (i = 0; i < 6; i++) {
-		rkisp2_write(params->rkisp2, ISP_RAWHIST_LITE_WEIGHT + 4 * i,
-			     ISP_RAWHIST_LITE_WEIGHT_WND0(arg->weights[4 * i + 0]) |
-			     ISP_RAWHIST_LITE_WEIGHT_WND1(arg->weights[4 * i + 1]) |
-			     ISP_RAWHIST_LITE_WEIGHT_WND2(arg->weights[4 * i + 2]) |
-			     ISP_RAWHIST_LITE_WEIGHT_WND3(arg->weights[4 * i + 3]));
-	}
+	for (core = 0; core < rkisp2_num_cores(params->rkisp2); core++) {
+		u32 h_size = arg->meas_window.h_size;
+		u32 h_offs = arg->meas_window.h_offs;
 
-	rkisp2_write(params->rkisp2, ISP_RAWHIST_LITE_WEIGHT + 4 * 6,
-		     ISP_RAWHIST_LITE_WEIGHT_WND0(arg->weights[24]));
+		if (rkisp2_is_unite(params->rkisp2))
+			rkisp2_unite_window(core, h_size, h_offs,
+					    &h_size, &h_offs);
+
+		rkisp2_write_core(params->rkisp2, core, ISP_RAWHIST_LITE_SIZE,
+				  ISP_RAWHIST_H_SIZE(h_size) |
+				  ISP_RAWHIST_V_SIZE(arg->meas_window.v_size));
+		rkisp2_write_core(params->rkisp2, core, ISP_RAWHIST_LITE_OFFS,
+				  ISP_RAWHIST_H_OFFS(h_offs) |
+				  ISP_RAWHIST_V_OFFS(arg->meas_window.v_offs));
+
+		for (i = 0; i < 6; i++) {
+			u8 w[4];
+			unsigned int j;
+
+			for (j = 0; j < 4; j++)
+				w[j] = rkisp2_hist_weight(params->rkisp2, core,
+							  arg->weights,
+							  4 * i + j, 5);
+
+			rkisp2_write_core(params->rkisp2, core,
+					  ISP_RAWHIST_LITE_WEIGHT + 4 * i,
+					  ISP_RAWHIST_LITE_WEIGHT_WND0(w[0]) |
+					  ISP_RAWHIST_LITE_WEIGHT_WND1(w[1]) |
+					  ISP_RAWHIST_LITE_WEIGHT_WND2(w[2]) |
+					  ISP_RAWHIST_LITE_WEIGHT_WND3(w[3]));
+		}
+
+		rkisp2_write_core(params->rkisp2, core,
+				  ISP_RAWHIST_LITE_WEIGHT + 4 * 6,
+				  ISP_RAWHIST_LITE_WEIGHT_WND0(
+					rkisp2_hist_weight(params->rkisp2, core,
+							   arg->weights, 24, 5)));
+	}
 
 	control = ISP_RAWHIST_CTRL_EN |
 		  ISP_RAWHIST_CTRL_STEPSIZE(arg->stepsize) |
@@ -674,7 +719,7 @@ static void rkisp2_params_hist_big(struct rkisp2_params *params,
 				   union rkisp2_params_block block)
 {
 	const struct rkisp2_params_hist_big *arg = block.hist_big;
-	unsigned int i, reg_base, ctrl;
+	unsigned int i, core, reg_base, ctrl;
 	u32 control;
 
 	switch (block.header->type) {
@@ -703,30 +748,49 @@ static void rkisp2_params_hist_big(struct rkisp2_params *params,
 	if (!(block.header->flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE))
 		return;
 
-	rkisp2_write(params->rkisp2, reg_base + ISP_RAWHIST_BIG_SIZE,
-		     ISP_RAWHIST_H_SIZE(arg->meas_window.h_size) |
-		     ISP_RAWHIST_V_SIZE(arg->meas_window.v_size));
-
-	rkisp2_write(params->rkisp2, reg_base + ISP_RAWHIST_BIG_OFFS,
-		     ISP_RAWHIST_H_OFFS(arg->meas_window.h_offs) |
-		     ISP_RAWHIST_V_OFFS(arg->meas_window.v_offs));
-
 	rkisp2_write(params->rkisp2, reg_base + ISP_RAWHIST_BIG_RAW2Y_CC,
 		     ISP_RAWHIST_RAW2Y_CC_RCC(arg->coeffs.r) |
 		     ISP_RAWHIST_RAW2Y_CC_GCC(arg->coeffs.g) |
 		     ISP_RAWHIST_RAW2Y_CC_BCC(arg->coeffs.b));
 
-	/*
-	 * TODO check if the other weights are programmed in the registers
-	 * after the bins, or if it's sequential write
-	 */
-	for (i = 0; i < 16; i++) {
-		rkisp2_write(params->rkisp2, reg_base + ISP_RAWHIST_BIG_WEIGHT_BASE + 4 * i,
-			     ISP_RAWHIST_BIG_WEIGHT_WND0(arg->weights[5 * i + 0]) |
-			     ISP_RAWHIST_BIG_WEIGHT_WND1(arg->weights[5 * i + 1]) |
-			     ISP_RAWHIST_BIG_WEIGHT_WND2(arg->weights[5 * i + 2]) |
-			     ISP_RAWHIST_BIG_WEIGHT_WND3(arg->weights[5 * i + 3]) |
-			     ISP_RAWHIST_BIG_WEIGHT_WND4(arg->weights[5 * i + 4]));
+	for (core = 0; core < rkisp2_num_cores(params->rkisp2); core++) {
+		u32 h_size = arg->meas_window.h_size;
+		u32 h_offs = arg->meas_window.h_offs;
+
+		if (rkisp2_is_unite(params->rkisp2))
+			rkisp2_unite_window(core, h_size, h_offs,
+					    &h_size, &h_offs);
+
+		rkisp2_write_core(params->rkisp2, core,
+				  reg_base + ISP_RAWHIST_BIG_SIZE,
+				  ISP_RAWHIST_H_SIZE(h_size) |
+				  ISP_RAWHIST_V_SIZE(arg->meas_window.v_size));
+		rkisp2_write_core(params->rkisp2, core,
+				  reg_base + ISP_RAWHIST_BIG_OFFS,
+				  ISP_RAWHIST_H_OFFS(h_offs) |
+				  ISP_RAWHIST_V_OFFS(arg->meas_window.v_offs));
+
+		/*
+		 * TODO check if the other weights are programmed in the
+		 * registers after the bins, or if it's sequential write
+		 */
+		for (i = 0; i < 16; i++) {
+			u8 w[5];
+			unsigned int j;
+
+			for (j = 0; j < 5; j++)
+				w[j] = rkisp2_hist_weight(params->rkisp2, core,
+							  arg->weights,
+							  5 * i + j, 15);
+
+			rkisp2_write_core(params->rkisp2, core,
+					  reg_base + ISP_RAWHIST_BIG_WEIGHT_BASE + 4 * i,
+					  ISP_RAWHIST_BIG_WEIGHT_WND0(w[0]) |
+					  ISP_RAWHIST_BIG_WEIGHT_WND1(w[1]) |
+					  ISP_RAWHIST_BIG_WEIGHT_WND2(w[2]) |
+					  ISP_RAWHIST_BIG_WEIGHT_WND3(w[3]) |
+					  ISP_RAWHIST_BIG_WEIGHT_WND4(w[4]));
+		}
 	}
 
 	rkisp2_param_set_bits(params, ISP_CTRL1, ISP21_BIGMODE_MODE | ISP21_BIGMODE_FORCE_EN);
@@ -745,7 +809,7 @@ static void rkisp2_params_awb_meas(struct rkisp2_params *params,
 				   union rkisp2_params_block block)
 {
 	const struct rkisp2_params_awb_meas *arg = block.awb_meas;
-	unsigned int i;
+	unsigned int i, core;
 	u32 val;
 	u32 control = 0;
 
@@ -760,12 +824,21 @@ static void rkisp2_params_awb_meas(struct rkisp2_params *params,
 	if (!(block.header->flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE))
 		return;
 
-	rkisp2_write(params->rkisp2, ISP21_RAWAWB_WIN_OFFS,
-		     ISP3X_RAWAWB_WIN(arg->meas_window.h_offs,
-				    arg->meas_window.v_offs));
-	rkisp2_write(params->rkisp2, ISP21_RAWAWB_WIN_SIZE,
-		     ISP3X_RAWAWB_WIN(arg->meas_window.h_size,
-				    arg->meas_window.v_size));
+	for (core = 0; core < rkisp2_num_cores(params->rkisp2); core++) {
+		u32 h_size = arg->meas_window.h_size;
+		u32 h_offs = arg->meas_window.h_offs;
+
+		if (rkisp2_is_unite(params->rkisp2))
+			rkisp2_unite_window(core, h_size, h_offs,
+					    &h_size, &h_offs);
+
+		rkisp2_write_core(params->rkisp2, core, ISP21_RAWAWB_WIN_OFFS,
+				  ISP3X_RAWAWB_WIN(h_offs,
+						   arg->meas_window.v_offs));
+		rkisp2_write_core(params->rkisp2, core, ISP21_RAWAWB_WIN_SIZE,
+				  ISP3X_RAWAWB_WIN(h_size,
+						   arg->meas_window.v_size));
+	}
 
 	rkisp2_write(params->rkisp2, ISP21_RAWAWB_LIMIT_RG_MAX,
 		     ISP3X_RAWAWB_LIMITS(arg->limits[1].r, arg->limits[1].g));
@@ -776,13 +849,24 @@ static void rkisp2_params_awb_meas(struct rkisp2_params *params,
 	rkisp2_write(params->rkisp2, ISP21_RAWAWB_LIMIT_BY_MIN,
 		     ISP3X_RAWAWB_LIMITS(arg->limits[0].b, arg->limits[0].y));
 
-	for (i = 0; i < RKISP2_ISP_AWB_COUNTS_SIZE / 5; i++) {
-		val = (arg->weights[5 * i] & 0x3f)
-		    | ((arg->weights[5 * i + 1] & 0x3f) << 6)
-		    | ((arg->weights[5 * i + 2] & 0x3f) << 12)
-		    | ((arg->weights[5 * i + 3] & 0x3f) << 18)
-		    | ((arg->weights[5 * i + 4] & 0x3f) << 24);
-		rkisp2_write(params->rkisp2, ISP21_RAWAWB_WRAM_DATA_BASE, val);
+	for (core = 0; core < rkisp2_num_cores(params->rkisp2); core++) {
+		for (i = 0; i < RKISP2_ISP_AWB_COUNTS_SIZE / 5; i++) {
+			u8 w[5];
+			unsigned int j;
+
+			for (j = 0; j < 5; j++)
+				w[j] = rkisp2_hist_weight(params->rkisp2, core,
+							  arg->weights,
+							  5 * i + j, 15);
+
+			val = (w[0] & 0x3f)
+			    | ((w[1] & 0x3f) << 6)
+			    | ((w[2] & 0x3f) << 12)
+			    | ((w[3] & 0x3f) << 18)
+			    | ((w[4] & 0x3f) << 24);
+			rkisp2_write_core(params->rkisp2, core,
+					  ISP21_RAWAWB_WRAM_DATA_BASE, val);
+		}
 	}
 
 	// This options looks like it's required to get "useful" data out

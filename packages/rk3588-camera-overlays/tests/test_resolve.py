@@ -151,6 +151,20 @@ class ResolveTests(unittest.TestCase):
         with self.assertRaises(resolve.FdtError):
             resolve.retarget_overlay(self.blob(), port=0, isp=0, clock_frequency=0)
 
+    def test_unite_retargets_both_isps(self):
+        out = resolve.retarget_overlay(self.blob(), port=1, unite=True)
+        root, _, _ = resolve.parse_fdt(out)
+        fixups = root.child("__fixups__")
+        names = [name for name, _ in fixups.props]
+        self.assertIn("isp_unite", names)
+        self.assertIn("isp_unite_mmu", names)
+        self.assertIn("cam_port1_sensor", names)
+        self.assertNotIn("cam_isp", names)
+        self.assertNotIn("cam_isp_mmu", names)
+        self.assertNotIn("isp0", names)
+        self.assertNotIn("isp1", names)
+
+
     def test_port1_leaves_unrelated_fixup(self):
         out = resolve.retarget_overlay(self.blob(), port=1, isp=1)
         root, _, _ = resolve.parse_fdt(out)

@@ -5,7 +5,7 @@
  * The port overlay publishes cam_portN_sensor, cam_portN_sensor_ep,
  * cam_portN_csi_ep, and cam_portN_reg. apply-overlays.sh rewrites the
  * generic cam_port_* fixups below to that port, points cam_isp at isp0
- * or isp1, and can also set 4lane,
+ * or isp1 (or at isp_unite when unite is set), and can also set 4lane,
  * link-frequency, rotation, and orientation.
  *
  *   imx708,port0

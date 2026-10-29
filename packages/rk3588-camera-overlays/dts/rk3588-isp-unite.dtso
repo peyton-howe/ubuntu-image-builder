@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * RK3588 dual-ISP ("unite") device.
+ *
+ * Rockchip's 4k90 example (rk3588s-evb1, and
+ * bambooCZ/rk3588-imx415-4k60 4k90/rock-5b-radxa-camera-4k-unite.dts)
+ * turns off the single rkisp0 device and turns on rkisp_unite, which
+ * owns both ISP register windows and both IOMMUs. Stock Ubuntu DTBs
+ * have neither, and rk3588-isp.dtbo adds isp0/isp1 instead. This
+ * overlay adds the unite device. apply-overlays.sh loads it after
+ * rk3588-isp.dtbo when a camera is selected with the unite parameter.
+ * The sensor overlay then sets isp_unite and isp_unite_mmu okay.
+ * isp0 and isp1 stay disabled, so one camera holds both cores.
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/clock/rockchip,rk3588-cru.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/power/rk3588-power.h>
+
+&{/} {
+	isp_unite: isp-unite@fdcb0000 {
+		compatible = "rockchip,rk3588-isp-unite";
+		reg = <0x0 0xfdcb0000 0x0 0x7f00>,
+		      <0x0 0xfdcc0000 0x0 0x7f00>;
+		interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH 0>,
+			     <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH 0>,
+			     <GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH 0>;
+		interrupt-names = "isp_irq", "mi_irq";
+		clocks = <&cru ACLK_ISP0>, <&cru HCLK_ISP0>,
+			 <&cru CLK_ISP0_CORE>, <&cru CLK_ISP0_CORE_MARVIN>,
+			 <&cru CLK_ISP0_CORE_VICAP>,
+			 <&cru ACLK_ISP1>, <&cru HCLK_ISP1>,
+			 <&cru CLK_ISP1_CORE>, <&cru CLK_ISP1_CORE_MARVIN>,
+			 <&cru CLK_ISP1_CORE_VICAP>;
+		clock-names = "aclk_isp0", "hclk_isp0", "clk_isp_core0",
+			      "clk_isp_core_marvin0", "clk_isp_core_vicap0",
+			      "aclk_isp1", "hclk_isp1", "clk_isp_core1",
+			      "clk_isp_core_marvin1", "clk_isp_core_vicap1";
+		power-domains = <&power RK3588_PD_ISP1>;
+		iommus = <&isp_unite_mmu>;
+		status = "disabled";
+	};
+
+	/*
+	 * One IOMMU node with both windows, same idea as rkisp_unite_mmu.
+	 * The node name differs from isp0_mmu (iommu@fdcb7f00) so the
+	 * overlay does not merge into that node. isp0_mmu and isp1_mmu
+	 * stay disabled while this one is enabled.
+	 */
+	isp_unite_mmu: isp-unite-mmu@fdcb7f00 {
+		compatible = "rockchip,rk3588-iommu", "rockchip,rk3568-iommu";
+		reg = <0x0 0xfdcb7f00 0x0 0x100>,
+		      <0x0 0xfdcc7f00 0x0 0x100>;
+		interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH 0>,
+			     <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH 0>;
+		clocks = <&cru ACLK_ISP0>, <&cru HCLK_ISP0>,
+			 <&cru ACLK_ISP1>, <&cru HCLK_ISP1>;
+		clock-names = "aclk", "iface", "aclk_isp1", "iface_isp1";
+		power-domains = <&power RK3588_PD_ISP1>;
+		#iommu-cells = <0>;
+		rockchip,disable-mmu-reset;
+		status = "disabled";
+	};
+};

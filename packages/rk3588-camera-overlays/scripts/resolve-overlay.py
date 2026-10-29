@@ -8,7 +8,8 @@ Sensor dtbos are written against the generic labels cam_port_sensor,
 cam_port_sensor_ep, cam_port_csi_ep, and cam_port_reg. A port overlay
 exports those labels with a port number (cam_port0_sensor, ...). This
 rewrites the sensor dtbo's __fixups__ so it attaches to that port, and
-points cam_isp / cam_isp_mmu at isp0 or isp1. It also
+points cam_isp / cam_isp_mmu at isp0 or isp1. With --unite those labels
+become isp_unite / isp_unite_mmu so one camera owns both ISPs. It also
 applies the same knobs the Pi exposes: 4lane, link-frequency, rotation,
 orientation.
 """
@@ -240,7 +241,7 @@ def _fragment_nodes(root):
 
 def retarget_overlay(blob, port, isp=None, four_lane=False, link_frequency=None,
                      rotation=None, orientation=None, clock_frequency=None,
-                     addr=None):
+                     unite=False, addr=None):
     root, rsv, version = parse_fdt(blob)
     fixups = root.child("__fixups__")
     if fixups is None:
@@ -263,9 +264,14 @@ def retarget_overlay(blob, port, isp=None, four_lane=False, link_frequency=None,
         renamed.append(new)
     if not renamed:
         raise FdtError("no cam_port fixups to retarget")
-    if isp not in (0, 1):
-        raise FdtError(f"isp must be 0 or 1, got {isp}")
-    isp_names = (("cam_isp", f"isp{isp}"), ("cam_isp_mmu", f"isp{isp}_mmu"))
+    if unite:
+        if isp is not None:
+            raise FdtError("unite uses both ISPs; drop isp")
+        isp_names = (("cam_isp", "isp_unite"), ("cam_isp_mmu", "isp_unite_mmu"))
+    else:
+        if isp not in (0, 1):
+            raise FdtError(f"isp must be 0 or 1, got {isp}")
+        isp_names = (("cam_isp", f"isp{isp}"), ("cam_isp_mmu", f"isp{isp}_mmu"))
     for old, new in isp_names:
         if not fixups.rename(old, new):
             raise FdtError(f"sensor overlay is missing fixup {old}")
@@ -333,7 +339,13 @@ def main(argv=None):
     parser.add_argument("src")
     parser.add_argument("dst")
     parser.add_argument("--port", type=int, required=True)
-    parser.add_argument("--isp", type=int, choices=(0, 1), required=True)
+    isp_group = parser.add_mutually_exclusive_group(required=True)
+    isp_group.add_argument("--isp", type=int, choices=(0, 1))
+    isp_group.add_argument(
+        "--unite",
+        action="store_true",
+        help="point the sensor at isp_unite (both ISPs)",
+    )
     parser.add_argument("--four-lane", action="store_true")
     parser.add_argument("--link-frequency", type=int)
     parser.add_argument("--rotation", type=int)
@@ -357,6 +369,7 @@ def main(argv=None):
             rotation=args.rotation,
             orientation=args.orientation,
             clock_frequency=args.clock_frequency,
+            unite=args.unite,
             addr=args.addr,
         )
     except (OSError, FdtError) as exc:

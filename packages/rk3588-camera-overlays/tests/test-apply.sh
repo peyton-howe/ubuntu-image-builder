@@ -47,6 +47,9 @@ python3 "${PKG}/scripts/resolve-overlay.py" \
 python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx415.dtbo" "${WORK}/imx415-port1-addr37.dtbo" \
     --port 1 --isp 1 --addr 0x37
+python3 "${PKG}/scripts/resolve-overlay.py" \
+    "${WORK}/imx708.dtbo" "${WORK}/imx708-port0-unite.dtbo" \
+    --port 0 --unite --four-lane
 
 apply() {
     local out="$1"
@@ -98,6 +101,12 @@ apply "${WORK}/imx415-addr37.dtb" \
     "${WORK}/rk3588-isp.dtbo" \
     "${WORK}/rk3588-rock-5b-plus-port1.dtbo" \
     "${WORK}/imx415-port1-addr37.dtbo"
+apply "${WORK}/rock-unite.dtb" \
+    "${WORK}/rk3588-isp.dtbo" \
+    "${WORK}/rk3588-isp-unite.dtbo" \
+    "${WORK}/rk3588-rock-5b-plus-port0.dtbo" \
+    "${WORK}/imx708-port0-unite.dtbo"
+
 python3 - "${PKG}/scripts/resolve-overlay.py" "${WORK}" <<'PY'
 import importlib.util
 import struct
@@ -232,6 +241,24 @@ assert u32s(prop(imx415_4k90, "/i2c@4/camera-port1", "assigned-clock-rates")) ==
 for ep in ("/i2c@4/camera-port1/port/endpoint", "/csi@4/port/endpoint"):
     assert u32s(prop(imx415_4k90, ep, "data-lanes")) == (1, 2, 3, 4)
     assert u64(prop(imx415_4k90, ep, "link-frequencies")) == 1188000000
+
+unite = load("rock-unite.dtb")
+assert prop(unite, "/isp-unite@fdcb0000", "status") == b"okay\0"
+assert prop(unite, "/isp-unite@fdcb0000", "compatible") == b"rockchip,rk3588-isp-unite\0"
+assert u32s(prop(unite, "/isp-unite@fdcb0000", "reg")) == (
+    0x0, 0xFDCB0000, 0x0, 0x7F00, 0x0, 0xFDCC0000, 0x0, 0x7F00,
+)
+assert prop(unite, "/isp-unite-mmu@fdcb7f00", "status") == b"okay\0"
+assert u32s(prop(unite, "/isp-unite-mmu@fdcb7f00", "reg"))[1] == 0xFDCB7F00
+assert u32s(prop(unite, "/isp-unite-mmu@fdcb7f00", "reg"))[5] == 0xFDCC7F00
+assert prop(unite, "/isp@fdcb0000", "status") == b"disabled\0"
+assert prop(unite, "/isp@fdcc0000", "status") == b"disabled\0"
+assert prop(unite, "/iommu@fdcb7f00", "status") == b"disabled\0"
+assert prop(unite, "/iommu@fdcc7f00", "status") == b"disabled\0"
+assert u32s(prop(unite, "/i2c@3/camera-port0/port/endpoint", "data-lanes")) == (1, 2, 3, 4)
+assert u32s(prop(unite, "/isp-unite@fdcb0000", "iommus")) == (
+    phandle(unite, "/isp-unite-mmu@fdcb7f00"),
+)
 
 imx519 = load("imx519.dtb")
 assert prop(imx519, "/i2c@3/camera-port0", "compatible") == b"sony,imx519\0"
@@ -432,5 +459,85 @@ RK3588_BOARD_SHARE="${FAKE}/usr/share" \
     bash "${PKG}/scripts/apply-overlays.sh"
 grep -q 'imx708-port1-isp0.dtbo' "${FAKE}/etc/default/u-boot"
 grep -q 'imx708-port0-isp1.dtbo' "${FAKE}/etc/default/u-boot"
+
+# unite consumes both ISPs and inserts the unite device overlay.
+cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'
+RK3588_CAMERA_OVERLAYS="imx708,port0,4lane,unite"
+EOF
+RK3588_CAMERA_CONF="${FAKE}/etc/rk3588-camera/overlays.conf" \
+RK3588_U_BOOT_DEFAULT="${FAKE}/etc/default/u-boot" \
+RK3588_CAMERA_OVERLAY_DIR="${FAKE}/usr/share/rk3588-camera/overlays" \
+RK3588_CAMERA_GEN_DIR="${FAKE}/var/lib/rk3588-camera" \
+RK3588_CAMERA_RESOLVER="${FAKE}/usr/lib/rk3588-camera/resolve-overlay.py" \
+RK3588_BOARD_SHARE="${FAKE}/usr/share" \
+    bash "${PKG}/scripts/apply-overlays.sh"
+grep -q 'rk3588-isp-unite.dtbo' "${FAKE}/etc/default/u-boot"
+grep -q 'imx708-port0-4lane-unite.dtbo' "${FAKE}/etc/default/u-boot"
+test -f "${FAKE}/var/lib/rk3588-camera/imx708-port0-4lane-unite.dtbo"
+line="$(grep '^U_BOOT_FDT_OVERLAYS=' "${FAKE}/etc/default/u-boot")"
+python3 - "${line}" <<'PY'
+import sys
+line = sys.argv[1]
+order = ["rk3588-isp.dtbo", "rk3588-isp-unite.dtbo",
+         "rk3588-rock-5b-plus-port0.dtbo", "imx708-port0-4lane-unite.dtbo"]
+positions = [line.index(name) for name in order]
+assert positions == sorted(positions), line
+assert "imx708-port0-isp" not in line
+print("unite boot line passed")
+PY
+
+# unite passes addr and clock-frequency to the resolver too: check the
+# generated dtbo, not just its name.
+cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'
+RK3588_CAMERA_OVERLAYS="imx415,port0,addr=0x37,link-frequency=1188000000,clock-frequency=37125000,unite"
+EOF
+RK3588_CAMERA_CONF="${FAKE}/etc/rk3588-camera/overlays.conf" \
+RK3588_U_BOOT_DEFAULT="${FAKE}/etc/default/u-boot" \
+RK3588_CAMERA_OVERLAY_DIR="${FAKE}/usr/share/rk3588-camera/overlays" \
+RK3588_CAMERA_GEN_DIR="${FAKE}/var/lib/rk3588-camera" \
+RK3588_CAMERA_RESOLVER="${FAKE}/usr/lib/rk3588-camera/resolve-overlay.py" \
+RK3588_BOARD_SHARE="${FAKE}/usr/share" \
+    bash "${PKG}/scripts/apply-overlays.sh"
+generated="${FAKE}/var/lib/rk3588-camera/imx415-port0-link-1188000000-clk-37125000-addr-0x37-unite.dtbo"
+grep -Fq "${generated}" "${FAKE}/etc/default/u-boot"
+test "$(fdtget -t x "${generated}" /fragment@0/__overlay__ reg)" = "37"
+test "$(fdtget -t u "${generated}" /fragment@0/__overlay__ assigned-clock-rates)" = "37125000"
+echo "unite addr and clock passed"
+
+cp "${FAKE}/etc/default/u-boot" "${FAKE}/etc/default/u-boot.good"
+
+cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'
+RK3588_CAMERA_OVERLAYS="imx708,port0,unite imx708,port1"
+EOF
+set +e
+RK3588_CAMERA_CONF="${FAKE}/etc/rk3588-camera/overlays.conf" \
+RK3588_U_BOOT_DEFAULT="${FAKE}/etc/default/u-boot" \
+RK3588_CAMERA_OVERLAY_DIR="${FAKE}/usr/share/rk3588-camera/overlays" \
+RK3588_CAMERA_GEN_DIR="${FAKE}/var/lib/rk3588-camera" \
+RK3588_CAMERA_RESOLVER="${FAKE}/usr/lib/rk3588-camera/resolve-overlay.py" \
+RK3588_BOARD_SHARE="${FAKE}/usr/share" \
+    bash "${PKG}/scripts/apply-overlays.sh" >"${WORK}/unite-two.out" 2>&1
+status=$?
+set -e
+test "${status}" -ne 0
+grep -q 'only one camera can be listed' "${WORK}/unite-two.out"
+cmp "${FAKE}/etc/default/u-boot" "${FAKE}/etc/default/u-boot.good"
+
+cat > "${FAKE}/etc/rk3588-camera/overlays.conf" <<'EOF'
+RK3588_CAMERA_OVERLAYS="imx708,port0,unite,isp0"
+EOF
+set +e
+RK3588_CAMERA_CONF="${FAKE}/etc/rk3588-camera/overlays.conf" \
+RK3588_U_BOOT_DEFAULT="${FAKE}/etc/default/u-boot" \
+RK3588_CAMERA_OVERLAY_DIR="${FAKE}/usr/share/rk3588-camera/overlays" \
+RK3588_CAMERA_GEN_DIR="${FAKE}/var/lib/rk3588-camera" \
+RK3588_CAMERA_RESOLVER="${FAKE}/usr/lib/rk3588-camera/resolve-overlay.py" \
+RK3588_BOARD_SHARE="${FAKE}/usr/share" \
+    bash "${PKG}/scripts/apply-overlays.sh" >"${WORK}/unite-isp.out" 2>&1
+status=$?
+set -e
+test "${status}" -ne 0
+grep -q 'drop isp0' "${WORK}/unite-isp.out"
+cmp "${FAKE}/etc/default/u-boot" "${FAKE}/etc/default/u-boot.good"
 
 echo "all camera overlay tests passed"

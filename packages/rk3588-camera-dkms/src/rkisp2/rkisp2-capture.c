@@ -10,6 +10,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/iopoll.h>
 #include <linux/pm_runtime.h>
 #include <media/v4l2-common.h>
 #include <media/v4l2-event.h>
@@ -408,7 +409,9 @@ static void rkisp2_mp_config(struct rkisp2_capture *cap)
 		     rkisp2_pixfmt_comp_size(pixm, RKISP2_PLANE_CR));
 
 	rkisp2_write(rkisp2, ISP3X_MI_MP_WR_Y_LLENGTH, cap->stride);
-	rkisp2_write(rkisp2, ISP3X_MI_MP_WR_Y_PIC_WIDTH, pixm->width);
+	rkisp2_write_split(rkisp2, ISP3X_MI_MP_WR_Y_PIC_WIDTH,
+			   rkisp2_core_out_width(rkisp2, 0, pixm->width),
+			   rkisp2_core_out_width(rkisp2, 1, pixm->width));
 	rkisp2_write(rkisp2, ISP3X_MI_MP_WR_Y_PIC_HEIGHT, pixm->height);
 	rkisp2_write(rkisp2, ISP3X_MI_MP_WR_Y_PIC_SIZE,
 		     cap->stride * pixm->height);
@@ -469,7 +472,9 @@ static void rkisp2_sp_config(struct rkisp2_capture *cap)
 		     rkisp2_pixfmt_comp_size(pixm, RKISP2_PLANE_CR));
 
 	rkisp2_write(rkisp2, RKISP2_CIF_MI_SP_Y_LLENGTH, cap->stride);
-	rkisp2_write(rkisp2, RKISP2_CIF_MI_SP_Y_PIC_WIDTH, pixm->width);
+	rkisp2_write_split(rkisp2, RKISP2_CIF_MI_SP_Y_PIC_WIDTH,
+			   rkisp2_core_out_width(rkisp2, 0, pixm->width),
+			   rkisp2_core_out_width(rkisp2, 1, pixm->width));
 	rkisp2_write(rkisp2, RKISP2_CIF_MI_SP_Y_PIC_HEIGHT, pixm->height);
 	rkisp2_write(rkisp2, RKISP2_CIF_MI_SP_Y_PIC_SIZE, cap->stride * pixm->height);
 
@@ -645,6 +650,26 @@ static void rkisp2_dummy_buf_destroy(struct rkisp2_capture *cap)
 		       cap->buf.dummy.dma_addr, DMA_ATTR_NO_KERNEL_MAPPING);
 }
 
+/*
+ * Unite mode: each core writes part of every line. The right core's data
+ * starts where the left core's ends (see rkisp2_unite_split(), which keeps
+ * that 16 byte aligned).
+ */
+static void rkisp2_set_right_bufs(struct rkisp2_capture *cap, dma_addr_t y,
+				  dma_addr_t cb)
+{
+	const struct v4l2_format_info *info = cap->pix.info;
+	/* The cut is in visible pixels, not in the stride (which can be padded) */
+	u32 split = rkisp2_unite_split(cap->pix.fmt.width);
+	u32 y_offs = (split * info->bpp[0]) & ~0xf;
+	u32 cb_offs = ((split / info->hdiv) * info->bpp[1]) & ~0xf;
+
+	rkisp2_write_right(cap->rkisp2, cap->config->mi.y_base_ad_init,
+			   y + y_offs);
+	rkisp2_write_right(cap->rkisp2, cap->config->mi.cb_base_ad_init,
+			   cb + cb_offs);
+}
+
 static void rkisp2_set_next_buf(struct rkisp2_capture *cap)
 {
 	cap->buf.curr = cap->buf.next;
@@ -658,22 +683,27 @@ static void rkisp2_set_next_buf(struct rkisp2_capture *cap)
 
 		buff_addr = cap->buf.next->buff_addr;
 
-		rkisp2_write(cap->rkisp2, cap->config->mi.y_base_ad_init,
-			     buff_addr[RKISP2_PLANE_Y]);
+		rkisp2_write_left(cap->rkisp2, cap->config->mi.y_base_ad_init,
+				  buff_addr[RKISP2_PLANE_Y]);
 		/*
 		 * In order to support grey format we capture
 		 * YUV422 planar format from the camera and
 		 * set the U and V planes to the dummy buffer
 		 */
 		if (cap->pix.cfg->fourcc == V4L2_PIX_FMT_GREY) {
-			rkisp2_write(cap->rkisp2,
-				     cap->config->mi.cb_base_ad_init,
-				     cap->buf.dummy.dma_addr);
+			rkisp2_write_left(cap->rkisp2,
+					  cap->config->mi.cb_base_ad_init,
+					  cap->buf.dummy.dma_addr);
 		} else {
-			rkisp2_write(cap->rkisp2,
-				     cap->config->mi.cb_base_ad_init,
-				     buff_addr[RKISP2_PLANE_CB]);
+			rkisp2_write_left(cap->rkisp2,
+					  cap->config->mi.cb_base_ad_init,
+					  buff_addr[RKISP2_PLANE_CB]);
 		}
+		if (rkisp2_is_unite(cap->rkisp2))
+			rkisp2_set_right_bufs(cap, buff_addr[RKISP2_PLANE_Y],
+				cap->pix.cfg->fourcc == V4L2_PIX_FMT_GREY ?
+				cap->buf.dummy.dma_addr :
+				buff_addr[RKISP2_PLANE_CB]);
 	} else {
 		/*
 		 * Use the dummy space allocated by dma_alloc_coherent to
@@ -722,14 +752,58 @@ irqreturn_t rkisp2_capture_isr(int irq, void *ctx)
 	struct device *dev = ctx;
 	struct rkisp2_device *rkisp2 = dev_get_drvdata(dev);
 	unsigned int i;
-	u32 status;
+	u32 status, ack;
 
 	if (!rkisp2->irqs_enabled)
 		return IRQ_NONE;
 
-	status = rkisp2_read(rkisp2, RKISP2_CIF_MI_MIS);
-	if (!status)
-		return IRQ_NONE;
+	if (rkisp2->unite_base) {
+		u32 left = readl(rkisp2->base_addr + RKISP2_CIF_MI_RIS);
+		u32 frames = 0, need;
+
+		for (i = 0; i < 2; ++i)
+			frames |= RKISP2_CIF_MI_FRAME(&rkisp2->capture_devs[i]);
+
+		/*
+		 * Work from the right core and clear the left core's flags, but
+		 * only hand a buffer on once both cores have written their part
+		 * of the frame, and program the next buffers only then: the
+		 * left core's frame end can come after the right core's, and
+		 * its half would otherwise land in the wrong buffer.
+		 */
+		if (left) {
+			writel(left, rkisp2->base_addr + RKISP2_CIF_MI_ICR);
+			rkisp2->unite_left_mi |= left & frames;
+		}
+		status = readl(rkisp2->unite_base + RKISP2_CIF_MI_MIS);
+		ack = status;
+		rkisp2->unite_right_mi |= status & frames;
+		status |= rkisp2->unite_right_mi;
+		if (!status)
+			return left ? IRQ_HANDLED : IRQ_NONE;
+
+		need = status & frames & ~rkisp2->unite_left_mi;
+		if (need) {
+			if (readl_poll_timeout_atomic(rkisp2->base_addr +
+						      RKISP2_CIF_MI_RIS, left,
+						      (left & need) == need,
+						      10, 1000)) {
+				dev_err_ratelimited(rkisp2->dev,
+						    "left MI did not finish its frame\n");
+			}
+			writel(left, rkisp2->base_addr + RKISP2_CIF_MI_ICR);
+			rkisp2->unite_left_mi |= left & frames;
+		}
+		/* Keep incomplete frames pending until the left MI interrupt. */
+		status &= ~(frames & ~rkisp2->unite_left_mi);
+		rkisp2->unite_left_mi &= ~(status & frames);
+		rkisp2->unite_right_mi &= ~(status & frames);
+	} else {
+		status = rkisp2_read(rkisp2, RKISP2_CIF_MI_MIS);
+		if (!status)
+			return IRQ_NONE;
+		ack = status;
+	}
 
 	for (i = 0; i < 2; ++i) {
 		struct rkisp2_capture *cap = &rkisp2->capture_devs[i];
@@ -759,7 +833,7 @@ irqreturn_t rkisp2_capture_isr(int irq, void *ctx)
 
 	rkisp2_dmarx_isr(rkisp2, status);
 
-	rkisp2_write(rkisp2, RKISP2_CIF_MI_ICR, status);
+	writel(ack, rkisp2_irq_base(rkisp2) + RKISP2_CIF_MI_ICR);
 
 	return IRQ_HANDLED;
 }
@@ -940,6 +1014,8 @@ static void rkisp2_cap_stream_disable(struct rkisp2_capture *cap)
 	if (!ret) {
 		cap->rkisp2->debug.stop_timeout[cap->id]++;
 		cap->ops->stop(cap);
+		cap->rkisp2->unite_left_mi &= ~RKISP2_CIF_MI_FRAME(cap);
+		cap->rkisp2->unite_right_mi &= ~RKISP2_CIF_MI_FRAME(cap);
 		cap->is_stopping = false;
 		cap->is_streaming = false;
 	}
@@ -979,6 +1055,20 @@ static int rkisp2_pipeline_stream_enable(struct rkisp2_capture *cap)
 {
 	struct rkisp2_device *rkisp2 = cap->rkisp2;
 	int ret;
+
+	if (rkisp2_is_unite(rkisp2) && cap->id == RKISP2_MAINPATH) {
+		struct v4l2_subdev_format fmt = {
+			.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+			.pad = RKISP2_ISP_PAD_SINK_VIDEO_DMA_0,
+		};
+
+		ret = v4l2_subdev_call(&rkisp2->isp.sd, pad, get_fmt, NULL, &fmt);
+		if (ret)
+			return ret;
+		if (fmt.format.width != cap->pix.fmt.width ||
+		    fmt.format.height != cap->pix.fmt.height)
+			return -EPIPE;
+	}
 
 	rkisp2_cap_stream_enable(cap);
 
