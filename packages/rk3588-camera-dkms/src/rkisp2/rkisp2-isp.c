@@ -799,6 +799,7 @@ irqreturn_t rkisp2_isp_isr(int irq, void *ctx)
 {
 	struct device *dev = ctx;
 	struct rkisp2_device *rkisp2 = dev_get_drvdata(dev);
+	bool frame_complete = true;
 	u32 status, isp_err;
 
 	if (!rkisp2->irqs_enabled)
@@ -829,6 +830,7 @@ irqreturn_t rkisp2_isp_isr(int irq, void *ctx)
 						      10, 1000)) {
 				dev_err_ratelimited(rkisp2->dev,
 						    "left ISP did not finish its frame\n");
+				frame_complete = false;
 			} else {
 				writel(left, rkisp2->base_addr +
 				       RKISP2_CIF_ISP_ICR);
@@ -869,7 +871,9 @@ irqreturn_t rkisp2_isp_isr(int irq, void *ctx)
 	if (status & RKISP2_CIF_ISP_FRAME) {
 		rkisp2->debug.complete_frames++;
 		rkisp2_params_isr(&rkisp2->params);
-		rkisp2_stats_isr_eof(&rkisp2->stats);
+		/* AE lite has no done bit: only complete stats after both cores. */
+		if (frame_complete)
+			rkisp2_stats_isr_eof(&rkisp2->stats);
 	}
 
 	writel(status, rkisp2_irq_base(rkisp2) + RKISP2_CIF_ISP_ICR);

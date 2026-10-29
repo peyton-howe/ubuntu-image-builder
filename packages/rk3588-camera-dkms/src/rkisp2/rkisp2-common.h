@@ -451,6 +451,7 @@ struct rkisp2_debug {
  * @unite_left_isp: frame end flags of the left core's ISP block that were seen
  *		   and cleared but whose frame has not been handled yet
  * @unite_left_mi: same for the left core's MI (output write) block
+ * @unite_right_mi: right MI frame ends waiting for the left core to finish
  * @dev:	   a pointer to the struct device
  * @clk_size:	   number of clocks
  * @clks:	   array of clocks
@@ -479,6 +480,7 @@ struct rkisp2_device {
 	void __iomem *unite_base;
 	u32 unite_left_isp;
 	u32 unite_left_mi;
+	u32 unite_right_mi;
 	struct device *dev;
 	unsigned int clk_size;
 	struct clk_bulk_data clks[RKISP2_MAX_BUS_CLK];

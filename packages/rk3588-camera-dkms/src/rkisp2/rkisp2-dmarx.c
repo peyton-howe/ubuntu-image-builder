@@ -195,7 +195,8 @@ static int rkisp2_rawrd_try_fmt(struct rkisp2_dmarx_chan *chan,
 	pix->xfer_func = V4L2_XFER_FUNC_DEFAULT;
 
 	pix->width = clamp_t(u32, pix->width,
-				RKISP2_ISP_MIN_WIDTH,
+				rkisp2_is_unite(chan->rkisp2) ?
+				2 * RKISP2_UNITE_EXTEND_PIXEL : RKISP2_ISP_MIN_WIDTH,
 				chan->rkisp2->info->max_width);
 	pix->height = clamp_t(u32, pix->height,
 				RKISP2_ISP_MIN_HEIGHT,

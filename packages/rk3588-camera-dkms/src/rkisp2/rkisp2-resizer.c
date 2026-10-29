@@ -370,6 +370,7 @@ void rkisp2_resizer_configure(struct rkisp2_resizer *rsz,
 			      struct v4l2_rect *crop)
 {
 	bool is_raw = v4l2_is_format_bayer(rsz->source_fmt_info);
+	struct v4l2_rect full;
 
 	dev_dbg(rsz->rkisp2->dev,
 		"%s: path %d sink (%d,%d)/%dx%d, crop (%d,%d)/%dx%d, source (%d,%d)/%dx%d\n",
@@ -382,7 +383,7 @@ void rkisp2_resizer_configure(struct rkisp2_resizer *rsz,
 
 	/* Apparently dual crop works on raw (untested) but resizer does not */
 	if (rkisp2_is_unite(rsz->rkisp2)) {
-		struct v4l2_rect full = *crop;
+		full = *crop;
 
 		if (crop->left || crop->width != rsz->sink_size.width) {
 			dev_dbg(rsz->rkisp2->dev,
@@ -390,7 +391,15 @@ void rkisp2_resizer_configure(struct rkisp2_resizer *rsz,
 			full.left = 0;
 			full.width = rsz->sink_size.width;
 		}
-		rkisp2_resizer_config_dcrop_unite(rsz, is_raw, &full);
+		crop = &full;
+		if (rsz->id == RKISP2_MAINPATH &&
+		    (crop->width != rsz->source_size.width ||
+		     crop->height != rsz->source_size.height)) {
+			dev_err_ratelimited(rsz->rkisp2->dev,
+					    "unite: scaling the main-path output is not supported\n");
+			return;
+		}
+		rkisp2_resizer_config_dcrop_unite(rsz, is_raw, crop);
 	} else if (rkisp2_has_feature(rsz->rkisp2, DUAL_CROP)) {
 		if (rkisp2_rect_equals(crop, &rsz->sink_size))
 			rkisp2_resizer_disable_dcrop(rsz);
@@ -401,15 +410,6 @@ void rkisp2_resizer_configure(struct rkisp2_resizer *rsz,
 	if (crop->width == rsz->source_size.width && crop->height == rsz->source_size.height) {
 		rkisp2_resizer_disable_rsz(rsz);
 	} else {
-		/*
-		 * Each core would have to scale its own part of the line and
-		 * the two parts do not line up: expect artifacts, and some
-		 * sizes produce no frames at all. Unite mode is for streams
-		 * that do not fit on one core, at the sensor's size.
-		 */
-		if (rkisp2_is_unite(rsz->rkisp2) && rsz->id == 0)
-			dev_warn_once(rsz->rkisp2->dev,
-				      "unite: scaling the output is not supported, use the sensor size\n");
 		rkisp2_resizer_config_rsz(rsz, crop,
 					  &rsz->source_size,
 					  &rsz->source_format);

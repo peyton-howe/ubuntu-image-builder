@@ -189,6 +189,9 @@ RK3588_CAMERA_OVERLAYS="imx708,port1,isp1"
 RK3588_CAMERA_OVERLAYS="imx415,port0,addr=0x37,link-frequency=1188000000,unite"
 ```
 
+The unite example uses a 24 MHz IMX415 module and requires loading the
+`imx415` module with `allow_24mhz_2376=1`.
+
 The first camera in that list enables isp0 and its IOMMU. The second
 enables isp1. `isp0` or `isp1` on a camera overrides that. Two cameras
 cannot share an ISP. On an Orange Pi 5B, `imx708,port1 imx708,port2`
@@ -210,7 +213,7 @@ the driver puts the AE, histogram and AWB statistics of the two cores
 back together for the IPA. The vendor rkcif `TOISP_UNITE` line split is
 not used. Scaling the output and horizontal cropping are not supported in
 this mode, which is for streams that do not fit on one core, so use the
-sensor's size (the driver warns once if the main path would be scaled).
+sensor's size (the driver rejects scaled main-path output at stream start).
 Tried with an IMX415 at 3864x2192, about 94 fps, on a ROCK 5B+.
 
 `link-frequency` is in Hz. The imx708 driver accepts 447000000, 450000000
@@ -236,11 +239,13 @@ keeps unrelated overlays. To switch cameras, edit the conf and re-run the
 script. To disable them, set `RK3588_CAMERA_OVERLAYS=""` and re-run.
 
 After reboot, `cat /proc/device-tree/isp@fdcb0000/status` should print
-`okay`. The pipeline uses two media devices: `rockchip-cif` captures from the
-sensor into memory, and `rkisp2` reads the frames back through
-`rkisp2_rawrd0` for processing. Processed images need a libcamera build with
-the rkisp2 pipeline handler, which Ubuntu's libcamera doesn't have yet. Build
-it yourself for now. The upstream rkisp2 branch
+`okay` for isp0 setups. For unite setups, check
+`cat /proc/device-tree/isp-unite@fdcb0000/status` for `okay` instead;
+`isp@fdcb0000` remains disabled. The pipeline uses two media devices:
+`rockchip-cif` captures from the sensor into memory, and `rkisp2` reads the
+frames back through `rkisp2_rawrd0` for processing. Processed images need a
+libcamera build with the rkisp2 pipeline handler, which Ubuntu's libcamera
+doesn't have yet. Build it yourself for now. The upstream rkisp2 branch
 (`git.ideasonboard.com/epaul/libcamera`, `epaul/dev/rkisp2/upstream-v3`) only
 matches cameras on the csi2 port, so ROCK 5B+ cam1 (csi4) needs a libcamera
 patch until that's fixed upstream; it also creates one camera per pipeline

@@ -752,7 +752,7 @@ irqreturn_t rkisp2_capture_isr(int irq, void *ctx)
 	struct device *dev = ctx;
 	struct rkisp2_device *rkisp2 = dev_get_drvdata(dev);
 	unsigned int i;
-	u32 status;
+	u32 status, ack;
 
 	if (!rkisp2->irqs_enabled)
 		return IRQ_NONE;
@@ -776,6 +776,9 @@ irqreturn_t rkisp2_capture_isr(int irq, void *ctx)
 			rkisp2->unite_left_mi |= left & frames;
 		}
 		status = readl(rkisp2->unite_base + RKISP2_CIF_MI_MIS);
+		ack = status;
+		rkisp2->unite_right_mi |= status & frames;
+		status |= rkisp2->unite_right_mi;
 		if (!status)
 			return left ? IRQ_HANDLED : IRQ_NONE;
 
@@ -787,16 +790,19 @@ irqreturn_t rkisp2_capture_isr(int irq, void *ctx)
 						      10, 1000)) {
 				dev_err_ratelimited(rkisp2->dev,
 						    "left MI did not finish its frame\n");
-			} else {
-				writel(left, rkisp2->base_addr +
-				       RKISP2_CIF_MI_ICR);
 			}
+			writel(left, rkisp2->base_addr + RKISP2_CIF_MI_ICR);
+			rkisp2->unite_left_mi |= left & frames;
 		}
+		/* Keep incomplete frames pending until the left MI interrupt. */
+		status &= ~(frames & ~rkisp2->unite_left_mi);
 		rkisp2->unite_left_mi &= ~(status & frames);
+		rkisp2->unite_right_mi &= ~(status & frames);
 	} else {
 		status = rkisp2_read(rkisp2, RKISP2_CIF_MI_MIS);
 		if (!status)
 			return IRQ_NONE;
+		ack = status;
 	}
 
 	for (i = 0; i < 2; ++i) {
@@ -827,7 +833,7 @@ irqreturn_t rkisp2_capture_isr(int irq, void *ctx)
 
 	rkisp2_dmarx_isr(rkisp2, status);
 
-	writel(status, rkisp2_irq_base(rkisp2) + RKISP2_CIF_MI_ICR);
+	writel(ack, rkisp2_irq_base(rkisp2) + RKISP2_CIF_MI_ICR);
 
 	return IRQ_HANDLED;
 }
@@ -1008,6 +1014,8 @@ static void rkisp2_cap_stream_disable(struct rkisp2_capture *cap)
 	if (!ret) {
 		cap->rkisp2->debug.stop_timeout[cap->id]++;
 		cap->ops->stop(cap);
+		cap->rkisp2->unite_left_mi &= ~RKISP2_CIF_MI_FRAME(cap);
+		cap->rkisp2->unite_right_mi &= ~RKISP2_CIF_MI_FRAME(cap);
 		cap->is_stopping = false;
 		cap->is_streaming = false;
 	}
@@ -1047,6 +1055,20 @@ static int rkisp2_pipeline_stream_enable(struct rkisp2_capture *cap)
 {
 	struct rkisp2_device *rkisp2 = cap->rkisp2;
 	int ret;
+
+	if (rkisp2_is_unite(rkisp2) && cap->id == RKISP2_MAINPATH) {
+		struct v4l2_subdev_format fmt = {
+			.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+			.pad = RKISP2_ISP_PAD_SINK_VIDEO_DMA_0,
+		};
+
+		ret = v4l2_subdev_call(&rkisp2->isp.sd, pad, get_fmt, NULL, &fmt);
+		if (ret)
+			return ret;
+		if (fmt.format.width != cap->pix.fmt.width ||
+		    fmt.format.height != cap->pix.fmt.height)
+			return -EPIPE;
+	}
 
 	rkisp2_cap_stream_enable(cap);
 
