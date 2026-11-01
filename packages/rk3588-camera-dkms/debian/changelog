@@ -6,7 +6,7 @@ rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
     549, 750, 960 MHz) with a timing for two lanes and one for four. 4608x2592 runs
     at 27 fps (four lanes at 450 MHz), 30 fps (four lanes at 549 MHz, two lanes at 960 MHz), 22.6 fps (two
     lanes, 750 MHz) and 45 fps (four lanes, 750 MHz); 2304x1296 reaches
-    120 fps (four lanes, 549 MHz) and 179 fps (750 MHz). The PLL registers
+    120 fps (four lanes, 549 MHz) and 172 fps (750 MHz). The PLL registers
     are static values per timing and per link frequency (447, 450, 453, 549,
     750, 960 MHz). Lane rates above 1.5 Gbps warn at probe: deskew
     calibration is not enabled.

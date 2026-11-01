@@ -233,11 +233,11 @@ the same pixel rate with half the line length. Default frame rates (4608x2592,
 | below 447 MHz (fallback) | 14, 30, 30 | 14, 30, 30 |
 | 447 to 453 MHz (default 450) | 14, 30, 30 | 27, 57.6, 30 |
 | 549 MHz | 16.5, 65, 30 | 30, 120, 30 |
-| 750 MHz | 22.6, 89.5, 30 | 45, 179, 30 |
-| 960 MHz | 30, 30, 30 | 60, 60, 30 |
+| 750 MHz | 22.6, 89.5, 30 | 45, 172, 30 |
+| 960 MHz | 30, 30, 30 | 58, 55, 30 |
 
 Lowering VBLANK reaches higher rates (for 4 lanes at 450 MHz up to 108 fps for
-2304x1296 and 182 fps for 1536x864; up to 182 fps for 1536x864 and 116 and 233
+2304x1296 and 182 fps for 1536x864; up to 182 fps for 1536x864 and 116 and 213
 fps for 2304x1296 at 960 MHz). HDR stays at 30 fps. `orientation` is 0 front,
 1 rear, 2 external (default 2).
 

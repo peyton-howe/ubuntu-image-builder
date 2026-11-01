@@ -781,7 +781,7 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 			},
 			{
 				/*
-				 * The Pi timing for 2 lanes: 30 fps. 4 lanes: 60 fps.
+				 * The Pi timing for 2 lanes: 30 fps. 4 lanes: 58 fps.
 				 */
 				.link_frequency = 960000000,
 				.lanes = {
@@ -794,8 +794,8 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 					{
 						.line_length_pix = 5216,
 						.vblank_default = 58,
-						.pixel_rate = 830400000,
-						.vt_mult = 173,
+						.pixel_rate = 801600000,
+						.vt_mult = 167,
 					},
 				},
 			},
@@ -879,7 +879,10 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 				},
 			},
 			{
-				/* 2 lanes: 89.5 fps. 4 lanes: 179 fps. */
+				/*
+				 * 2 lanes: 89.5 fps. 4 lanes: 172 fps, which leaves
+				 * 0.5 us idle on the link per line.
+				 */
 				.link_frequency = 750000000,
 				.lanes = {
 					{
@@ -891,8 +894,8 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 					{
 						.line_length_pix = 2608,
 						.vblank_default = 40,
-						.pixel_rate = 624000000,
-						.vt_mult = 130,
+						.pixel_rate = 600000000,
+						.vt_mult = 125,
 					},
 				},
 			},
@@ -912,8 +915,8 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 					{
 						.line_length_pix = 2608,
 						.vblank_default = 3888,
-						.pixel_rate = 811200000,
-						.vt_mult = 169,
+						.pixel_rate = 744000000,
+						.vt_mult = 155,
 					},
 				},
 			},
