@@ -164,7 +164,7 @@ struct imx708_reg_list {
  * frequency four lanes carry twice the data, so they run the same pixel rate
  * with half the line length (or a faster one with the same line).
  */
-#define IMX708_NUM_MODE_TIMINGS		5
+#define IMX708_NUM_MODE_TIMINGS		6
 
 enum {
 	IMX708_LANES_2,
@@ -282,6 +282,8 @@ static const struct imx708_link_freq link_freqs[] = {
 	{ 750000000, 1, 250 },
 	/* Needs deskew calibration, and is only for two lanes. */
 	{ 960000000, 1, 320 },
+	/* The lowest link frequency that gives 60 fps at full resolution. */
+	{ 1002000000, 1, 334 },
 };
 
 static const struct imx708_reg mode_common_regs[] = {
@@ -799,6 +801,26 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 					},
 				},
 			},
+			{
+				/*
+				 * 2 lanes: 30 fps. 4 lanes: 60 fps, with 0.5 us idle on the link.
+				 */
+				.link_frequency = 1002000000,
+				.lanes = {
+					{
+						.line_length_pix = 10432,
+						.vblank_default = 58,
+						.pixel_rate = 830400000,
+						.vt_mult = 173,
+					},
+					{
+						.line_length_pix = 5216,
+						.vblank_default = 58,
+						.pixel_rate = 830400000,
+						.vt_mult = 173,
+					},
+				},
+			},
 		},
 		.exposure_lines_min = 8,
 		.exposure_lines_step = 1,
@@ -920,6 +942,27 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 					},
 				},
 			},
+			{
+				/*
+				 * 2 lanes: 30.7 fps by default, up to 119. 4 lanes: 57 fps by
+				 * default, up to 220.
+				 */
+				.link_frequency = 1002000000,
+				.lanes = {
+					{
+						.line_length_pix = 5216,
+						.vblank_default = 3888,
+						.pixel_rate = 830400000,
+						.vt_mult = 173,
+					},
+					{
+						.line_length_pix = 2608,
+						.vblank_default = 3888,
+						.pixel_rate = 768000000,
+						.vt_mult = 160,
+					},
+				},
+			},
 		},
 		.exposure_lines_min = 4,
 		.exposure_lines_step = 2,
@@ -1022,6 +1065,26 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 				 * The Pi timing, 30 fps by default, up to 182.
 				 */
 				.link_frequency = 960000000,
+				.lanes = {
+					{
+						.line_length_pix = 5216,
+						.vblank_default = 4627,
+						.pixel_rate = 859200000,
+						.vt_mult = 179,
+					},
+					{
+						.line_length_pix = 5216,
+						.vblank_default = 4627,
+						.pixel_rate = 859200000,
+						.vt_mult = 179,
+					},
+				},
+			},
+			{
+				/*
+				 * 30 fps by default, up to 182.
+				 */
+				.link_frequency = 1002000000,
 				.lanes = {
 					{
 						.line_length_pix = 5216,

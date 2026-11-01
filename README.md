@@ -218,7 +218,8 @@ Tried with an IMX415 at 3864x2192, about 94 fps, on a ROCK 5B+.
 
 `link-frequency` is in Hz. The imx708 driver takes two or four data lanes
 (`4lane`, the same knob the Pi has) and these link frequencies: 447000000,
-450000000 (the default), 453000000, 549000000, 750000000 and 960000000.
+450000000 (the default), 453000000, 549000000, 750000000, 960000000 and
+1002000000.
 Keep it at or below 750000000: faster lanes need D-PHY deskew calibration
 from the sensor, which this driver does not enable, and it warns at probe.
 
@@ -235,6 +236,7 @@ the same pixel rate with half the line length. Default frame rates (4608x2592,
 | 549 MHz | 16.5, 65, 30 | 30, 120, 30 |
 | 750 MHz | 22.6, 89.5, 30 | 45, 172, 30 |
 | 960 MHz | 30, 30, 30 | 58, 55, 30 |
+| 1002 MHz | 30, 30.7, 30 | 60, 57, 30 |
 
 Lowering VBLANK reaches higher rates (for 4 lanes at 450 MHz up to 108 fps for
 2304x1296 and 182 fps for 1536x864; up to 182 fps for 1536x864 and 116 and 213
