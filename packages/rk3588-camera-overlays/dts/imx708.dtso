@@ -15,8 +15,9 @@
  * The shipped imx708 driver accepts link frequencies 447000000, 450000000
  * (the default), 453000000, 549000000, 750000000, 960000000 and 1002000000,
  * and two or four data lanes. Four lanes at 549000000 or 750000000 have the bandwidth
- * for its faster mode timings. Keep lanes at or below 1.5 Gbps (750000000):
- * faster needs D-PHY deskew calibration, which the driver does not enable.
+ * for its faster mode timings. Above 1.5 Gbps (750000000) D-PHY v1.2 wants
+ * deskew calibration, which the driver does not enable; 1002000000 and below
+ * worked on the D-PHY and DCPHY ports tried.
  * resolve-overlay.py rewrites every data-lanes and link-frequencies
  * property in the overlay when those parameters are set.
  */

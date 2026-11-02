@@ -220,12 +220,16 @@ Tried with an IMX415 at 3864x2192, about 94 fps, on a ROCK 5B+.
 (`4lane`, the same knob the Pi has) and these link frequencies: 447000000,
 450000000 (the default), 453000000, 549000000, 750000000, 960000000 and
 1002000000.
-Keep it at or below 750000000: faster lanes need D-PHY deskew calibration
-from the sensor, which this driver does not enable, and it warns at probe.
+Lane rates above 1.5 Gbps (link frequencies above 750000000) are outside
+what the D-PHY v1.2 spec allows without skew calibration from the sensor,
+which this driver does not enable, so it warns at probe. Raw capture tried
+on an IMX708 at 4 lanes: 960000000 and 1002000000 (1.92 and 2.0 Gbps per
+lane) ran at the expected rates on an Orange Pi 5B CAM1 and CAM2 and a
+ROCK 5B+ CAM0. Faster links have not been tried.
 
 Each mode has a fallback timing (the Pi's) and faster ones for link
-frequencies of 447 (the 450 MHz default), 549, 750 and 960 MHz, each with a timing for two lanes and one
-for four. Four lanes carry twice the data at a given frequency, so they run
+frequencies of 447 (the 450 MHz default), 549, 750, 960 and 1002 MHz, each
+with a timing for two lanes and one for four. Four lanes carry twice the data at a given frequency, so they run
 the same pixel rate with half the line length. Default frame rates (4608x2592,
 2304x1296, 1536x864):
 

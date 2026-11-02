@@ -280,7 +280,7 @@ static const struct imx708_link_freq link_freqs[] = {
 	{ 453000000, 2, 302 },
 	{ 549000000, 2, 366 },
 	{ 750000000, 1, 250 },
-	/* Needs deskew calibration, and is only for two lanes. */
+	/* The Pi's link frequency for two lanes. Above 1.5 Gbps per lane. */
 	{ 960000000, 1, 320 },
 	/* The lowest link frequency that gives 60 fps at full resolution. */
 	{ 1002000000, 1, 334 },
