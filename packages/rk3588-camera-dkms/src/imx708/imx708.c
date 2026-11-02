@@ -1954,8 +1954,13 @@ static int imx708_start_streaming(struct imx708 *imx708)
 	ret = imx708_write_reg(imx708, IMX708_REG_LINE_LENGTH,
 			       IMX708_REG_VALUE_16BIT,
 			       imx708_get_timing(imx708)->line_length_pix);
-	if (!ret)
-		ret = imx708_pll_write(imx708);
+	if (ret) {
+		dev_err(&client->dev, "%s failed to set line length\n",
+			__func__);
+		return ret;
+	}
+
+	ret = imx708_pll_write(imx708);
 	if (ret) {
 		dev_err(&client->dev, "%s failed to set PLL registers\n",
 			__func__);
