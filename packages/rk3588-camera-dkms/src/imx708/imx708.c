@@ -256,12 +256,6 @@ static const u8 pdaf_gains[2][9] = {
 #define IMX708_OP_PRE_PLL_CLK_DIV	4
 
 /*
- * Above this lane rate a D-PHY v1.2 receiver expects deskew calibration
- * patterns from the transmitter, which this driver does not enable.
- */
-#define IMX708_DESKEW_LANE_RATE		1500000000ULL
-
-/*
  * Supported link frequencies and the IOP settings for each: the lane rate is
  * twice the link frequency, the PLL runs at lane rate x sys_div and the
  * multiplier is that over INCK / 4 = 6 MHz. sys_div keeps the PLL within
@@ -280,7 +274,6 @@ static const struct imx708_link_freq link_freqs[] = {
 	{ 453000000, 2, 302 },
 	{ 549000000, 2, 366 },
 	{ 750000000, 1, 250 },
-	/* The Pi's link frequency for two lanes. Above 1.5 Gbps per lane. */
 	{ 960000000, 1, 320 },
 	/* The lowest link frequency that gives 60 fps at full resolution. */
 	{ 1002000000, 1, 334 },
@@ -2399,11 +2392,6 @@ static int imx708_check_hwcfg(struct device *dev, struct imx708 *imx708)
 			imx708->link_frequency);
 		goto error_out;
 	}
-
-	if ((u64)imx708->link_frequency * 2 > IMX708_DESKEW_LANE_RATE)
-		dev_warn(dev,
-			 "%lld Hz link: lane rate above %llu bps without deskew calibration\n",
-			 imx708->link_frequency, IMX708_DESKEW_LANE_RATE);
 
 	ret = 0;
 
