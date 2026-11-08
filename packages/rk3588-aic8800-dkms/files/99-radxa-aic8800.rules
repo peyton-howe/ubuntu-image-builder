@@ -1,0 +1,3 @@
+# The AIC8800 module's Wi-Fi interface has a 88:00:* address; name it by slot
+# instead of letting the driver's address pick a different name each boot.
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="88:00:*", NAME="$env{ID_NET_SLOT}"

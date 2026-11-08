@@ -9,10 +9,12 @@ Debian packages installed into the rootfs on the **stock** kernel path
 | `rk3588-board-orangepi-5b` | Board glue (below), plus its own DTB (upstream DTS + kernel patch 0010 (5B WiFi/BT/eMMC) + `files/rk3588s-orangepi-5b-*.dtsi`) and the AP6275P WiFi/BT firmware |
 | `rk3588-board-orangepi-5` | Board glue, plus its own DTB (upstream DTS built with `-@` so camera overlays can apply) |
 | `rk3588-board-rock-5b-plus` | Board glue |
+| `rk3588-board-orangepi-5-max`, `-orangepi-5-plus`, `-orangepi-5-pro`, `-rock-5a`, `-rock-5b`, `-rock-5c`, `-rock-5-itx` | Board glue only (not tested on hardware) |
+| `rk3588-aic8800-dkms` | DKMS: the AIC8800 USB Wi-Fi/Bluetooth driver (`aic_load_fw`, `aic8800_fdrv`, `aic_btusb`) and its firmware, from radxa-pkg/aic8800; installed for the ROCK 5C |
 | `rk3588-camera-dkms` | DKMS: `imx708` sensor + `rkisp2` ISP (`rockchip-isp2`), plus a replacement `phy-rockchip-samsung-dcphy` with the CSI receiver for the SoC's DCPHYs |
 | `rk3588-camera-overlays` | One `.dtbo` per CSI port and per sensor (`imx708`, `imx219`, `imx519`), plus `rk3588-isp.dtbo` and `rk3588-isp-unite.dtbo`. `overlays.conf` uses Pi syntax (`imx708,port0`, or `imx708,port0,unite`); `apply-overlays.sh` bakes parameters and treats the conf as the full camera-overlay list |
 
-**Board glue**, shared by all three board packages:
+**Board glue**, shared by all the board packages:
 
 | File | Purpose |
 |---|---|

@@ -1,0 +1,23 @@
+PACKAGE_NAME="rk3588-aic8800"
+PACKAGE_VERSION="#MODULE_VERSION#"
+AUTOINSTALL="yes"
+CLEAN="make clean"
+
+# aic8800_fdrv needs aic_load_fw's symbols, so both are built in one
+# directory; aic_btusb is separate. The _usb suffix matches Radxa's packaging.
+MAKE[0]="make -C ${kernel_source_dir} M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build/aic8800 && make -C ${kernel_source_dir} M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build/aic_btusb"
+
+BUILT_MODULE_NAME[0]="aic_load_fw"
+DEST_MODULE_NAME[0]="aic_load_fw_usb"
+BUILT_MODULE_LOCATION[0]="aic8800/aic_load_fw"
+DEST_MODULE_LOCATION[0]="/updates/dkms"
+
+BUILT_MODULE_NAME[1]="aic8800_fdrv"
+DEST_MODULE_NAME[1]="aic8800_fdrv_usb"
+BUILT_MODULE_LOCATION[1]="aic8800/aic8800_fdrv"
+DEST_MODULE_LOCATION[1]="/updates/dkms"
+
+BUILT_MODULE_NAME[2]="aic_btusb"
+DEST_MODULE_NAME[2]="aic_btusb_usb"
+BUILT_MODULE_LOCATION[2]="aic_btusb"
+DEST_MODULE_LOCATION[2]="/updates/dkms"

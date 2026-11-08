@@ -215,6 +215,9 @@ if is_stock_kernel; then
     else
         echo "Warning: no board support package mapping for BOARD=${BOARD:-unset}"
     fi
+    for pkg in $(board_extra_packages "${BOARD:-}"); do
+        cp -v "${DEBS_DIR}/${pkg}_$(package_version "${pkg}")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    done
 else
     echo "[+] Custom kernel path (${KERNEL_TYPE}): staging kernel debs from ${KERNEL_DIR}"
     if compgen -G "${KERNEL_DIR}/*.deb" > /dev/null; then

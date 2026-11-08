@@ -1,0 +1,20 @@
+Source: rk3588-aic8800-dkms
+Section: kernel
+Priority: optional
+Maintainer: Peyton Howe <peyton@localhost>
+Build-Depends: debhelper-compat (= 13), dh-dkms, dkms
+Standards-Version: 4.6.2
+Homepage: https://github.com/peyton-howe/ubuntu-image-builder
+
+Package: rk3588-aic8800-dkms
+Architecture: all
+Depends: ${misc:Depends}, dkms
+Recommends: linux-headers-generic | linux-headers-virtual | linux-headers-arm64
+Description: DKMS driver and firmware for the AIC8800 USB Wi-Fi/Bluetooth module
+ Out-of-tree driver for the Aicsemi AIC8800D80 Wi-Fi and Bluetooth module
+ (USB) on the Radxa ROCK 5C, which the mainline kernel has no driver for.
+ The source is radxa-pkg/aic8800 with its kernel 7.x build fixes applied
+ (see README.md), plus the module's firmware for /lib/firmware/aic8800_fw/USB.
+ .
+ Headers are only recommended: the image build installs headers matching
+ each installed kernel.

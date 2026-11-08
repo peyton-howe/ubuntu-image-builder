@@ -24,6 +24,14 @@ PACKAGES=(
     rk3588-board-orangepi-5
     rk3588-board-orangepi-5b
     rk3588-board-rock-5b-plus
+    rk3588-board-orangepi-5-max
+    rk3588-board-orangepi-5-plus
+    rk3588-board-orangepi-5-pro
+    rk3588-board-rock-5a
+    rk3588-board-rock-5b
+    rk3588-board-rock-5c
+    rk3588-board-rock-5-itx
+    rk3588-aic8800-dkms
 )
 
 if [[ $# -gt 0 ]]; then

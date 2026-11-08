@@ -84,6 +84,21 @@ board_support_package() {
         orangepi-5) echo "rk3588-board-orangepi-5" ;;
         orangepi-5b) echo "rk3588-board-orangepi-5b" ;;
         rock-5b-plus) echo "rk3588-board-rock-5b-plus" ;;
+        orangepi-5-max) echo "rk3588-board-orangepi-5-max" ;;
+        orangepi-5-plus) echo "rk3588-board-orangepi-5-plus" ;;
+        orangepi-5-pro) echo "rk3588-board-orangepi-5-pro" ;;
+        rock-5a) echo "rk3588-board-rock-5a" ;;
+        rock-5b) echo "rk3588-board-rock-5b" ;;
+        rock-5c) echo "rk3588-board-rock-5c" ;;
+        rock-5-itx) echo "rk3588-board-rock-5-itx" ;;
+        *) echo "" ;;
+    esac
+}
+
+# Extra packages a board needs beyond its board package (empty if none).
+board_extra_packages() {
+    case "${1:-}" in
+        rock-5c) echo "rk3588-aic8800-dkms" ;;
         *) echo "" ;;
     esac
 }
@@ -105,6 +120,7 @@ package_version() {
 stock_packages() {
     echo rk3588-camera-overlays rk3588-camera-dkms
     board_support_package "${1:-${BOARD:-}}"
+    board_extra_packages "${1:-${BOARD:-}}"
 }
 
 # True when build/debs has package $1 at its current changelog version, so a
