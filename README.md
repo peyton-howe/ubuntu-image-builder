@@ -21,7 +21,8 @@ are still available for development.
 | Radxa ROCK 5C | `rock-5c` | Builds; not tested on hardware. Onboard AIC8800 Wi-Fi/BT via Radxa's prebuilt `aic8800-usb-dkms` and `aic8800-firmware` .debs (the build downloads them; they compile against 7.3.0-9) |
 | Radxa ROCK 5 ITX | `rock-5-itx` | Builds; not tested on hardware |
 
-The boards that are not tested have no camera port overlays. eMMC is enabled in
+The boards that are not tested have no camera port overlays, except the Orange Pi
+5 Max, 5 Plus and 5 Pro (see [Cameras](#cameras)). eMMC is enabled in
 the stock kernel's device tree on all of them. Onboard WiFi/BT works out of the
 box on the Orange Pi 5 Pro (AP6256; its package ships the firmware, as the 5B's
 does) and the ROCK 5C (AIC8800 over USB, with an out-of-tree DKMS driver). The
@@ -195,6 +196,9 @@ The port number is the CAM number on the board:
 | Board | Ports |
 |---|---|
 | Orange Pi 5 / 5B | `port1` (CAM1), `port2` (CAM2), `port3` (CAM3) |
+| Orange Pi 5 Max | `port0` (CAM0), `port1` (CAM1), `port2` (CAM2) |
+| Orange Pi 5 Plus | `port1` (CAM1) |
+| Orange Pi 5 Pro | `port1` (CAM1), `port2` (CAM2) |
 | ROCK 5B+ | `port0` (CAM0), `port1` (CAM1) |
 
 Two cameras, or a Pi-style link-frequency override:
@@ -306,6 +310,7 @@ the sensor can resolve `cam_portN_*`. Overlays also need the base DTB to have
 | Orange Pi 5B | Packaged (built with `-@`) | port1 tested on hardware (as the old cam1 IMX708 overlay); port2 (CAM2) and port3 (CAM3) tested on hardware |
 | ROCK 5B+ | Ubuntu's (has `__symbols__`, since upstream ships overlays for it) | port0 and port1 together; tested on hardware as the old cam0/cam1 overlays. ISP follows list order now |
 | Orange Pi 5 | Packaged (built with `-@`) | port1/port2/port3 can apply; not tested on hardware |
+| Orange Pi 5 Max, 5 Plus, 5 Pro | Packaged (built with `-@`) | Pins from Orange Pi's vendor tree; the ports apply to the packaged DTBs, not tested on hardware |
 
 The generated sensor overlay enables the chosen ISP and leaves capture on
 VICAP. It does not wire CSI straight into the ISP (that needed the

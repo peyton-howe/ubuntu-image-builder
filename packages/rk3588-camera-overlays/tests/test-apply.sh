@@ -594,4 +594,49 @@ test "${status}" -ne 0
 grep -q 'drop isp0' "${WORK}/unite-isp.out"
 cmp "${FAKE}/etc/default/u-boot" "${FAKE}/etc/default/u-boot.good"
 
+# Orange Pi 5 Max / 5 Plus / 5 Pro: the board package directory selects the
+# port overlays, each board has its own set of connectors, and the shorter
+# orangepi-5 name must not take over.
+run_board() {
+    local root="$1" conf="$2"
+    RK3588_CAMERA_CONF="${conf}" \
+    RK3588_U_BOOT_DEFAULT="${root}/etc/default/u-boot" \
+    RK3588_CAMERA_OVERLAY_DIR="${FAKE}/usr/share/rk3588-camera/overlays" \
+    RK3588_CAMERA_GEN_DIR="${root}/var/lib/rk3588-camera" \
+    RK3588_CAMERA_RESOLVER="${FAKE}/usr/lib/rk3588-camera/resolve-overlay.py" \
+    RK3588_BOARD_SHARE="${root}/usr/share" \
+        bash "${PKG}/scripts/apply-overlays.sh"
+}
+for board_case in \
+    "orangepi-5-max:rk3588-orangepi-5-max:0 1 2:3" \
+    "orangepi-5-plus:rk3588-orangepi-5-plus:1:2" \
+    "orangepi-5-pro:rk3588s-orangepi-5-pro:1 2:3"; do
+    IFS=: read -r bname bprefix bports bmissing <<< "${board_case}"
+    broot="${WORK}/root-${bname}"
+    mkdir -p "${broot}/usr/share/rk3588-board-${bname}" "${broot}/etc/default" "${broot}/etc/rk3588-camera"
+    : > "${broot}/etc/default/u-boot"
+    # Several cameras, one per connector, each on its own ISP where there is one.
+    specs=""
+    n=0
+    for port in ${bports}; do
+        specs+="imx708,port${port},isp$((n % 2)) "
+        n=$((n + 1))
+        [[ ${n} -ge 2 ]] && break
+    done
+    printf 'RK3588_CAMERA_OVERLAYS="%s"\n' "${specs% }" > "${broot}/etc/rk3588-camera/overlays.conf"
+    run_board "${broot}" "${broot}/etc/rk3588-camera/overlays.conf"
+    first="${bports%% *}"
+    grep -q "/${bprefix}-port${first}.dtbo" "${broot}/etc/default/u-boot"
+    # A connector the board does not have is rejected.
+    printf 'RK3588_CAMERA_OVERLAYS="imx708,port%s"\n' "${bmissing}" \
+        > "${broot}/etc/rk3588-camera/overlays.conf"
+    set +e
+    run_board "${broot}" "${broot}/etc/rk3588-camera/overlays.conf" >"${WORK}/bad-port.out" 2>&1
+    status=$?
+    set -e
+    test "${status}" -ne 0
+    grep -q "has no port${bmissing}" "${WORK}/bad-port.out"
+done
+echo "orange pi 5 max/plus/pro port selection passed"
+
 echo "all camera overlay tests passed"
