@@ -1,8 +1,0 @@
-rk3588-aic8800-dkms (0.1.0-1) UNRELEASED; urgency=medium
-
-  * Initial package: the AIC8800 USB Wi-Fi and Bluetooth drivers
-    (aic_load_fw, aic8800_fdrv, aic_btusb) from radxa-pkg/aic8800 at commit
-    e31c031 with its Linux 7.x build fixes, built against Ubuntu 7.3.0-9, for
-    the Radxa ROCK 5C. Depends on Radxa's aic8800-firmware package.
-
- -- Peyton Howe <peyton@localhost>  Sun, 08 Nov 2026 12:00:00 +0000

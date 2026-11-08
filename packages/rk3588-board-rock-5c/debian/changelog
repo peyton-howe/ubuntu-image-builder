@@ -4,6 +4,8 @@ rk3588-board-rock-5c (0.1.0-1) UNRELEASED; urgency=medium
     kernel for U-Boot booti, register the board with flash-kernel, boot the
     stock kernel's own DTB, load the Rockchip MMC drivers in the initramfs
     and enable panthor GPU profiling.
-  * Recommend rk3588-aic8800-dkms, the driver for the onboard AIC8800 Wi-Fi/BT.
+  * Rename the onboard AIC8800 Wi-Fi interface by slot (udev rule). The driver
+    and firmware are Radxa's aic8800-usb-dkms and aic8800-firmware .debs,
+    which the image build downloads.
 
  -- Peyton Howe <peyton@localhost>  Sun, 08 Nov 2026 12:00:00 +0000

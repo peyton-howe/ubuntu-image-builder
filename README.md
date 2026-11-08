@@ -18,7 +18,7 @@ are still available for development.
 | Orange Pi 5 Pro | `orangepi-5-pro` | Builds; not tested on hardware. U-Boot gets a Pro defconfig, device tree and Ethernet driver from patches carried in `patches/u-boot/orangepi-5-pro/` (from Armbian) |
 | Radxa ROCK 5A | `rock-5a` | Builds; not tested on hardware |
 | Radxa ROCK 5B | `rock-5b` | Builds; not tested on hardware |
-| Radxa ROCK 5C | `rock-5c` | Builds; not tested on hardware. Onboard AIC8800 Wi-Fi/BT via the `rk3588-aic8800-dkms` package (compiles against 7.3.0-9) |
+| Radxa ROCK 5C | `rock-5c` | Builds; not tested on hardware. Onboard AIC8800 Wi-Fi/BT via Radxa's prebuilt `aic8800-usb-dkms` and `aic8800-firmware` .debs (the build downloads them; they compile against 7.3.0-9) |
 | Radxa ROCK 5 ITX | `rock-5-itx` | Builds; not tested on hardware |
 
 The boards that are not tested have no camera port overlays. eMMC is enabled in

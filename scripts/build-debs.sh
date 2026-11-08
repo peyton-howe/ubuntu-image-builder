@@ -31,20 +31,11 @@ PACKAGES=(
     rk3588-board-rock-5b
     rk3588-board-rock-5c
     rk3588-board-rock-5-itx
-    rk3588-aic8800-dkms
 )
 
 if [[ $# -gt 0 ]]; then
     PACKAGES=("$@")
 fi
-
-# rk3588-aic8800-dkms depends on Radxa's firmware .deb, which is downloaded
-# rather than built from packages/.
-for name in "${PACKAGES[@]}"; do
-    if [[ ${name} == rk3588-aic8800-dkms ]]; then
-        "${REPO_ROOT}/scripts/fetch-aic8800-firmware.sh"
-    fi
-done
 
 produced=()
 for name in "${PACKAGES[@]}"; do

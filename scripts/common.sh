@@ -95,10 +95,11 @@ board_support_package() {
     esac
 }
 
-# Extra packages a board needs beyond its board package (empty if none).
-board_extra_packages() {
+# Prebuilt .debs a board needs besides its board package, downloaded into
+# build/debs/ by scripts/fetch-aic8800-debs.sh (empty if none).
+board_fetched_debs() {
     case "${1:-}" in
-        rock-5c) echo "rk3588-aic8800-dkms" ;;
+        rock-5c) echo "aic8800-firmware aic8800-usb-dkms" ;;
         *) echo "" ;;
     esac
 }
@@ -120,7 +121,6 @@ package_version() {
 stock_packages() {
     echo rk3588-camera-overlays rk3588-camera-dkms
     board_support_package "${1:-${BOARD:-}}"
-    board_extra_packages "${1:-${BOARD:-}}"
 }
 
 # True when build/debs has package $1 at its current changelog version, so a
