@@ -12,5 +12,8 @@ under the names upstream `brcmfmac` and `hci_bcm` ask for.
 | `brcmfmac43456-sdio.xunlong,orangepi-5-pro.txt` | `brcm/brcmfmac43456-sdio.txt` (the AP6256 nvram; the board-specific name keeps it from being used by other BCM43456 boards) |
 | `BCM4345C5.hcd` | `brcm/BCM4345C5.hcd` |
 
+The package also links `brcmfmac43456-sdio.xunlong,orangepi-5-pro.bin` to the
+generic `.bin`, as Armbian does.
+
 To refresh, copy the same paths from a newer armbian/firmware checkout and
 update the commit above.

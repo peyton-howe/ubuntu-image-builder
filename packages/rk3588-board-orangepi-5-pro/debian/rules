@@ -28,3 +28,6 @@ override_dh_auto_install:
 	# AP6256 WiFi/BT firmware, vendored from armbian/firmware (see firmware/README.md).
 	install -d debian/$(PKG)/lib/firmware/brcm
 	install -m 0644 firmware/brcm/* debian/$(PKG)/lib/firmware/brcm/
+	# brcmfmac asks for the board-specific name first (Armbian links it too).
+	ln -s brcmfmac43456-sdio.bin \
+		debian/$(PKG)/lib/firmware/brcm/brcmfmac43456-sdio.xunlong,orangepi-5-pro.bin

@@ -15,7 +15,7 @@ are still available for development.
 | Radxa ROCK 5B+ | `rock-5b-plus` | Tested: boot, WiFi/BT out of the box, status LED, IMX708 on cam0 and cam1 |
 | Orange Pi 5 Max | `orangepi-5-max` | Builds; not tested on hardware |
 | Orange Pi 5 Plus | `orangepi-5-plus` | Builds; not tested on hardware |
-| Orange Pi 5 Pro | `orangepi-5-pro` | Builds; not tested on hardware. Uses the Orange Pi 5 U-Boot defconfig, because U-Boot has none for the Pro |
+| Orange Pi 5 Pro | `orangepi-5-pro` | Builds; not tested on hardware. U-Boot gets a Pro defconfig, device tree and Ethernet driver from patches carried in `patches/u-boot/orangepi-5-pro/` (from Armbian) |
 | Radxa ROCK 5A | `rock-5a` | Builds; not tested on hardware |
 | Radxa ROCK 5B | `rock-5b` | Builds; not tested on hardware |
 | Radxa ROCK 5C | `rock-5c` | Builds; not tested on hardware. Onboard AIC8800 Wi-Fi/BT via the `rk3588-aic8800-dkms` package (compiles against 7.3.0-9) |
