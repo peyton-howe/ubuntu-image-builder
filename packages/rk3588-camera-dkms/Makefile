@@ -6,3 +6,4 @@ obj-m += rkisp2/
 obj-m += dcphy/
 obj-m += rkcif/
 obj-m += imx415/
+obj-m += imx519/
