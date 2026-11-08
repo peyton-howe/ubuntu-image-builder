@@ -1,6 +1,10 @@
 # rkisp2: the 4416x3312 limit on processed (ISP) streams
 
-**Status: not fixed.** Observed on a ROCK 5B+ with an IMX708, stock Ubuntu
+**Status: fixed in the sources, not yet run on hardware.** The kernel's
+main-path limit and libcamera's `ispMaxSize` are both 4672x3504 now (the second
+fix below), so the 4608x2592 mode can be selected for a processed stream and
+a full-size processed output is possible. The rest of this note describes the
+problem as it was first seen, on a ROCK 5B+ with an IMX708, stock Ubuntu
 7.3.0-9 kernel, `rk3588-camera-dkms` 0.1.11, libcamera `rkisp2-upstream`.
 
 ## Symptom
@@ -53,7 +57,7 @@ Any processed output that needs the 4608x2592 sensor mode, which for the
 IMX708 means every size above 2304x1296. Full resolution is only usable as
 raw.
 
-## Possible fixes
+## Fixes (the second one was applied)
 
 1. **libcamera only.** Use the ISP *input* limit (4672x3504) as the maximum
    when choosing the sensor mode, and keep 4416x3312 as the output cap. That
