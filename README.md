@@ -244,7 +244,8 @@ fps for 2304x1296 at 960 MHz). HDR stays at 30 fps. `orientation` is 0 front,
 Sensors shipped: `imx708` (the DKMS driver), `ov5647` (Raspberry Pi Camera v1;
 needs the kernel's ov5647 module; two lanes at 218.75 MHz, and the overlay sets
 the 25 MHz input clock that driver requires), `imx219` (mainline binding;
-needs the kernel's imx219 module), `imx519` (Raspberry Pi binding, two lanes at 408 MHz; the
+needs the kernel's imx219 module; two lanes at 456 MHz, or four with
+`4lane,link-frequency=364000000`, the only rate its driver takes on four lanes), `imx519` (Raspberry Pi binding, two lanes at 408 MHz; the
 `rk3588-camera-dkms` imx519 module), `imx415` (Radxa Camera 4K at 0x1a; Raspberry Pi modules such
 as Arducam's B0569 answer at 0x37, so use `addr=0x37`. Needs the kernel's imx415 module.
 Four lanes at 720 MHz, 3864x2192 at about 60 fps. `link-frequency=360000000`
