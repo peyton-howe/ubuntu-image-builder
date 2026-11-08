@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * OmniVision OV5647 (Raspberry Pi Camera v1), attached like the Pi
+ * overlay: ov5647,port0
+ *
+ * Same port labels and parameters as imx708.dtso. Mainline's ov5647
+ * binding uses avdd/dovdd/dvdd and reg 0x36, and the driver only accepts
+ * a 25 MHz input clock (the port overlays default to 24 MHz, so this one
+ * sets 25 MHz itself; clock-frequency= still replaces it). The sensor has
+ * two lanes and the driver's two link frequencies are 218.75 MHz (full
+ * size modes) and 145.83 MHz (VGA); the clock is continuous. This repo
+ * does not build an ov5647 driver; use the one in the kernel.
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	fragment@0 {
+		target = <&cam_port_sensor>;
+		__overlay__ {
+			compatible = "ovti,ov5647";
+			reg = <0x36>;
+			status = "okay";
+			clock-names = "xclk";
+			assigned-clock-rates = <25000000>;
+			orientation = <2>;
+			avdd-supply = <&cam_port_reg>;
+			dovdd-supply = <&cam_port_reg>;
+			dvdd-supply = <&cam_port_reg>;
+		};
+	};
+
+	fragment@1 {
+		target = <&cam_port_sensor_ep>;
+		__overlay__ {
+			data-lanes = <1 2>;
+			link-frequencies = /bits/ 64 <218750000>;
+		};
+	};
+
+	fragment@2 {
+		target = <&cam_port_csi_ep>;
+		__overlay__ {
+			data-lanes = <1 2>;
+			link-frequencies = /bits/ 64 <218750000>;
+		};
+	};
+
+#include "sensor-isp.dtsi"
+};

@@ -4,8 +4,9 @@
  *
  * Same port labels and parameters as imx708.dtso. Mainline's imx219
  * binding uses VANA/VDIG/VDDL and reg 0x10. The default link frequency
- * is 456 MHz. This repo does not build an imx219 driver; use the one
- * in the kernel.
+ * is 456 MHz for two lanes. The driver also takes four lanes, but only
+ * at 364 MHz, so use imx219,portN,4lane,link-frequency=364000000. This
+ * repo does not build an imx219 driver; use the one in the kernel.
  */
 
 /dts-v1/;

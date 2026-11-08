@@ -3,7 +3,8 @@
  * Sony IMX519 (Raspberry Pi / Arducam binding), attached as imx519,port0.
  *
  * Same port labels and parameters as imx708.dtso. Default link frequency
- * is 408 MHz, matching the Pi overlay. No imx519 driver is packaged here.
+ * is 408 MHz, matching the Pi overlay, and the only one the driver accepts
+ * (two lanes, 24 MHz clock). The driver comes from rk3588-camera-dkms.
  */
 
 /dts-v1/;

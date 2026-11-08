@@ -52,6 +52,14 @@ rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
     present a buffer with a pitch that is not aligned (one error per frame in
     a GTK dmabuf preview of the IMX415). Sizes that already are aligned do not
     change.
+  * Add an imx519 module (Arducam's 16 MP IMX519, which the kernel has no
+    driver for): Raspberry Pi's driver from raspberrypi/linux rpi-6.12.y, two
+    lanes at 408 MHz and a 24 MHz sensor clock, without its embedded
+    metadata pad. Not packaged in the kernel, so it installs under
+    updates/dkms like the others.
+  * Add an imx477 module for the Raspberry Pi High Quality Camera, also from
+    raspberrypi/linux rpi-6.12.y without the metadata pad: two lanes and a
+    24 MHz sensor clock, at 450 MHz by default.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
