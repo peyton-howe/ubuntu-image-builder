@@ -34,6 +34,8 @@ python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx219.dtbo" "${WORK}/imx219-port0-4lane.dtbo" \
     --port 0 --isp 0 --four-lane --link-frequency 364000000
 python3 "${PKG}/scripts/resolve-overlay.py" \
+    "${WORK}/imx477.dtbo" "${WORK}/imx477-port1.dtbo" --port 1 --isp 0
+python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx708.dtbo" "${WORK}/imx708-port1.dtbo" --port 1 --isp 0
 python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx708.dtbo" "${WORK}/imx708-port1-isp1.dtbo" --port 1 --isp 1
@@ -101,6 +103,10 @@ apply "${WORK}/imx219-4lane.dtb" \
     "${WORK}/rk3588-isp.dtbo" \
     "${WORK}/rk3588-rock-5b-plus-port0.dtbo" \
     "${WORK}/imx219-port0-4lane.dtbo"
+apply "${WORK}/imx477.dtb" \
+    "${WORK}/rk3588-isp.dtbo" \
+    "${WORK}/rk3588-rock-5b-plus-port1.dtbo" \
+    "${WORK}/imx477-port1.dtbo"
 apply "${WORK}/ov5647.dtb" \
     "${WORK}/rk3588-isp.dtbo" \
     "${WORK}/rk3588-rock-5b-plus-port0.dtbo" \
@@ -291,6 +297,13 @@ assert prop(imx219_4, "/i2c@3/camera-port0", "compatible") == b"sony,imx219\0"
 for ep in ("/i2c@3/camera-port0/port/endpoint", "/csi@2/port/endpoint"):
     assert u32s(prop(imx219_4, ep, "data-lanes")) == (1, 2, 3, 4)
     assert u64(prop(imx219_4, ep, "link-frequencies")) == 364000000
+
+imx477 = load("imx477.dtb")
+assert prop(imx477, "/i2c@4/camera-port1", "compatible") == b"sony,imx477\0"
+assert prop(imx477, "/i2c@4/camera-port1", "reg") == struct.pack(">I", 0x1A)
+for ep in ("/i2c@4/camera-port1/port/endpoint", "/csi@4/port/endpoint"):
+    assert u32s(prop(imx477, ep, "data-lanes")) == (1, 2)
+    assert u64(prop(imx477, ep, "link-frequencies")) == 450000000
 
 ov5647 = load("ov5647.dtb")
 assert prop(ov5647, "/i2c@3/camera-port0", "compatible") == b"ovti,ov5647\0"
