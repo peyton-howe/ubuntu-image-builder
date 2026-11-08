@@ -17,8 +17,11 @@ ROCK 5C. The mainline kernel has no driver for it.
 
 ## Firmware
 
-`firmware/` is the `aic8800D80`, `aic8800D80N` and `aic8800D80X2` directories from the same
-commit, installed to `/lib/firmware/aic8800_fw/USB/` (the path the patched driver reads).
-The other AIC8800 chip families are not included.
+Not vendored here. The package depends on Radxa's `aic8800-firmware` .deb
+(release `5.0+git20260123.5f7be68d-10` of radxa-pkg/aic8800), which installs
+the files to `/lib/firmware/aic8800_fw/USB/`, the path the patched driver reads.
+`scripts/fetch-aic8800-firmware.sh` downloads it into `build/debs/`, pinned by
+release asset and SHA-256, and the ROCK 5C image build installs it with this
+package. To update it, change the version, asset id and checksum in that script.
 
 To refresh, repeat the steps above with a newer radxa-pkg/aic8800 checkout.

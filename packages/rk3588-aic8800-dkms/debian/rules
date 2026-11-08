@@ -19,9 +19,6 @@ override_dh_auto_install:
 	cp -a src/aic_btusb $(DEST)/aic_btusb
 	cp -a debian/$(PKG).dkms $(DEST)/dkms.conf
 	sed -i 's/#MODULE_VERSION#/$(VERSION)/' $(DEST)/dkms.conf
-	# Firmware for the driver's USB path (CONFIG_PLATFORM_UBUNTU).
-	install -d debian/$(PKG)/lib/firmware/aic8800_fw/USB
-	cp -a firmware/. debian/$(PKG)/lib/firmware/aic8800_fw/USB/
 	install -d debian/$(PKG)/usr/lib/udev/rules.d
 	install -m 0644 files/99-radxa-aic8800.rules \
 		debian/$(PKG)/usr/lib/udev/rules.d/99-radxa-aic8800.rules

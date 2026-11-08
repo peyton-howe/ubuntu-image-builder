@@ -38,6 +38,14 @@ if [[ $# -gt 0 ]]; then
     PACKAGES=("$@")
 fi
 
+# rk3588-aic8800-dkms depends on Radxa's firmware .deb, which is downloaded
+# rather than built from packages/.
+for name in "${PACKAGES[@]}"; do
+    if [[ ${name} == rk3588-aic8800-dkms ]]; then
+        "${REPO_ROOT}/scripts/fetch-aic8800-firmware.sh"
+    fi
+done
+
 produced=()
 for name in "${PACKAGES[@]}"; do
     src="${REPO_ROOT}/packages/${name}"

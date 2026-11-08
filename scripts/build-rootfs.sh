@@ -217,6 +217,11 @@ if is_stock_kernel; then
     fi
     for pkg in $(board_extra_packages "${BOARD:-}"); do
         cp -v "${DEBS_DIR}/${pkg}_$(package_version "${pkg}")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+        if [[ ${pkg} == rk3588-aic8800-dkms ]]; then
+            # Not built from packages/: Radxa's firmware .deb, which the driver depends on.
+            "${ROOT_DIR}/scripts/fetch-aic8800-firmware.sh"
+            cp -v "${DEBS_DIR}"/aic8800-firmware_*_all.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+        fi
     done
 else
     echo "[+] Custom kernel path (${KERNEL_TYPE}): staging kernel debs from ${KERNEL_DIR}"

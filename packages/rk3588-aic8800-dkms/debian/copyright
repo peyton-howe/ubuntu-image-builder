@@ -6,10 +6,6 @@ Files: src/*
 Copyright: Aicsemi / RivieraWaves and contributors, patches Radxa Computer Co., Ltd
 License: GPL-2
 
-Files: firmware/*
-Copyright: Aicsemi
-License: Redistributable firmware, as shipped by radxa-pkg/aic8800
-
 Files: debian/* files/*
 Copyright: 2026 Peyton Howe
 License: GPL-2.0-only
