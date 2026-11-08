@@ -60,6 +60,10 @@ rk3588-camera-dkms (0.1.4-1) UNRELEASED; urgency=medium
   * Add an imx477 module for the Raspberry Pi High Quality Camera, also from
     raspberrypi/linux rpi-6.12.y without the metadata pad: two lanes and a
     24 MHz sensor clock, at 450 MHz by default.
+  * rkisp2: raise the main path output limit from 4416x3312, the rkisp1
+    resizer maximum, to 4672x3504, the ISP input limit and the value
+    Rockchip's driver uses on the RK3588. Together with the same change in
+    libcamera, a processed stream can use the full resolution sensor mode.
 
  -- Peyton Howe <peyton@localhost>  Sun, 18 Oct 2026 12:00:00 +0000
 
