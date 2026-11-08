@@ -241,7 +241,9 @@ Lowering VBLANK reaches higher rates (for 4 lanes at 450 MHz up to 108 fps for
 fps for 2304x1296 at 960 MHz). HDR stays at 30 fps. `orientation` is 0 front,
 1 rear, 2 external (default 2).
 
-Sensors shipped: `imx708` (the DKMS driver), `imx219` (mainline binding;
+Sensors shipped: `imx708` (the DKMS driver), `ov5647` (Raspberry Pi Camera v1;
+needs the kernel's ov5647 module; two lanes at 218.75 MHz, and the overlay sets
+the 25 MHz input clock that driver requires), `imx219` (mainline binding;
 needs the kernel's imx219 module), `imx519` (Raspberry Pi binding; no driver
 in this repo), `imx415` (Radxa Camera 4K at 0x1a; Raspberry Pi modules such
 as Arducam's B0569 answer at 0x37, so use `addr=0x37`. Needs the kernel's imx415 module.

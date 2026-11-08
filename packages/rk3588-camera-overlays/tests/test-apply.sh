@@ -39,6 +39,11 @@ python3 "${PKG}/scripts/resolve-overlay.py" \
 python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx519.dtbo" "${WORK}/imx519-port0.dtbo" --port 0 --isp 0
 python3 "${PKG}/scripts/resolve-overlay.py" \
+    "${WORK}/ov5647.dtbo" "${WORK}/ov5647-port0.dtbo" --port 0 --isp 0
+python3 "${PKG}/scripts/resolve-overlay.py" \
+    "${WORK}/ov5647.dtbo" "${WORK}/ov5647-port0-24mhz.dtbo" \
+    --port 0 --isp 0 --clock-frequency 24000000
+python3 "${PKG}/scripts/resolve-overlay.py" \
     "${WORK}/imx415.dtbo" "${WORK}/imx415-port1-30fps.dtbo" \
     --port 1 --isp 1 --link-frequency 360000000
 python3 "${PKG}/scripts/resolve-overlay.py" \
@@ -89,6 +94,14 @@ apply "${WORK}/imx519.dtb" \
     "${WORK}/rk3588-isp.dtbo" \
     "${WORK}/rk3588-rock-5b-plus-port0.dtbo" \
     "${WORK}/imx519-port0.dtbo"
+apply "${WORK}/ov5647.dtb" \
+    "${WORK}/rk3588-isp.dtbo" \
+    "${WORK}/rk3588-rock-5b-plus-port0.dtbo" \
+    "${WORK}/ov5647-port0.dtbo"
+apply "${WORK}/ov5647-24mhz.dtb" \
+    "${WORK}/rk3588-isp.dtbo" \
+    "${WORK}/rk3588-rock-5b-plus-port0.dtbo" \
+    "${WORK}/ov5647-port0-24mhz.dtbo"
 apply "${WORK}/imx415.dtb" \
     "${WORK}/rk3588-isp.dtbo" \
     "${WORK}/rk3588-rock-5b-plus-port1.dtbo" \
@@ -264,6 +277,20 @@ imx519 = load("imx519.dtb")
 assert prop(imx519, "/i2c@3/camera-port0", "compatible") == b"sony,imx519\0"
 assert prop(imx519, "/i2c@3/camera-port0", "reg") == struct.pack(">I", 0x1A)
 assert u64(prop(imx519, "/i2c@3/camera-port0/port/endpoint", "link-frequencies")) == 408000000
+
+ov5647 = load("ov5647.dtb")
+assert prop(ov5647, "/i2c@3/camera-port0", "compatible") == b"ovti,ov5647\0"
+assert prop(ov5647, "/i2c@3/camera-port0", "reg") == struct.pack(">I", 0x36)
+# The driver rejects any clock but 25 MHz, so the sensor overlay wins over the
+# port's 24 MHz unless clock-frequency says otherwise.
+assert u32s(prop(ov5647, "/i2c@3/camera-port0", "assigned-clock-rates")) == (25000000,)
+for ep in ("/i2c@3/camera-port0/port/endpoint", "/csi@2/port/endpoint"):
+    assert u32s(prop(ov5647, ep, "data-lanes")) == (1, 2)
+    assert u64(prop(ov5647, ep, "link-frequencies")) == 218750000
+    assert ov5647.find(ep).get("clock-noncontinuous") is None
+assert prop(ov5647, "/isp@fdcb0000", "status") == b"okay\0"
+ov5647_24 = load("ov5647-24mhz.dtb")
+assert u32s(prop(ov5647_24, "/i2c@3/camera-port0", "assigned-clock-rates")) == (24000000,)
 
 print("overlay apply checks passed")
 PY

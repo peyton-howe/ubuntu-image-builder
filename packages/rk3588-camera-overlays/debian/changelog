@@ -2,7 +2,7 @@ rk3588-camera-overlays (0.2.0-1) UNRELEASED; urgency=medium
 
   * Split camera overlays the way the Raspberry Pi does: one dtbo per
     board CSI port, and one dtbo per sensor (imx708, imx219, imx519,
-    imx415).
+    imx415, ov5647).
     Select a camera with imx708,port0. 4lane, link-frequency, rotation,
     and orientation are baked in by apply-overlays.sh.
   * The first camera in overlays.conf enables isp0 and the second isp1.
