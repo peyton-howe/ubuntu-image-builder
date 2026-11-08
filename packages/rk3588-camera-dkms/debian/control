@@ -10,9 +10,9 @@ Package: rk3588-camera-dkms
 Architecture: all
 Depends: ${misc:Depends}, dkms
 Recommends: linux-headers-generic | linux-headers-virtual | linux-headers-arm64
-Description: DKMS drivers for RK3588 cameras (IMX708, IMX519, IMX415, rkisp2, rkcif, DCPHY)
+Description: DKMS drivers for RK3588 cameras (IMX708, IMX519, IMX477, IMX415, rkisp2, rkcif, DCPHY)
  Out-of-tree modules extracted from the ubuntu-image-builder mainline
- camera patch series: the IMX708 and IMX519 sensor drivers, the rkisp2 ISP driver, the
+ camera patch series: the IMX708, IMX519 and IMX477 sensor drivers, the rkisp2 ISP driver, the
  rkcif capture driver, the Samsung DCPHY CSI receiver and an imx415 with a
  2376 Mbps lane rate. The last three replace Ubuntu's modules of the same
  name.

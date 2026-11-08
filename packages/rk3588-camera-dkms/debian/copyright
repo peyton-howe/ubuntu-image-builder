@@ -10,6 +10,10 @@ Files: src/imx415/*
 Copyright: 2023 WolfVision GmbH
 License: GPL-2.0-only
 
+Files: src/imx477/*
+Copyright: 2020 Raspberry Pi (Trading) Ltd
+License: GPL-2.0-only
+
 Files: src/imx519/*
 Copyright: 2021 Arducam Technology co., Ltd.
  2020 Raspberry Pi (Trading) Ltd

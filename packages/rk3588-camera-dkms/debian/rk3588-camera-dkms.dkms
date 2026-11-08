@@ -32,6 +32,11 @@ BUILT_MODULE_NAME[5]="imx519"
 BUILT_MODULE_LOCATION[5]="imx519"
 DEST_MODULE_LOCATION[5]="/updates/dkms"
 
+# Raspberry Pi High Quality Camera (the kernel has no driver for it).
+BUILT_MODULE_NAME[6]="imx477"
+BUILT_MODULE_LOCATION[6]="imx477"
+DEST_MODULE_LOCATION[6]="/updates/dkms"
+
 # Rebuild the kernel's initrd so it does not keep a stale copy of a module this
 # package replaces. $kernelver is expanded by DKMS when it reads this file.
 POST_INSTALL="refresh-initramfs.sh $kernelver"
