@@ -1,0 +1,209 @@
+# Stock Ubuntu images for every board under configs/boards/.
+# A pull request into main builds stonking desktop and server for each
+# configs/boards/*.sh (honouring that file's COMPATIBLE_SUITES and
+# COMPATIBLE_FLAVORS). Adding a board config is enough to include it;
+# the workflow does not list boards by name.
+# workflow_dispatch can rebuild one board, flavor, or release, or all of them.
+name: Build images
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Ubuntu release
+        type: choice
+        options:
+          - stonking
+          - resolute
+          - questing
+          - all
+        default: stonking
+      flavor:
+        description: Image flavor
+        type: choice
+        options:
+          - both
+          - desktop
+          - server
+        default: both
+      board:
+        description: Board name, or all
+        type: string
+        default: all
+
+concurrency:
+  group: build-images-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    name: Choose images
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    outputs:
+      include: ${{ steps.set.outputs.include }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build the matrix from configs/
+        id: set
+        env:
+          RELEASE: ${{ github.event.inputs.release || 'stonking' }}
+          FLAVOR: ${{ github.event.inputs.flavor || 'both' }}
+          BOARD: ${{ github.event.inputs.board || 'all' }}
+        run: |
+          set -euo pipefail
+          delimiter="MATRIX_$(python3 -c 'import uuid; print(uuid.uuid4().hex)')"
+          {
+            echo "include<<${delimiter}"
+            python3 .github/scripts/image-matrix.py
+            echo "${delimiter}"
+          } >> "${GITHUB_OUTPUT}"
+          echo "Images:"
+          python3 .github/scripts/image-matrix.py | python3 -m json.tool
+
+  build:
+    name: ${{ matrix.board }} ${{ matrix.release }} ${{ matrix.flavor }}
+    needs: matrix
+    if: needs.matrix.result == 'success' && needs.matrix.outputs.include != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include: ${{ fromJSON(needs.matrix.outputs.include) }}
+    steps:
+      - name: Free disk space
+        run: |
+          set -euo pipefail
+          sudo rm -rf \
+            /usr/local/lib/android \
+            /usr/share/dotnet \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /usr/local/share/boost \
+            /usr/share/swift \
+            /usr/local/share/powershell \
+            /usr/share/miniconda \
+            /opt/hostedtoolcache \
+            "${AGENT_TOOLSDIRECTORY:-/opt/hostedtoolcache}" \
+            /home/linuxbrew \
+            /usr/local/share/vcpkg \
+            /usr/local/lib/node_modules \
+            /opt/az \
+            /usr/local/share/chromium \
+            /usr/local/share/google \
+            /usr/local/share/edge \
+            /usr/share/gradle \
+            /usr/share/java \
+            /usr/local/julia* \
+            /usr/share/miniconda || true
+          sudo docker system prune -af || true
+          sudo apt-get clean || true
+          root_kb="$(df -k / | awk 'NR==2 {print $4}')"
+          if mountpoint -q /mnt; then
+            mnt_kb="$(df -k /mnt | awk 'NR==2 {print $4}')"
+          else
+            mnt_kb=0
+          fi
+          echo "Free space: / has ${root_kb} KiB, /mnt has ${mnt_kb} KiB"
+          # ISO + extracted rootfs + uncompressed image needs room past the
+          # documented 14 GiB standard-runner disk. When /mnt is a larger
+          # scratch disk, build there so the artifact stays inside the workspace.
+          data_fs=/
+          if [[ "${mnt_kb}" -gt "${root_kb}" && "${mnt_kb}" -gt $((20 * 1024 * 1024)) ]]; then
+            sudo mkdir -p /mnt/image-build
+            sudo chown "$(id -u):$(id -g)" /mnt/image-build
+            sudo mount --bind /mnt/image-build "${GITHUB_WORKSPACE}"
+            data_fs=/mnt
+            echo "Bound /mnt/image-build over ${GITHUB_WORKSPACE}"
+          fi
+          avail_kb="$(df -k "${data_fs}" | awk 'NR==2 {print $4}')"
+          if [[ "${avail_kb}" -lt $((20 * 1024 * 1024)) ]]; then
+            echo "Not enough free disk to build an image (have ${avail_kb} KiB on ${data_fs}, need 20 GiB)."
+            df -h
+            exit 1
+          fi
+          df -h
+
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            git make gcc gcc-aarch64-linux-gnu bison flex swig bc \
+            python3-dev python3-setuptools python3-pyelftools \
+            libssl-dev libgnutls28-dev uuid-dev uuid-runtime \
+            debhelper dh-dkms dkms dpkg-dev device-tree-compiler \
+            squashfs-tools parted e2fsprogs fuse2fs xz-utils wget curl \
+            qemu-user-static binfmt-support rsync kmod cpio \
+            util-linux
+          sudo update-binfmts --enable qemu-aarch64 || true
+
+      # Root's package and U-Boot builds clone GitHub over HTTPS. The job
+      # token raises the anonymous rate limit, which fresh checkouts hit
+      # when several boards fetch the kernel DTS at once.
+      - name: Authenticate git clones
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          sudo git config --system --add safe.directory '*'
+          sudo git config --system url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+
+      # Drop the ISO before the image is packed. build.sh keeps it for
+      # rebuilds; a runner does not rebuild, and the uncompressed image
+      # needs that space.
+      - name: Build stock image
+        env:
+          BOARD: ${{ matrix.board }}
+          RELEASE: ${{ matrix.release }}
+          FLAVOR: ${{ matrix.flavor }}
+        run: |
+          set -euo pipefail
+          sudo ./build.sh \
+            --board="${BOARD}" \
+            --release="${RELEASE}" \
+            --flavor="${FLAVOR}" \
+            --kernel-type=stock \
+            --rootfs-only
+          # Glob as root. The ISO is root-owned, and an unexpanded glob would
+          # leave the multi-GB file in place for the image pack.
+          sudo bash -c 'shopt -s nullglob; rm -rf build/rootfs/*.iso build/rootfs/SHA256SUMS build/rootfs/iso-mnt'
+          df -h
+          sudo ./build.sh \
+            --board="${BOARD}" \
+            --release="${RELEASE}" \
+            --flavor="${FLAVOR}" \
+            --kernel-type=stock
+          image="images/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64-${BOARD}.img.xz"
+          if [[ ! -f "${image}" ]]; then
+            echo "Missing ${image}"
+            ls -la images || true
+            exit 1
+          fi
+          sudo chown -R "$(id -u):$(id -g)" images
+          sudo chmod -R a+rX images
+          ls -lh images
+
+      - name: Upload image
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ubuntu-${{ matrix.release }}-preinstalled-${{ matrix.flavor }}-arm64-${{ matrix.board }}
+          path: images/ubuntu-${{ matrix.release }}-preinstalled-${{ matrix.flavor }}-arm64-${{ matrix.board }}.img.xz
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
