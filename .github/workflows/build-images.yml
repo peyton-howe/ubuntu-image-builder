@@ -52,7 +52,7 @@ jobs:
       include: ${{ steps.set.outputs.include }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Build the matrix from configs/
         id: set
@@ -137,7 +137,7 @@ jobs:
           df -h
 
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Install build dependencies
         run: |
@@ -202,7 +202,7 @@ jobs:
           ls -lh images
 
       - name: Upload image
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ubuntu-${{ matrix.release }}-preinstalled-${{ matrix.flavor }}-arm64-${{ matrix.board }}
           path: images/ubuntu-${{ matrix.release }}-preinstalled-${{ matrix.flavor }}-arm64-${{ matrix.board }}.img.xz
