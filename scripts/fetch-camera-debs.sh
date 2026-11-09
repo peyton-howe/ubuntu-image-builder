@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # Put the prebuilt camera packages into build/debs/: rk3588-camera-overlays and
-# rk3588-camera-dkms, and libcamera (and, on desktop images, qcam) built for the
-# Ubuntu release being built. They come from the rk3588-cameras repository
+# rk3588-camera-dkms, and libcamera built for the Ubuntu release being built. They come from the rk3588-cameras repository
 # (https://github.com/peyton-howe/rk3588-cameras); see scripts/camera-debs.conf
 # for the pinned release. Safe to run repeatedly.
 #
-# Usage: fetch-camera-debs.sh <release> <flavor>
+# Usage: fetch-camera-debs.sh <release>
 #
 # To use packages that are not released yet, point RK3588_CAMERA_DEBS_DIR at
 # the directories holding them (colon separated), for example the build
@@ -20,7 +19,6 @@ source "${REPO_ROOT}/scripts/camera-debs.conf"
 source "${REPO_ROOT}/scripts/common.sh"
 
 RELEASE="${1:?release (questing, resolute, stonking)}"
-FLAVOR="${2:?flavor (desktop, server)}"
 OUT_DIR="${REPO_ROOT}/build/debs"
 mkdir -p "${OUT_DIR}"
 
@@ -28,7 +26,7 @@ mkdir -p "${OUT_DIR}"
 # architecture-independent ones by name, the libcamera ones by the release in
 # their version.
 declare -a names=()
-read -r -a names <<< "$(camera_packages "${FLAVOR}")"
+read -r -a names <<< "$(camera_packages)"
 
 pattern_for() {
     case "$1" in

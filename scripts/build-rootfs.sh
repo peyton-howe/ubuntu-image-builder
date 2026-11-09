@@ -210,8 +210,8 @@ if is_stock_kernel; then
     done
     # Camera packages (overlays, DKMS drivers, libcamera) are prebuilt, from the
     # rk3588-cameras repository.
-    "${ROOT_DIR}/scripts/fetch-camera-debs.sh" "${RELEASE}" "${FLAVOR}"
-    for pkg in $(camera_packages "${FLAVOR}"); do
+    "${ROOT_DIR}/scripts/fetch-camera-debs.sh" "${RELEASE}"
+    for pkg in $(camera_packages); do
         compgen -G "${DEBS_DIR}/${pkg}_*.deb" > /dev/null || continue
         cp -v "${DEBS_DIR}/${pkg}_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
     done
