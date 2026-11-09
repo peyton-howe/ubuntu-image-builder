@@ -1,0 +1,4 @@
+# Fragment merged into /etc/default/u-boot by rk3588-board-rock-5-itx
+# Packaged DTB (built with -@) so camera overlays can apply; Ubuntu's copy
+# has no __symbols__.
+U_BOOT_FDT="/usr/lib/rk3588-board-rock-5-itx/dtbs/rockchip/rk3588-rock-5-itx.dtb"

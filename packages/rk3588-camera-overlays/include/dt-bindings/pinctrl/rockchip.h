@@ -25,5 +25,13 @@
 #define RK_PC5 21
 #define RK_PC6 22
 #define RK_PC7 23
+#define RK_PD0 24
+#define RK_PD1 25
+#define RK_PD2 26
+#define RK_PD3 27
+#define RK_PD4 28
+#define RK_PD5 29
+#define RK_PD6 30
+#define RK_PD7 31
 #define RK_FUNC_GPIO 0
 #endif

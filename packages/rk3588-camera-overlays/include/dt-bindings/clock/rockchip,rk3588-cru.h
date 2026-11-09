@@ -2,6 +2,8 @@
 /* Minimal subset of rockchip,rk3588-cru.h used by the IMX708, ISP and DCPHY CSI overlays. */
 #ifndef _DT_BINDINGS_CLK_ROCKCHIP_RK3588_CRU_H
 #define _DT_BINDINGS_CLK_ROCKCHIP_RK3588_CRU_H
+#define CLK_MIPI_CAMARAOUT_M1 244
+#define CLK_MIPI_CAMARAOUT_M2 245
 #define CLK_MIPI_CAMARAOUT_M3 246
 #define CLK_MIPI_CAMARAOUT_M4 247
 #define CLK_ISP1_CORE 271

@@ -1,0 +1,22 @@
+#!/bin/sh
+# Ensure Rockchip MMC (and heartbeat LED) land in the initramfs for stock
+# Ubuntu generic kernels where these drivers are built as modules.
+prereqs() {
+	echo ""
+}
+
+case "$1" in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+manual_add_modules dw_mmc
+manual_add_modules dw_mmc_pltfm
+manual_add_modules dw_mmc_rockchip
+manual_add_modules sdhci-of-dwcmshc
+manual_add_modules mmc_block
+manual_add_modules ledtrig-heartbeat

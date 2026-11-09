@@ -84,6 +84,22 @@ board_support_package() {
         orangepi-5) echo "rk3588-board-orangepi-5" ;;
         orangepi-5b) echo "rk3588-board-orangepi-5b" ;;
         rock-5b-plus) echo "rk3588-board-rock-5b-plus" ;;
+        orangepi-5-max) echo "rk3588-board-orangepi-5-max" ;;
+        orangepi-5-plus) echo "rk3588-board-orangepi-5-plus" ;;
+        orangepi-5-pro) echo "rk3588-board-orangepi-5-pro" ;;
+        rock-5a) echo "rk3588-board-rock-5a" ;;
+        rock-5b) echo "rk3588-board-rock-5b" ;;
+        rock-5c) echo "rk3588-board-rock-5c" ;;
+        rock-5-itx) echo "rk3588-board-rock-5-itx" ;;
+        *) echo "" ;;
+    esac
+}
+
+# Prebuilt .debs a board needs besides its board package, downloaded into
+# build/debs/ by scripts/fetch-aic8800-debs.sh (empty if none).
+board_fetched_debs() {
+    case "${1:-}" in
+        rock-5c) echo "aic8800-firmware aic8800-usb-dkms" ;;
         *) echo "" ;;
     esac
 }

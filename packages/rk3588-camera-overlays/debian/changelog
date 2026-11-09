@@ -8,6 +8,15 @@ rk3588-camera-overlays (0.2.0-1) UNRELEASED; urgency=medium
   * The first camera in overlays.conf enables isp0 and the second isp1.
     isp0 or isp1 on a camera overrides that. Port overlays no longer
     pick an ISP.
+  * Add port overlays for the Orange Pi 5 Max (port0 to port2), 5 Plus
+    (port1) and 5 Pro (port1, port2), with the connector pins from
+    Orange Pi's vendor tree. Their board packages ship a DTB built with
+    symbols, which the ports need. Add CLK_MIPI_CAMARAOUT_M1 and M2 to the
+    bundled clock header, and RK_PD0 to RK_PD7 to the pinctrl header.
+  * Add port overlays for the ROCK 5B (port0, the 5B+ CAM0 connector), ROCK 5A
+    and 5C (port0) and ROCK 5 ITX (port0, port1), with the connector data from
+    Radxa's overlays. On the 5A, 5C and ITX the connector's power-down line
+    enables the module through the port's regulator.
   * unite on one camera enables the dual-ISP device (both register
     windows and both IOMMUs) and rejects a second camera.
   * Add imx415 (Radxa Camera 4K) at 24 MHz. The default 720 MHz link

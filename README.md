@@ -13,6 +13,24 @@ are still available for development.
 | Orange Pi 5B | `orangepi-5b` | Tested: boot, eMMC/SD, WiFi/BT out of the box, status LED, IMX708 camera on cam1 |
 | Orange Pi 5 | `orangepi-5` | Builds; not tested on hardware |
 | Radxa ROCK 5B+ | `rock-5b-plus` | Tested: boot, WiFi/BT out of the box, status LED, IMX708 on cam0 and cam1 |
+| Orange Pi 5 Max | `orangepi-5-max` | Builds; not tested on hardware |
+| Orange Pi 5 Plus | `orangepi-5-plus` | Builds; not tested on hardware |
+| Orange Pi 5 Pro | `orangepi-5-pro` | Builds; not tested on hardware. U-Boot gets a Pro defconfig, device tree and Ethernet driver from patches carried in `patches/u-boot/orangepi-5-pro/` (from Armbian) |
+| Radxa ROCK 5A | `rock-5a` | Builds; not tested on hardware |
+| Radxa ROCK 5B | `rock-5b` | Builds; not tested on hardware |
+| Radxa ROCK 5C | `rock-5c` | Builds; not tested on hardware. Onboard AIC8800 Wi-Fi/BT via Radxa's prebuilt `aic8800-usb-dkms` and `aic8800-firmware` .debs (the build downloads them; they compile against 7.3.0-9) |
+| Radxa ROCK 5 ITX | `rock-5-itx` | Builds; not tested on hardware |
+
+The boards that are not tested have camera port overlays too (see
+[Cameras](#cameras)), taken from the vendors' own overlays. eMMC is enabled in
+the stock kernel's device tree on all of them. Onboard WiFi/BT works out of the
+box on the Orange Pi 5 Pro (AP6256; its package ships the firmware, as the 5B's
+does) and the ROCK 5C (AIC8800 over USB, with an out-of-tree DKMS driver). The
+Orange Pi 5 Max's AP6611S is a Synaptics chip that mainline `brcmfmac` does not
+support, so its onboard WiFi is not supported yet. The Orange Pi 5 Plus, ROCK 5A, 5B and 5 ITX have no onboard
+WiFi/BT; a card in the M.2 slot works if the kernel and linux-firmware support
+it. The ROCK 5D has no device tree in the stock kernel and no U-Boot support
+yet, so it is not included.
 
 Releases (`--release`): `questing` (25.10), `resolute` (26.04), `stonking`
 (26.10 daily). Flavors (`--flavor`): `desktop`, `server`.
@@ -42,7 +60,7 @@ upstream device-tree sources for the Orange Pi 5B (~16 MB, from GitHub).
 ## Options
 
 ```
--b, --board=BOARD         orangepi-5 | orangepi-5b | rock-5b-plus
+-b, --board=BOARD         orangepi-5 | orangepi-5b | orangepi-5-max | orangepi-5-plus | orangepi-5-pro | rock-5a | rock-5b | rock-5b-plus | rock-5c | rock-5-itx
 -r, --release=RELEASE     questing | resolute | stonking
 -f, --flavor=FLAVOR       desktop | server
 -kt, --kernel-type=TYPE   stock (default) | vendor | mainline
@@ -178,7 +196,12 @@ The port number is the CAM number on the board:
 | Board | Ports |
 |---|---|
 | Orange Pi 5 / 5B | `port1` (CAM1), `port2` (CAM2), `port3` (CAM3) |
+| Orange Pi 5 Max | `port0` (CAM0), `port1` (CAM1), `port2` (CAM2) |
+| Orange Pi 5 Plus | `port1` (CAM1) |
+| Orange Pi 5 Pro | `port1` (CAM1), `port2` (CAM2) |
 | ROCK 5B+ | `port0` (CAM0), `port1` (CAM1) |
+| ROCK 5 ITX | `port0` (CAM0), `port1` (CAM1) |
+| ROCK 5A, 5B, 5C | `port0` |
 
 Two cameras, or a Pi-style link-frequency override:
 
@@ -289,6 +312,9 @@ the sensor can resolve `cam_portN_*`. Overlays also need the base DTB to have
 | Orange Pi 5B | Packaged (built with `-@`) | port1 tested on hardware (as the old cam1 IMX708 overlay); port2 (CAM2) and port3 (CAM3) tested on hardware |
 | ROCK 5B+ | Ubuntu's (has `__symbols__`, since upstream ships overlays for it) | port0 and port1 together; tested on hardware as the old cam0/cam1 overlays. ISP follows list order now |
 | Orange Pi 5 | Packaged (built with `-@`) | port1/port2/port3 can apply; not tested on hardware |
+| Orange Pi 5 Max, 5 Plus, 5 Pro | Packaged (built with `-@`) | Pins from Orange Pi's vendor tree; the ports apply to the packaged DTBs, not tested on hardware |
+| ROCK 5B | Ubuntu's (has `__symbols__`) | port0, the same connector as the 5B+ CAM0; applies to Ubuntu's DTB, not tested on hardware |
+| ROCK 5A, 5C, 5 ITX | Packaged (built with `-@`) | Pins from Radxa's overlays. The connector's power-down line enables the module through `cam_portN_reg`; the reset line is not wired. Not tested on hardware |
 
 The generated sensor overlay enables the chosen ISP and leaves capture on
 VICAP. It does not wire CSI straight into the ISP (that needed the

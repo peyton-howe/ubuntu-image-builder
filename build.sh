@@ -8,7 +8,7 @@ source scripts/common.sh
 
 usage() {
 cat << HEREDOC
-Usage: $0 --board=[orangepi-5|rock-5b-plus] --release=[questing|resolute|stonking] --flavor=[server|desktop]
+Usage: $0 --board=[orangepi-5|orangepi-5b|orangepi-5-max|orangepi-5-plus|orangepi-5-pro|rock-5a|rock-5b|rock-5b-plus|rock-5c|rock-5-itx] --release=[questing|resolute|stonking] --flavor=[server|desktop]
 
 Required arguments:
   -b, --board=BOARD           target board
