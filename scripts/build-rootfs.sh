@@ -215,6 +215,12 @@ if is_stock_kernel; then
     else
         echo "Warning: no board support package mapping for BOARD=${BOARD:-unset}"
     fi
+    if [[ -n $(board_fetched_debs "${BOARD:-}") ]]; then
+        "${ROOT_DIR}/scripts/fetch-aic8800-debs.sh"
+        for pkg in $(board_fetched_debs "${BOARD:-}"); do
+            cp -v "${DEBS_DIR}/${pkg}_"*_all.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+        done
+    fi
 else
     echo "[+] Custom kernel path (${KERNEL_TYPE}): staging kernel debs from ${KERNEL_DIR}"
     if compgen -G "${KERNEL_DIR}/*.deb" > /dev/null; then

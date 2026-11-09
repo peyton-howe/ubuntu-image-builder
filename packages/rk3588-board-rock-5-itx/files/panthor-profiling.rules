@@ -1,0 +1,5 @@
+# Enable panthor's per-job GPU timestamps so DRM fdinfo reports
+# drm-engine-panthor, which system monitors (Resources, nvtop, ...) use to
+# show GPU usage. The kernel default is 0 (off). 2 sets only the timestamp
+# bit; cycle counting (bit 0) isn't needed for usage.
+ACTION=="add|bind", SUBSYSTEM=="platform", DRIVER=="panthor", ATTR{profiling}="2"

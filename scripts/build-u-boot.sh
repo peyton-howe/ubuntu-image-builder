@@ -64,6 +64,40 @@ if [[ -f ${OPI5B_PATCH} ]]; then
     fi
 fi
 
+# Per-board patch series in patches/u-boot/<board>/, applied in order for that
+# board and reverted (last to first) for every other board, for the same
+# reason as above.
+for series_dir in "${ROOT_DIR}"/patches/u-boot/*/; do
+    [[ -d ${series_dir} ]] || continue
+    series_board="$(basename "${series_dir}")"
+    mapfile -t series < <(find "${series_dir}" -maxdepth 1 -name '*.patch' | sort)
+    if [[ ${BOARD} == "${series_board}" ]]; then
+        # Later patches change files earlier ones touch, so only the topmost
+        # applied patch reverses cleanly: find it, then apply what follows.
+        applied=0
+        for ((i = ${#series[@]} - 1; i >= 0; i--)); do
+            if git apply --reverse --check "${series[i]}" 2>/dev/null; then
+                applied=$((i + 1))
+                break
+            fi
+        done
+        if [[ ${applied} -gt 0 ]]; then
+            echo "[+] ${series_board} u-boot patches 1-${applied} already applied."
+        fi
+        for ((i = applied; i < ${#series[@]}; i++)); do
+            echo "[+] Applying ${series_board} u-boot patch $(basename "${series[i]}")..."
+            git apply "${series[i]}"
+        done
+    else
+        for ((i = ${#series[@]} - 1; i >= 0; i--)); do
+            if git apply --reverse --check "${series[i]}" 2>/dev/null; then
+                echo "[+] Reverting ${series_board} u-boot patch $(basename "${series[i]}") for ${BOARD}..."
+                git apply --reverse "${series[i]}"
+            fi
+        done
+    fi
+done
+
 make clean
 make CROSS_COMPILE=aarch64-linux-gnu- \
      ROCKCHIP_TPL=../rkbin/bin/rk35/rk3588_ddr_lp4_2112MHz_lp5_2400MHz_v1.24.bin \
