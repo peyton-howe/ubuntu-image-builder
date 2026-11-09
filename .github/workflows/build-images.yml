@@ -5,7 +5,8 @@
 # package, and pack. Questing is not built. Adding a board config is
 # enough to include it; the workflow does not list boards by name.
 # workflow_dispatch can rebuild one board, one flavor, or one of those
-# two releases.
+# two releases. R2 upload is off unless the R2_UPLOAD repository
+# variable is true, or a dispatch run checks "Upload images to R2".
 name: Build images
 
 on:
@@ -36,6 +37,10 @@ on:
         description: Board name, or all
         type: string
         default: all
+      upload_r2:
+        description: Upload images to R2
+        type: boolean
+        default: false
 
 concurrency:
   group: build-images-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -346,3 +351,33 @@ jobs:
           if-no-files-found: error
           retention-days: 3
           compression-level: 0
+
+      # After the GitHub artifact, so a storage failure still leaves the
+      # image to download. Skipped unless R2 upload is turned on. Each job
+      # uploads only its own image; the files are already under images/.
+      - name: Upload image to R2
+        if: vars.R2_UPLOAD == 'true' || (github.event_name == 'workflow_dispatch' && inputs.upload_r2)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          RELEASE: ${{ matrix.release }}
+          FLAVOR: ${{ matrix.flavor }}
+          BOARD: ${{ matrix.board }}
+        run: |
+          set -euo pipefail
+          if ! command -v aws >/dev/null; then
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y awscli
+          fi
+          image="images/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64-${BOARD}.img.xz"
+          sha256sum "${image}" > "${image}.sha256"
+          # A pull request's GITHUB_REF_NAME is "<number>/merge". Use the head
+          # branch so the object key is the branch name.
+          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          dest="s3://tachyn-downloads/images/${ref}"
+          endpoint="https://d4c5965011f175a03fd911313e9c9062.r2.cloudflarestorage.com"
+          aws s3 cp "${image}" "${dest}/$(basename "${image}")" \
+            --endpoint-url "${endpoint}"
+          aws s3 cp "${image}.sha256" "${dest}/$(basename "${image}.sha256")" \
+            --endpoint-url "${endpoint}"
