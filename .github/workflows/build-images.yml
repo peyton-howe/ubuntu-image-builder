@@ -5,12 +5,18 @@
 # package, and pack. Questing is not built. Adding a board config is
 # enough to include it; the workflow does not list boards by name.
 # workflow_dispatch can rebuild one board, one flavor, or one of those
-# two releases. R2 upload is off unless the R2_UPLOAD repository
-# variable is true, or a dispatch run checks "Upload images to R2".
+# two releases. Pull requests never upload to R2. A push to main
+# uploads, and also copies each image to images/latest/. A manual run
+# uploads only when "Upload images to R2" is checked.
 name: Build images
 
 on:
   pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  push:
     branches: [main]
     paths-ignore:
       - "**/*.md"
@@ -353,10 +359,10 @@ jobs:
           compression-level: 0
 
       # After the GitHub artifact, so a storage failure still leaves the
-      # image to download. Skipped unless R2 upload is turned on. Each job
-      # uploads only its own image; the files are already under images/.
+      # image to download. Pull requests never reach the public bucket.
+      # Each job uploads only its own image.
       - name: Upload image to R2
-        if: vars.R2_UPLOAD == 'true' || (github.event_name == 'workflow_dispatch' && inputs.upload_r2)
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.upload_r2)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -372,12 +378,22 @@ jobs:
           fi
           image="images/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64-${BOARD}.img.xz"
           sha256sum "${image}" > "${image}.sha256"
-          # A pull request's GITHUB_REF_NAME is "<number>/merge". Use the head
-          # branch so the object key is the branch name.
+          # A pull request's GITHUB_REF_NAME is "<number>/merge". This step
+          # does not run for pull requests; the head branch covers a manual run.
           ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          dest="s3://tachyn-downloads/images/${ref}"
+          name="$(basename "${image}")"
+          sum="$(basename "${image}.sha256")"
           endpoint="https://d4c5965011f175a03fd911313e9c9062.r2.cloudflarestorage.com"
-          aws s3 cp "${image}" "${dest}/$(basename "${image}")" \
+          aws s3 cp "${image}" "s3://tachyn-downloads/images/${ref}/${name}" \
             --endpoint-url "${endpoint}"
-          aws s3 cp "${image}.sha256" "${dest}/$(basename "${image}.sha256")" \
+          aws s3 cp "${image}.sha256" "s3://tachyn-downloads/images/${ref}/${sum}" \
             --endpoint-url "${endpoint}"
+          # Same object names on every main build, so a wiki link does not move.
+          # Release, flavor, and board stay in the name so those images do not
+          # overwrite each other.
+          if [[ ${ref} == main ]]; then
+            aws s3 cp "${image}" "s3://tachyn-downloads/images/latest/${name}" \
+              --endpoint-url "${endpoint}"
+            aws s3 cp "${image}.sha256" "s3://tachyn-downloads/images/latest/${sum}" \
+              --endpoint-url "${endpoint}"
+          fi
