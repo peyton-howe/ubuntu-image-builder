@@ -594,9 +594,9 @@ test "${status}" -ne 0
 grep -q 'drop isp0' "${WORK}/unite-isp.out"
 cmp "${FAKE}/etc/default/u-boot" "${FAKE}/etc/default/u-boot.good"
 
-# Orange Pi 5 Max / 5 Plus / 5 Pro: the board package directory selects the
-# port overlays, each board has its own set of connectors, and the shorter
-# orangepi-5 name must not take over.
+# Orange Pi 5 Max / 5 Plus / 5 Pro and ROCK 5A / 5B / 5C / 5 ITX: the board
+# package directory selects the port overlays, each board has its own set of
+# connectors, and the shorter orangepi-5 and rock-5b names must not take over.
 run_board() {
     local root="$1" conf="$2"
     RK3588_CAMERA_CONF="${conf}" \
@@ -610,7 +610,11 @@ run_board() {
 for board_case in \
     "orangepi-5-max:rk3588-orangepi-5-max:0 1 2:3" \
     "orangepi-5-plus:rk3588-orangepi-5-plus:1:2" \
-    "orangepi-5-pro:rk3588s-orangepi-5-pro:1 2:3"; do
+    "orangepi-5-pro:rk3588s-orangepi-5-pro:1 2:3" \
+    "rock-5a:rk3588s-rock-5a:0:1" \
+    "rock-5b:rk3588-rock-5b:0:1" \
+    "rock-5c:rk3588s-rock-5c:0:1" \
+    "rock-5-itx:rk3588-rock-5-itx:0 1:2"; do
     IFS=: read -r bname bprefix bports bmissing <<< "${board_case}"
     broot="${WORK}/root-${bname}"
     mkdir -p "${broot}/usr/share/rk3588-board-${bname}" "${broot}/etc/default" "${broot}/etc/rk3588-camera"
@@ -637,6 +641,6 @@ for board_case in \
     test "${status}" -ne 0
     grep -q "has no port${bmissing}" "${WORK}/bad-port.out"
 done
-echo "orange pi 5 max/plus/pro port selection passed"
+echo "orange pi 5 max/plus/pro and radxa port selection passed"
 
 echo "all camera overlay tests passed"

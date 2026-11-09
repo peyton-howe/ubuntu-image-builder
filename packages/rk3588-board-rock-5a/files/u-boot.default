@@ -1,3 +1,4 @@
 # Fragment merged into /etc/default/u-boot by rk3588-board-rock-5a
-# Relative to /lib/firmware/<kernel version>/, so each kernel gets its own DTB.
-U_BOOT_FDT="device-tree/rockchip/rk3588s-rock-5a.dtb"
+# Packaged DTB (built with -@) so camera overlays can apply; Ubuntu's copy
+# has no __symbols__.
+U_BOOT_FDT="/usr/lib/rk3588-board-rock-5a/dtbs/rockchip/rk3588s-rock-5a.dtb"
