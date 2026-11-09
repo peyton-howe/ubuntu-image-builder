@@ -49,6 +49,10 @@ board_prefix() {
         orangepi-5-plus) echo rk3588-orangepi-5-plus ;;
         orangepi-5-pro) echo rk3588s-orangepi-5-pro ;;
         rock-5b-plus) echo rk3588-rock-5b-plus ;;
+        rock-5b) echo rk3588-rock-5b ;;
+        rock-5a) echo rk3588s-rock-5a ;;
+        rock-5c) echo rk3588s-rock-5c ;;
+        rock-5-itx) echo rk3588-rock-5-itx ;;
         *) return 1 ;;
     esac
 }
@@ -62,7 +66,9 @@ detect_board() {
     # Exact directory names, so the shorter orangepi-5 cannot win by prefix.
     for base in rk3588-board-orangepi-5b rk3588-board-orangepi-5-max \
                 rk3588-board-orangepi-5-plus rk3588-board-orangepi-5-pro \
-                rk3588-board-orangepi-5 rk3588-board-rock-5b-plus; do
+                rk3588-board-orangepi-5 rk3588-board-rock-5b-plus \
+                rk3588-board-rock-5b rk3588-board-rock-5a rk3588-board-rock-5c \
+                rk3588-board-rock-5-itx; do
         d="${BOARD_SHARE}/${base}"
         [[ -d ${d} ]] || continue
         case "${base}" in
@@ -72,6 +78,10 @@ detect_board() {
             rk3588-board-orangepi-5-pro) echo orangepi-5-pro; return 0 ;;
             rk3588-board-orangepi-5) echo orangepi-5; return 0 ;;
             rk3588-board-rock-5b-plus) echo rock-5b-plus; return 0 ;;
+            rk3588-board-rock-5b) echo rock-5b; return 0 ;;
+            rk3588-board-rock-5a) echo rock-5a; return 0 ;;
+            rk3588-board-rock-5c) echo rock-5c; return 0 ;;
+            rk3588-board-rock-5-itx) echo rock-5-itx; return 0 ;;
         esac
     done
     if [[ -r /proc/device-tree/model ]]; then
@@ -84,6 +94,10 @@ detect_board() {
             *"Orange Pi 5 Pro"*) echo orangepi-5-pro; return 0 ;;
             *"Orange Pi 5"*) echo orangepi-5; return 0 ;;
             *"ROCK 5B+"*) echo rock-5b-plus; return 0 ;;
+            *"ROCK 5B"*) echo rock-5b; return 0 ;;
+            *"ROCK 5A"*) echo rock-5a; return 0 ;;
+            *"ROCK 5C"*) echo rock-5c; return 0 ;;
+            *"ROCK 5 ITX"*) echo rock-5-itx; return 0 ;;
         esac
     fi
     return 1
@@ -340,7 +354,7 @@ for ((i = 0; i < ${#sensors[@]}; i++)); do
 done
 
 if [[ ${need_board} -eq 1 ]]; then
-    board="$(detect_board)" || die "could not tell which board this is. Set RK3588_CAMERA_BOARD in ${CONF} to orangepi-5, orangepi-5b, orangepi-5-max, orangepi-5-plus, orangepi-5-pro, or rock-5b-plus."
+    board="$(detect_board)" || die "could not tell which board this is. Set RK3588_CAMERA_BOARD in ${CONF} to orangepi-5, orangepi-5b, orangepi-5-max, orangepi-5-plus, orangepi-5-pro, rock-5a, rock-5b, rock-5b-plus, rock-5c, or rock-5-itx."
     prefix="$(board_prefix "${board}")" || die "unknown RK3588_CAMERA_BOARD '${board}'"
 fi
 
@@ -365,7 +379,7 @@ if [[ ${need_board} -eq 1 ]]; then
         done
         port_file="${OVERLAY_DIR}/${prefix}-port${p}.dtbo"
         if [[ ! -f ${port_file} ]]; then
-            die "${board} has no port${p} (${port_file} is not installed). Orange Pi 5/5B connectors are port1, port2, and port3; Orange Pi 5 Max port0, port1, and port2; Orange Pi 5 Plus port1; Orange Pi 5 Pro port1 and port2. ROCK 5B+ connectors are port0 and port1."
+            die "${board} has no port${p} (${port_file} is not installed). Orange Pi 5/5B connectors are port1, port2, and port3; Orange Pi 5 Max port0, port1, and port2; Orange Pi 5 Plus port1; Orange Pi 5 Pro port1 and port2. ROCK 5B+ and ROCK 5 ITX connectors are port0 and port1; ROCK 5A, 5B and 5C have port0."
         fi
         if [[ ${already} -eq 0 ]]; then
             port_seen+=("${p}")
