@@ -171,9 +171,14 @@ Ubuntu's DTB (which has `__symbols__`).
 
 ## Cameras
 
-`rk3588-camera-dkms` builds the `imx708` sensor driver and the `rkisp2` ISP
-driver against the installed kernel. `rk3588-camera-overlays` ships one
-overlay per CSI port and one overlay per sensor. None are enabled by default.
+The camera stack lives in its own repository,
+[rk3588-cameras](https://github.com/peyton-howe/rk3588-cameras), and the images
+install it from prebuilt packages. `rk3588-camera-dkms` builds the sensor
+drivers and the `rkisp2` ISP driver against the installed kernel,
+`rk3588-camera-overlays` ships one overlay per CSI port and one overlay per
+sensor, and `libcamera0.8` is libcamera with the rkisp2 pipeline handler
+(`libcamera0.8-qcam`, the Qt viewer, only on desktop images). No camera is
+enabled by default.
 
 A port overlay turns the connector on (I2C, clock, reset, regulator, CSI
 host) and publishes `cam_portN_*` labels. A sensor overlay describes the

@@ -208,8 +208,13 @@ if is_stock_kernel; then
             exit 1
         fi
     done
-    cp -v "${DEBS_DIR}/rk3588-camera-overlays_$(package_version "rk3588-camera-overlays")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
-    cp -v "${DEBS_DIR}/rk3588-camera-dkms_$(package_version "rk3588-camera-dkms")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    # Camera packages (overlays, DKMS drivers, libcamera) are prebuilt, from the
+    # rk3588-cameras repository.
+    "${ROOT_DIR}/scripts/fetch-camera-debs.sh" "${RELEASE}" "${FLAVOR}"
+    for pkg in $(camera_packages "${FLAVOR}"); do
+        compgen -G "${DEBS_DIR}/${pkg}_*.deb" > /dev/null || continue
+        cp -v "${DEBS_DIR}/${pkg}_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    done
     if [[ -n ${BOARD_PKG} ]]; then
         cp -v "${DEBS_DIR}/${BOARD_PKG}_$(package_version "${BOARD_PKG}")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
     else

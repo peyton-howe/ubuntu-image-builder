@@ -119,8 +119,16 @@ package_version() {
 
 # Packages from packages/ that the stock-kernel rootfs installs for BOARD.
 stock_packages() {
-    echo rk3588-camera-overlays rk3588-camera-dkms
     board_support_package "${1:-${BOARD:-}}"
+}
+
+# The prebuilt camera packages (see fetch-camera-debs.sh) the stock-kernel
+# rootfs installs for a flavor. qcam needs Qt, so only desktop images get it.
+camera_packages() {
+    local flavor="${1:-}" libcamera
+    # shellcheck source=camera-debs.conf
+    libcamera="$(. "${REPO_ROOT_DIR}/scripts/camera-debs.conf" && echo "${CAMERA_LIBCAMERA_PKG}")"
+    echo "rk3588-camera-overlays rk3588-camera-dkms ${libcamera}$([[ ${flavor} == desktop ]] && echo " ${libcamera}-qcam")"
 }
 
 # True when build/debs has package $1 at its current changelog version, so a

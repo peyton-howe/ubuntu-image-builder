@@ -173,8 +173,8 @@ First milestone should **probe a real stock image**: `zcat /proc/config.gz` / `/
 ```text
 packages/
   README.md
-  rk3588-camera-dkms/          # debian/ + src/{imx708,rkisp2,dcphy}
-  rk3588-camera-overlays/      # debian/ + dts/*.dtso + apply-overlays.sh
+  # rk3588-camera-dkms and rk3588-camera-overlays now live in the rk3588-camera
+  # repository and are installed from prebuilt packages
   rk3588-board-orangepi-5/     # flash-kernel, u-boot fragment, AP6275P fw
   rk3588-board-orangepi-5b/
   rk3588-board-rock-5b-plus/
