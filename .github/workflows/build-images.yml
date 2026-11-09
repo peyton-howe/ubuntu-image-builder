@@ -1,9 +1,10 @@
 # Stock Ubuntu images for every board under configs/boards/.
-# A pull request into main builds stonking desktop and server for each
-# configs/boards/*.sh (honouring that file's COMPATIBLE_SUITES and
-# COMPATIBLE_FLAVORS). Adding a board config is enough to include it;
-# the workflow does not list boards by name.
-# workflow_dispatch can rebuild one board, flavor, or release, or all of them.
+# A pull request into main builds stonking and resolute, desktop and
+# server, for each configs/boards/*.sh (honouring that file's
+# COMPATIBLE_SUITES and COMPATIBLE_FLAVORS). Questing is not built.
+# Adding a board config is enough to include it; the workflow does not
+# list boards by name. workflow_dispatch can rebuild one board, one
+# flavor, or one of those two releases.
 name: Build images
 
 on:
@@ -18,11 +19,10 @@ on:
         description: Ubuntu release
         type: choice
         options:
+          - stonking,resolute
           - stonking
           - resolute
-          - questing
-          - all
-        default: stonking
+        default: stonking,resolute
       flavor:
         description: Image flavor
         type: choice
@@ -57,7 +57,7 @@ jobs:
       - name: Build the matrix from configs/
         id: set
         env:
-          RELEASE: ${{ github.event.inputs.release || 'stonking' }}
+          RELEASE: ${{ github.event.inputs.release || 'stonking,resolute' }}
           FLAVOR: ${{ github.event.inputs.flavor || 'both' }}
           BOARD: ${{ github.event.inputs.board || 'all' }}
         run: |
