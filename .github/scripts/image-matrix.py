@@ -94,7 +94,25 @@ def main() -> None:
         )
         sys.exit(1)
 
-    json.dump(include, sys.stdout, separators=(",", ":"))
+    # images: one row per board. rootfs: the release/flavor pairs those rows
+    # share, so the ISO is downloaded once per pair.
+    kind = os.environ.get("MATRIX_KIND", "images")
+    if kind == "rootfs":
+        payload = []
+        seen: set[tuple[str, str]] = set()
+        for row in include:
+            key = (row["release"], row["flavor"])
+            if key in seen:
+                continue
+            seen.add(key)
+            payload.append({"release": row["release"], "flavor": row["flavor"]})
+    elif kind == "images":
+        payload = include
+    else:
+        print(f"error: unknown MATRIX_KIND {kind!r}; use images or rootfs", file=sys.stderr)
+        sys.exit(1)
+
+    json.dump(payload, sys.stdout, separators=(",", ":"))
     sys.stdout.write("\n")
 
 
