@@ -2,14 +2,16 @@ Source: rk3588-board-orangepi-5-pro
 Section: admin
 Priority: optional
 Maintainer: Peyton Howe <peyton@localhost>
-Build-Depends: debhelper-compat (= 13)
+Build-Depends: debhelper-compat (= 13), device-tree-compiler, gcc, git
 Standards-Version: 4.6.2
 Homepage: https://github.com/peyton-howe/ubuntu-image-builder
 
 Package: rk3588-board-orangepi-5-pro
 Architecture: all
 Depends: ${misc:Depends}, u-boot-menu, flash-kernel, zstd
+Recommends: rk3588-camera-overlays, rk3588-camera-dkms
 Description: Board support for Xunlong Orange Pi 5 Pro
- Flash-kernel registration and u-boot-menu defaults for Xunlong Orange Pi 5 Pro
- on stock Ubuntu arm64. Meant to be installed into an official Ubuntu ISO
- rootfs alongside our U-Boot image write.
+ Flash-kernel registration, packaged DTB with overlay symbols, and
+ u-boot-menu defaults for Xunlong Orange Pi 5 Pro on stock Ubuntu arm64.
+ Meant to be installed into an official Ubuntu ISO rootfs alongside our
+ U-Boot image write.
