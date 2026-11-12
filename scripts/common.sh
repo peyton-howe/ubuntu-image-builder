@@ -141,15 +141,32 @@ deb_is_current() {
 # vendor/mainline, one kernel) installed, so its .done stamp records what it
 # was built for; a different BOARD or KERNEL_TYPE means it must be rebuilt.
 # On the stock path it also records the package versions, so bumping a
-# package under packages/ rebuilds the rootfs that has the old one installed.
+# package under packages/ rebuilds the rootfs that has the old one installed,
+# and where the camera packages come from (camera_source_id).
 rootfs_stamp_id() {
     local id="board=${BOARD:-} kernel=${KERNEL_TYPE:-stock}" pkg
     if is_stock_kernel; then
         for pkg in $(stock_packages); do
             id+=" ${pkg}=$(package_version "${pkg}")"
         done
+        id+=" camera=$(camera_source_id)"
     fi
     echo "${id}"
+}
+
+# Where the camera packages come from: the release pinned in
+# scripts/camera-debs.conf, or a hash of the local packages when
+# RK3588_CAMERA_DEBS_DIR is set. A different source means the rootfs has other
+# camera packages installed and must be rebuilt.
+camera_source_id() {
+    local -a dirs
+    if [[ -n ${RK3588_CAMERA_DEBS_DIR:-} ]]; then
+        IFS=: read -r -a dirs <<< "${RK3588_CAMERA_DEBS_DIR}"
+        echo "local:$(find "${dirs[@]}" -maxdepth 1 \( -name 'rk3588-camera-*.deb' -o -name 'libcamera*.deb' \) -print0 2>/dev/null \
+            | sort -z | xargs -0 -r cat | sha256sum | cut -c1-16)"
+    else
+        (. "${REPO_ROOT_DIR}/scripts/camera-debs.conf" && echo "${CAMERA_TAG:-none}:${CAMERA_SUMS_SHA256:0:12}")
+    fi
 }
 
 # True when stamp file $1 exists and matches the current BOARD/KERNEL_TYPE.
