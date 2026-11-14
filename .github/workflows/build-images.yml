@@ -1,11 +1,11 @@
 # Stock Ubuntu images for every board under configs/boards/.
-# A pull request into main builds stonking and resolute, desktop and
-# server. Each release/flavor rootfs is built once (camera packages, no
-# board package). Image jobs download that tarball, install one board
-# package, and pack. Questing is not built. Adding a board config is
-# enough to include it; the workflow does not list boards by name.
-# workflow_dispatch can rebuild one board, one flavor, or one of those
-# two releases. Pull requests never upload to R2. A push to main
+# A pull request into main builds stonking, desktop and server.
+# Resolute is not built yet. Each release/flavor rootfs is built once
+# (camera packages, no board package). Image jobs download that tarball,
+# install one board package, and pack. Adding a board config is enough
+# to include it; the workflow does not list boards by name.
+# workflow_dispatch can rebuild one board or one flavor. Pull requests
+# never upload to R2. A push to main
 # uploads, and also copies each image to images/latest/. A manual run
 # uploads only when "Upload images to R2" is checked.
 name: Build images
@@ -27,10 +27,8 @@ on:
         description: Ubuntu release
         type: choice
         options:
-          - stonking,resolute
           - stonking
-          - resolute
-        default: stonking,resolute
+        default: stonking
       flavor:
         description: Image flavor
         type: choice
@@ -71,7 +69,7 @@ jobs:
       - name: Build the matrix from configs/
         id: set
         env:
-          RELEASE: ${{ github.event.inputs.release || 'stonking,resolute' }}
+          RELEASE: ${{ github.event.inputs.release || 'stonking' }}
           FLAVOR: ${{ github.event.inputs.flavor || 'both' }}
           BOARD: ${{ github.event.inputs.board || 'all' }}
         run: |

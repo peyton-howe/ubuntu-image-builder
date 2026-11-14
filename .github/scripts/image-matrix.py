@@ -39,8 +39,7 @@ fi
 
 def select(requested: str, available: list[str], label: str) -> list[str]:
     # "both" is the flavor input for desktop and server. A release list is
-    # comma-separated so a pull request can build stonking and resolute
-    # without also building every file under configs/releases.
+    # comma-separated. The workflow default is stonking.
     if requested == "all" or (requested == "both" and label == "flavor"):
         return available
     chosen: list[str] = []
@@ -68,7 +67,7 @@ def main() -> None:
         sys.exit(1)
 
     want_board = select(os.environ.get("BOARD", "all"), boards, "board")
-    want_release = select(os.environ.get("RELEASE", "stonking,resolute"), releases, "release")
+    want_release = select(os.environ.get("RELEASE", "stonking"), releases, "release")
     want_flavor = select(os.environ.get("FLAVOR", "both"), flavors, "flavor")
 
     include = []
@@ -88,7 +87,7 @@ def main() -> None:
         print(
             "error: matrix is empty "
             f"(BOARD={os.environ.get('BOARD', 'all')} "
-            f"RELEASE={os.environ.get('RELEASE', 'stonking,resolute')} "
+            f"RELEASE={os.environ.get('RELEASE', 'stonking')} "
             f"FLAVOR={os.environ.get('FLAVOR', 'both')})",
             file=sys.stderr,
         )
