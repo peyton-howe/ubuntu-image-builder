@@ -10,7 +10,7 @@ Package: rk3588-board-orangepi-5
 Architecture: all
 Depends: ${misc:Depends}, u-boot-menu, flash-kernel, zstd
 Recommends: rk3588-camera-overlays, rk3588-camera-dkms
-Breaks: rk3588-camera-overlays (<< 0.1.1-1)
+Conflicts: rk3588-board-orangepi-5b
 Description: Board support for Orange Pi 5
  Firmware, flash-kernel registration, packaged DTB with overlay symbols,
  and u-boot-menu defaults for Orange Pi 5 on stock Ubuntu arm64. Meant to

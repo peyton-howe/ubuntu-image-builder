@@ -9,15 +9,20 @@ PKG := rk3588-board-rock-5-itx
 
 override_dh_auto_clean:
 	rm -f build/$(DTB)
+	rm -rf build/ports
 
 # build/ keeps the sparse kernel checkout between builds.
 override_dh_auto_build:
 	$(CURDIR)/files/build-dtb.sh build/$(DTB) build
+	$(CURDIR)/files/build-ports.sh build/ports build
 
 override_dh_auto_install:
 	install -d debian/$(PKG)/usr/share/$(PKG)
 	install -m 0644 files/flash-kernel.db debian/$(PKG)/usr/share/$(PKG)/flash-kernel.db
 	install -m 0644 files/u-boot.default debian/$(PKG)/usr/share/$(PKG)/u-boot.default
+	install -d debian/$(PKG)/usr/share/rk3588-camera/overlays debian/$(PKG)/usr/share/rk3588-camera/boards
+	install -m 0644 build/ports/*.dtbo debian/$(PKG)/usr/share/rk3588-camera/overlays/
+	install -m 0644 files/camera-board.conf debian/$(PKG)/usr/share/rk3588-camera/boards/rock-5-itx.conf
 	install -d debian/$(PKG)/usr/lib/$(PKG)/dtbs/rockchip
 	install -m 0644 build/$(DTB) debian/$(PKG)/usr/lib/$(PKG)/dtbs/rockchip/$(DTB)
 	install -d debian/$(PKG)/etc/initramfs-tools/hooks

@@ -75,11 +75,13 @@ RK3588_CAMERA_DEBS_DIR=~/rk3588-cameras/build/debs:~/rk3588-cameras/build/libcam
     sudo -E ./build.sh -b rock-5b -r resolute -f desktop
 ```
 
-What stays here is the board side of it: each board package builds the base
-DTB (with `__symbols__`) that the port overlays attach to, and
-`apply-overlays.sh` recognises the board from the installed board package. A
-new board therefore needs a package here and its port overlays in
-rk3588-cameras.
+What stays here is the board side of it. Each board package ships its CSI port
+overlays (`files/ports/*.dtso`, built by `files/build-ports.sh` against the
+dt-bindings of the kernel the board DTS comes from) and a marker,
+`/usr/share/rk3588-camera/boards/<name>.conf`, with the board's name, port
+file prefix and port numbers. `apply-overlays.sh` reads the marker, so a new
+board only touches this repository. Constants that the kernel's headers do not
+have yet (`PHY_DIRECTION_RX`) are defined in the port file behind an `#ifndef`.
 
 `patches/kernel/mainline/` is kept for the custom mainline kernel build only;
 the DKMS sources are maintained in rk3588-cameras.

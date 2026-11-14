@@ -175,9 +175,10 @@ The camera stack lives in its own repository,
 [rk3588-cameras](https://github.com/peyton-howe/rk3588-cameras), and the images
 install it from prebuilt packages. `rk3588-camera-dkms` builds the sensor
 drivers and the `rkisp2` ISP driver against the installed kernel,
-`rk3588-camera-overlays` ships one overlay per CSI port and one overlay per
-sensor, and `libcamera0.8` is libcamera with the rkisp2 pipeline handler. No
-camera is enabled by default.
+`rk3588-camera-overlays` ships one overlay per sensor and the ISP overlays, and
+`libcamera0.8` is libcamera with the rkisp2 pipeline handler. The CSI port
+overlays for a board come with its `rk3588-board-*` package. No camera is
+enabled by default.
 
 A port overlay turns the connector on (I2C, clock, reset, regulator, CSI
 host) and publishes `cam_portN_*` labels. A sensor overlay describes the
@@ -186,7 +187,7 @@ U-Boot does not apply Raspberry Pi overlay parameters, so
 `apply-overlays.sh` bakes `portN`, `ispN`, `unite`, `4lane`, `link-frequency`,
 `rotation`, and `orientation` into a dtbo under `/var/lib/rk3588-camera/`
 and points `U_BOOT_FDT_OVERLAYS` at it. It also selects the port overlay
-for the installed board package.
+for the installed board package, using the marker that package installs.
 
 ```bash
 sudo sed -i 's/^RK3588_CAMERA_OVERLAYS=.*/RK3588_CAMERA_OVERLAYS="imx708,port1"/' \
