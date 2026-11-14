@@ -30,16 +30,148 @@ fi
 # shellcheck source=/dev/null
 source "${ROOT_DIR}/configs/flavors/${FLAVOR}.sh"
 
-# The extracted rootfs directory is the build artifact; build-image.sh copies
-# it straight into the image. The stamp is written last, so an interrupted
-# build leaves no stamp and the next run starts over. It records the board and
-# kernel type (see rootfs_stamp_id) so another board rebuilds instead of
-# reusing this board's packages.
+# The extracted rootfs directory is what build-image.sh copies into the image.
+# The stamp is written last, so an interrupted build leaves no stamp and the
+# next run starts over. A shared tarball (no board package) is reused: this
+# script installs the requested board's deb into it instead of repeating the
+# ISO download and apt.
 ROOTFS_STAMP="${RELEASE}-${FLAVOR}.done"
-if rootfs_is_current "${ROOTFS_STAMP}" && [[ -d ${RELEASE}-${FLAVOR} ]]; then
-    echo "[+] Rootfs already built for $(rootfs_stamp_id): ${RELEASE}-${FLAVOR}"
+ROOTFS_DIR="${RELEASE}-${FLAVOR}"
+TARBALL="$(rootfs_tarball_name)"
+KERNEL_TYPE="${KERNEL_TYPE:-stock}"
+BOARD_PKG="$(board_support_package "${BOARD:-}")"
+DEBS_DIR="${ROOT_DIR}/build/debs"
+
+# Install BOARD's package into a rootfs that was built with no board. The
+# board package postinst rebuilds the initramfs.
+install_board_into_shared_rootfs() {
+    local pkg fetched
+    if [[ -z ${BOARD_PKG} ]]; then
+        echo "Error: no board support package mapping for BOARD=${BOARD:-unset}"
+        exit 1
+    fi
+    if ! deb_is_current "${BOARD_PKG}"; then
+        echo "Error: ${BOARD_PKG} $(package_version "${BOARD_PKG}") not in ${DEBS_DIR}; run ./scripts/build-debs.sh ${BOARD_PKG} first"
+        exit 1
+    fi
+    mkdir -p "${ROOTFS_DIR}/tmp/rk3588-debs"
+    cp -v "${DEBS_DIR}/${BOARD_PKG}_$(package_version "${BOARD_PKG}")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    fetched="$(board_fetched_debs "${BOARD}")"
+    if [[ -n ${fetched} ]]; then
+        "${ROOT_DIR}/scripts/fetch-aic8800-debs.sh"
+        for pkg in ${fetched}; do
+            if ! compgen -G "${DEBS_DIR}/${pkg}_"*.deb > /dev/null; then
+                echo "Error: ${pkg} not in ${DEBS_DIR}"
+                exit 1
+            fi
+            cp -v "${DEBS_DIR}/${pkg}_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+        done
+    fi
+
+    rm -f "${ROOTFS_DIR}/etc/resolv.conf"
+    tee "${ROOTFS_DIR}/etc/resolv.conf" >/dev/null <<EOF
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+EOF
+    if [[ "$(uname -m)" != "aarch64" ]]; then
+        cp /usr/bin/qemu-aarch64-static "${ROOTFS_DIR}/usr/bin/"
+    fi
+    prepare_chroot_mounts "${ROOTFS_DIR}"
+    chroot "${ROOTFS_DIR}" /bin/bash -c "
+set -e
+export DEBIAN_FRONTEND=noninteractive
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+BOARD_PKG='${BOARD_PKG}'
+echo '[+] Installing '\${BOARD_PKG}' into the shared rootfs...'
+dpkg -i /tmp/rk3588-debs/*.deb || apt-get -f install -y
+rm -rf /tmp/rk3588-debs
+if ! dpkg-query -W -f='\${Status}' \${BOARD_PKG} 2>/dev/null | grep -q 'install ok installed'; then
+    echo \"Error: \${BOARD_PKG} did not install\" >&2
+    exit 1
+fi
+"
+    teardown_chroot_mounts "${ROOTFS_DIR}"
+    if [[ "$(uname -m)" != "aarch64" ]]; then
+        rm -f "${ROOTFS_DIR}/usr/bin/qemu-aarch64-static"
+    fi
+    rm -f "${ROOTFS_DIR}/etc/resolv.conf"
+    if [[ -e "${ROOTFS_DIR}/run/systemd/resolve/stub-resolv.conf" ]] || [[ -d "${ROOTFS_DIR}/lib/systemd" ]]; then
+        ln -sf ../run/systemd/resolve/stub-resolv.conf "${ROOTFS_DIR}/etc/resolv.conf"
+    fi
+}
+
+# Archive the shared tree. The ISO is removed first: the archive is a second
+# full copy, and a runner does not have room for the ISO, the tree, and the
+# tarball together. The extracted tree is removed after the archive is in
+# place; image jobs extract the archive again.
+pack_shared_rootfs_tarball() {
+    local iso
+    shopt -s nullglob
+    for iso in *.iso; do
+        rm -f "${iso}"
+    done
+    shopt -u nullglob
+    rm -f SHA256SUMS
+    if mountpoint -q iso-mnt 2>/dev/null; then
+        umount iso-mnt || true
+    fi
+    rm -rf iso-mnt
+    echo "[+] Packing shared rootfs ${TARBALL}"
+    rm -f "${TARBALL}" "${TARBALL}.partial"
+    # -T0 uses every core. A partial name keeps a killed pack from looking done.
+    set -o pipefail
+    tar -cf - "${ROOTFS_DIR}" "${ROOTFS_STAMP}" | xz -T0 -c > "${TARBALL}.partial"
+    set +o pipefail
+    mv -f "${TARBALL}.partial" "${TARBALL}"
+    rm -rf "${ROOTFS_DIR}"
+    echo "[✓] Shared rootfs: $(pwd)/${TARBALL}"
+}
+
+if [[ -z ${BOARD} && -f ${TARBALL} ]]; then
+    echo "[+] Shared rootfs tarball present: ${TARBALL}"
     exit 0
 fi
+
+if rootfs_is_current "${ROOTFS_STAMP}" && [[ -d ${ROOTFS_DIR} ]]; then
+    echo "[+] Rootfs already built for $(rootfs_stamp_id): ${RELEASE}-${FLAVOR}"
+    if [[ -z ${BOARD} && ! -f ${TARBALL} ]]; then
+        pack_shared_rootfs_tarball
+    fi
+    exit 0
+fi
+
+# A board image with the release tarball available starts from that archive
+# instead of the ISO. A stale archive (camera package versions changed) falls
+# through and is rebuilt.
+if [[ -n ${BOARD} && -f ${TARBALL} ]]; then
+    if [[ -d ${ROOTFS_DIR} ]] && ! rootfs_shared_is_current "${ROOTFS_STAMP}"; then
+        echo "[+] Replacing rootfs built for $(cat "${ROOTFS_STAMP}" 2>/dev/null || echo unknown)"
+        rm -rf "${ROOTFS_DIR}"
+        rm -f "${ROOTFS_STAMP}"
+    fi
+    if [[ ! -d ${ROOTFS_DIR} ]]; then
+        echo "[+] Extracting shared rootfs ${TARBALL}"
+        tar -xJf "${TARBALL}"
+    fi
+    if rootfs_shared_is_current "${ROOTFS_STAMP}"; then
+        install_board_into_shared_rootfs
+        rootfs_stamp_id > "${ROOTFS_STAMP}"
+        # The image pack needs the extracted tree, not a second copy of it.
+        rm -f "${TARBALL}"
+        echo "[✓] Rootfs: $(pwd)/${ROOTFS_DIR}"
+        exit 0
+    fi
+    if rootfs_is_current "${ROOTFS_STAMP}" && [[ -d ${ROOTFS_DIR} ]]; then
+        rm -f "${TARBALL}"
+        echo "[+] Rootfs already built for $(rootfs_stamp_id): ${RELEASE}-${FLAVOR}"
+        exit 0
+    fi
+    echo "[+] Shared rootfs ${TARBALL} does not match this checkout; rebuilding from the ISO"
+    rm -rf "${ROOTFS_DIR}"
+    rm -f "${ROOTFS_STAMP}" "${TARBALL}"
+fi
+
 if [[ -f ${ROOTFS_STAMP} ]]; then
     echo "[+] Rootfs was built for $(cat "${ROOTFS_STAMP}"), need $(rootfs_stamp_id); rebuilding"
 fi
@@ -55,12 +187,8 @@ fi
 
 ISO_NAME="$(basename "${ISO_URL}")"
 ISO_PATH="$(pwd)/${ISO_NAME}"
-ROOTFS_DIR="${RELEASE}-${FLAVOR}"
 ISO_MNT="$(pwd)/iso-mnt"
 KERNEL_DIR="${ROOT_DIR}/build/kernel"
-DEBS_DIR="${ROOT_DIR}/build/debs"
-KERNEL_TYPE="${KERNEL_TYPE:-stock}"
-BOARD_PKG="$(board_support_package "${BOARD:-}")"
 
 cleanup_iso() {
     if mountpoint -q "${ISO_MNT}" 2>/dev/null; then
@@ -212,8 +340,8 @@ if is_stock_kernel; then
     cp -v "${DEBS_DIR}/rk3588-camera-dkms_$(package_version "rk3588-camera-dkms")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
     if [[ -n ${BOARD_PKG} ]]; then
         cp -v "${DEBS_DIR}/${BOARD_PKG}_$(package_version "${BOARD_PKG}")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
-    else
-        echo "Warning: no board support package mapping for BOARD=${BOARD:-unset}"
+    elif [[ -n ${BOARD} ]]; then
+        echo "Warning: no board support package mapping for BOARD=${BOARD}"
     fi
     if [[ -n $(board_fetched_debs "${BOARD:-}") ]]; then
         "${ROOT_DIR}/scripts/fetch-aic8800-debs.sh"
@@ -353,4 +481,8 @@ if [[ "$(uname -m)" != "aarch64" ]]; then
 fi
 
 rootfs_stamp_id > "${ROOTFS_STAMP}"
-echo "[✓] Rootfs: $(pwd)/${ROOTFS_DIR}"
+if [[ -z ${BOARD} ]]; then
+    pack_shared_rootfs_tarball
+else
+    echo "[✓] Rootfs: $(pwd)/${ROOTFS_DIR}"
+fi

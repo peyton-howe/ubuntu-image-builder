@@ -28,7 +28,8 @@ Optional arguments:
   -ko, --kernel-only          only compile the kernel (vendor/mainline)
   -do, --debs-only            only build board/camera .debs into build/debs/
   -uo, --uboot-only           only compile uboot
-  -ro, --rootfs-only          only extract Ubuntu's official aarch64 ISO into a rootfs
+  -ro, --rootfs-only          only build the rootfs. With no --board, pack a shared
+                              tarball (camera packages, no board package)
        --compress             xz-compress the output image (default)
        --no-compress          leave the output image uncompressed
   -v,  --verbose              increase the verbosity of the bash script
@@ -324,13 +325,40 @@ if [ "${DEBS_ONLY}" == "Y" ]; then
     exit 0
 fi
 
+# Build only the named packages that are missing or older than their changelog.
+# A shared rootfs needs the camera packages. A board image needs that board's
+# package (and, for the ROCK 5C, the fetched AIC8800 debs).
+ensure_stock_debs() {
+    local pkg missing=()
+    for pkg in "$@"; do
+        if [[ -z ${pkg} ]]; then
+            continue
+        fi
+        if ! deb_is_current "${pkg}"; then
+            echo "[+] ${pkg} $(package_version "${pkg}") not in build/debs; rebuilding"
+            missing+=("${pkg}")
+        fi
+    done
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        ./scripts/build-debs.sh "${missing[@]}"
+    fi
+    if [[ -n ${BOARD} && -n $(board_fetched_debs "${BOARD}") ]]; then
+        ./scripts/fetch-aic8800-debs.sh
+    fi
+}
+
 if [ "${ROOTFS_ONLY}" == "Y" ]; then
     if [ -z "${RELEASE}" ] || [ -z "${FLAVOR}" ]; then
         usage
         exit 1
     fi
     if is_stock_kernel; then
-        ./scripts/build-debs.sh
+        if [ -z "${BOARD}" ]; then
+            ensure_stock_debs rk3588-camera-overlays rk3588-camera-dkms
+        else
+            # shellcheck disable=SC2046
+            ensure_stock_debs $(stock_packages)
+        fi
     fi
     ./scripts/build-rootfs.sh
     exit 0
@@ -352,17 +380,15 @@ if [ -z "${BOARD}" ] || [ -z "${RELEASE}" ] || [ -z "${FLAVOR}" ]; then
 fi
 
 if is_stock_kernel; then
-    # Board/camera packages for the stock ISO path; rebuild when missing or
-    # older than packages/*/debian/changelog.
-    need_debs=0
-    for pkg in $(stock_packages); do
-        if ! deb_is_current "${pkg}"; then
-            echo "[+] ${pkg} $(package_version "${pkg}") not in build/debs; rebuilding packages"
-            need_debs=1
-        fi
-    done
-    if [[ ${need_debs} -eq 1 ]]; then
-        ./scripts/build-debs.sh
+    # A shared tarball already has the camera packages. Build the board
+    # package only, then install it into the extracted tree. Without that
+    # tarball, build the camera packages and this board's package from the ISO.
+    rootfs_tar="build/rootfs/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64.rootfs.tar.xz"
+    if [[ -f ${rootfs_tar} ]]; then
+        ensure_stock_debs "$(board_support_package "${BOARD}")"
+    else
+        # shellcheck disable=SC2046
+        ensure_stock_debs $(stock_packages)
     fi
 else
     # Build the custom Linux kernel if not found
