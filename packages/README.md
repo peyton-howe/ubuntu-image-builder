@@ -64,15 +64,21 @@ To test a change on a running board without reflashing:
 The camera stack (the DKMS drivers, the overlays with their port and sensor
 `.dtso` files and `apply-overlays.sh`, and libcamera) lives in its own
 repository, [rk3588-cameras](https://github.com/peyton-howe/rk3588-cameras),
-and is installed from prebuilt packages. `scripts/fetch-camera-debs.sh` puts
-them into `build/debs/`: the release to use is pinned in
-`scripts/camera-debs.conf` (tag and the hash of its `SHA256SUMS`), and
-libcamera is picked for the Ubuntu release being built. To try packages that are
-not released yet, point `RK3588_CAMERA_DEBS_DIR` at their build output:
+and is installed from the Tachyn Labs apt repository, `https://apt.tachynlabs.com`
+(settings in `scripts/camera-apt.conf`). `scripts/setup-camera-apt.sh` adds the
+repository to the rootfs after checking its archive key against the fingerprint
+in that file, and `build-rootfs.sh` installs the camera packages from it once the
+board package is in. The source stays in the image, so `apt upgrade` updates
+them. The repository has a suite per Ubuntu release (`stonking` for now), and
+`build.sh` refuses `--kernel-type=stock` for any other release.
+The rootfs is rebuilt when the suite's packages change.
+
+To try packages that are not published yet, point `RK3588_CAMERA_DEBS_DIR` at
+their build output and they are installed instead:
 
 ```bash
-RK3588_CAMERA_DEBS_DIR=~/rk3588-cameras/build/debs:~/rk3588-cameras/build/libcamera/resolute \
-    sudo -E ./build.sh -b rock-5b -r resolute -f desktop
+RK3588_CAMERA_DEBS_DIR=~/rk3588-cameras/build/debs:~/rk3588-cameras/build/libcamera/stonking \
+    sudo -E ./build.sh -b rock-5b-plus -r stonking -f desktop
 ```
 
 What stays here is the board side of it. Each board package ships its CSI port

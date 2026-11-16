@@ -187,6 +187,15 @@ if [ -n "${RELEASE}" ]; then
     done
 fi
 
+# The stock-kernel images (the prebuilt Ubuntu images with our packages) install
+# the camera packages from the apt repository, which has a suite for these
+# releases only. Any other release needs a custom kernel.
+if is_stock_kernel && [ -n "${RELEASE}" ] && ! camera_apt_has_suite "${RELEASE}"; then
+    echo "Error: --kernel-type=stock only supports: $(camera_apt_suites)."
+    echo "       \"${RELEASE}\" needs a custom kernel (--kernel-type=vendor or mainline)."
+    exit 1
+fi
+
 if [ "${FLAVOR}" == "help" ]; then
     for file in configs/flavors/*; do
         basename "${file%.sh}"
