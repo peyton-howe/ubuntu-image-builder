@@ -32,8 +32,9 @@ WiFi/BT; a card in the M.2 slot works if the kernel and linux-firmware support
 it. The ROCK 5D has no device tree in the stock kernel and no U-Boot support
 yet, so it is not included.
 
-Releases (`--release`): `questing` (25.10), `resolute` (26.04), `stonking`
-(26.10 daily). Flavors (`--flavor`): `desktop`, `server`.
+Releases (`--release`): `stonking` (26.10 daily) with the default stock kernel.
+`questing` (25.10) and `resolute` (26.04) need a custom kernel
+(`--kernel-type=vendor` or `mainline`). Flavors (`--flavor`): `desktop`, `server`.
 
 ## Quick start
 
@@ -44,7 +45,7 @@ Build on an Ubuntu host (arm64 native, or x86_64 with `qemu-user-static`),
 sudo apt install git make gcc gcc-aarch64-linux-gnu bison flex swig \
     python3-dev python3-pyelftools libssl-dev libgnutls28-dev uuid-dev \
     debhelper dh-dkms dkms dpkg-dev device-tree-compiler \
-    squashfs-tools parted e2fsprogs xz-utils wget
+    squashfs-tools parted e2fsprogs xz-utils wget curl gnupg
 # x86_64 hosts also need: qemu-user-static binfmt-support
 
 sudo ./build.sh -b orangepi-5b -r stonking -f desktop
@@ -61,7 +62,7 @@ upstream device-tree sources for the Orange Pi 5B (~16 MB, from GitHub).
 
 ```
 -b, --board=BOARD         orangepi-5 | orangepi-5b | orangepi-5-max | orangepi-5-plus | orangepi-5-pro | rock-5a | rock-5b | rock-5b-plus | rock-5c | rock-5-itx
--r, --release=RELEASE     questing | resolute | stonking
+-r, --release=RELEASE     stonking (stock kernel) | questing | resolute (custom kernel only)
 -f, --flavor=FLAVOR       desktop | server
 -kt, --kernel-type=TYPE   stock (default) | vendor | mainline
     --compress / --no-compress   xz the final image (default: compress)
@@ -171,9 +172,15 @@ Ubuntu's DTB (which has `__symbols__`).
 
 ## Cameras
 
-`rk3588-camera-dkms` builds the `imx708` sensor driver and the `rkisp2` ISP
-driver against the installed kernel. `rk3588-camera-overlays` ships one
-overlay per CSI port and one overlay per sensor. None are enabled by default.
+The camera stack lives in its own repository,
+[rk3588-cameras](https://github.com/peyton-howe/rk3588-cameras), and the images
+install it from the Tachyn Labs apt repository (`https://apt.tachynlabs.com`),
+which they keep as an apt source so `apt upgrade` updates it. `rk3588-camera-dkms` builds the sensor
+drivers and the `rkisp2` ISP driver against the installed kernel,
+`rk3588-camera-overlays` ships one overlay per sensor and the ISP overlays, and
+`libcamera0.8` is libcamera with the rkisp2 pipeline handler. The CSI port
+overlays for a board come with its `rk3588-board-*` package. No camera is
+enabled by default.
 
 A port overlay turns the connector on (I2C, clock, reset, regulator, CSI
 host) and publishes `cam_portN_*` labels. A sensor overlay describes the
@@ -182,7 +189,7 @@ U-Boot does not apply Raspberry Pi overlay parameters, so
 `apply-overlays.sh` bakes `portN`, `ispN`, `unite`, `4lane`, `link-frequency`,
 `rotation`, and `orientation` into a dtbo under `/var/lib/rk3588-camera/`
 and points `U_BOOT_FDT_OVERLAYS` at it. It also selects the port overlay
-for the installed board package.
+for the installed board package, using the marker that package installs.
 
 ```bash
 sudo sed -i 's/^RK3588_CAMERA_OVERLAYS=.*/RK3588_CAMERA_OVERLAYS="imx708,port1"/' \

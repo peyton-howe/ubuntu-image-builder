@@ -119,8 +119,28 @@ package_version() {
 
 # Packages from packages/ that the stock-kernel rootfs installs for BOARD.
 stock_packages() {
-    echo rk3588-camera-overlays rk3588-camera-dkms
     board_support_package "${1:-${BOARD:-}}"
+}
+
+# The camera packages the stock-kernel rootfs installs, from the apt repository
+# in camera-apt.conf (or from RK3588_CAMERA_DEBS_DIR, see use-local-camera-debs.sh).
+camera_packages() {
+    local libcamera
+    # shellcheck source=camera-apt.conf
+    libcamera="$(. "${REPO_ROOT_DIR}/scripts/camera-apt.conf" && echo "${CAMERA_LIBCAMERA_PKG}")"
+    echo "rk3588-camera-overlays rk3588-camera-dkms ${libcamera}"
+}
+
+# The releases the camera apt repository has a suite for.
+camera_apt_suites() {
+    (. "${REPO_ROOT_DIR}/scripts/camera-apt.conf" && echo "${CAMERA_APT_SUITES}")
+}
+
+# True when the camera apt repository has a suite for release $1.
+camera_apt_has_suite() {
+    local suites
+    suites="$(. "${REPO_ROOT_DIR}/scripts/camera-apt.conf" && echo "${CAMERA_APT_SUITES}")"
+    [[ " ${suites} " == *" $1 "* ]]
 }
 
 # True when build/debs has package $1 at its current changelog version, so a
@@ -134,13 +154,15 @@ deb_is_current() {
 # apt, no board package. build-rootfs.sh can install one board into that tree.
 # A stamp of "board=<name> ..." already has that board's package. Package
 # versions are recorded so a changelog bump rebuilds a rootfs that has the
-# old deb installed.
+# old deb installed, and camera_source_id records where the camera
+# packages came from.
 rootfs_stamp_id() {
     local id="board=${BOARD:-} kernel=${KERNEL_TYPE:-stock}" pkg
     if is_stock_kernel; then
         for pkg in $(stock_packages); do
             id+=" ${pkg}=$(package_version "${pkg}")"
         done
+        id+=" camera=$(camera_source_id)"
     fi
     echo "${id}"
 }
@@ -158,6 +180,27 @@ rootfs_shared_is_current() {
 # Archive of a shared rootfs, relative to build/rootfs/.
 rootfs_tarball_name() {
     echo "ubuntu-${RELEASE:?}-preinstalled-${FLAVOR:?}-arm64.rootfs.tar.xz"
+}
+
+# Where the camera packages come from: the apt repository (a hash of the
+# suite's InRelease, so publishing new packages rebuilds the rootfs), or a hash
+# of the local packages when RK3588_CAMERA_DEBS_DIR is set. A different source
+# means the rootfs has other camera packages installed and must be rebuilt.
+camera_source_id() {
+    local -a dirs
+    local url release_file
+    if [[ -n ${RK3588_CAMERA_DEBS_DIR:-} ]]; then
+        IFS=: read -r -a dirs <<< "${RK3588_CAMERA_DEBS_DIR}"
+        echo "local:$(find "${dirs[@]}" -maxdepth 1 \( -name 'rk3588-camera-*.deb' -o -name 'libcamera*.deb' \) -print0 2>/dev/null \
+            | sort -z | xargs -0 -r cat | sha256sum | cut -c1-16)"
+    elif camera_apt_has_suite "${RELEASE:-}"; then
+        url="$(. "${REPO_ROOT_DIR}/scripts/camera-apt.conf" && echo "${CAMERA_APT_URL}")"
+        release_file="$(curl -fsSL --retry 3 "${url}/dists/${RELEASE}/InRelease" 2>/dev/null)" \
+            || { echo "apt:unavailable"; return; }
+        echo "apt:$(printf '%s' "${release_file}" | sha256sum | cut -c1-12)"
+    else
+        echo "none"
+    fi
 }
 
 # True when stamp file $1 exists and matches the current BOARD/KERNEL_TYPE.

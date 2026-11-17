@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build packages under packages/rk3588-* into build/debs/
+# Build the board packages under packages/rk3588-* into build/debs/
 set -eE
 trap 'echo Error: in $0 on line $LINENO' ERR
 
@@ -19,8 +19,6 @@ if ! dpkg -s debhelper >/dev/null 2>&1; then
 fi
 
 PACKAGES=(
-    rk3588-camera-overlays
-    rk3588-camera-dkms
     rk3588-board-orangepi-5
     rk3588-board-orangepi-5b
     rk3588-board-rock-5b-plus

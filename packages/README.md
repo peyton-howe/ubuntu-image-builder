@@ -12,8 +12,7 @@ Debian packages installed into the rootfs on the **stock** kernel path
 | `rk3588-board-orangepi-5-max`, `-orangepi-5-plus`, `-orangepi-5-pro` | Board glue, plus their own DTB (upstream DTS built with `-@` so camera overlays can apply); not tested on hardware |
 | `rk3588-board-rock-5a`, `-rock-5c`, `-rock-5-itx` | Board glue, plus their own DTB (upstream DTS built with `-@` so camera overlays can apply); not tested on hardware |
 | `rk3588-board-rock-5b` | Board glue only (Ubuntu's DTB already has `__symbols__`); not tested on hardware |
-| `rk3588-camera-dkms` | DKMS: `imx708` sensor + `rkisp2` ISP (`rockchip-isp2`), plus a replacement `phy-rockchip-samsung-dcphy` with the CSI receiver for the SoC's DCPHYs |
-| `rk3588-camera-overlays` | One `.dtbo` per CSI port and per sensor (`imx708`, `imx219`, `imx519`), plus `rk3588-isp.dtbo` and `rk3588-isp-unite.dtbo`. `overlays.conf` uses Pi syntax (`imx708,port0`, or `imx708,port0,unite`); `apply-overlays.sh` bakes parameters and treats the conf as the full camera-overlay list |
+| `rk3588-camera-dkms`, `rk3588-camera-overlays`, `libcamera0.8` | Not built here: they come prebuilt from the [rk3588-cameras](https://github.com/peyton-howe/rk3588-cameras) repository (see [Camera packages](#camera-packages)) |
 
 **Board glue**, shared by all the board packages:
 
@@ -60,18 +59,35 @@ To test a change on a running board without reflashing:
   dpkg refuses to unpack the package, and the image then won't boot.
   `build-rootfs.sh` now fails loudly if the board package doesn't install.
 
-## Regenerating camera sources
+## Camera packages
 
-`rk3588-camera-dkms/src/` and `rk3588-camera-overlays/dts/rk3588-isp.dtso`
-are generated from `patches/kernel/mainline/` and committed; edit the
-patches, not those generated files. The port and sensor `.dtso` files are
-maintained in `dts/` (patch 0006's per-board imx708 overlays are only for
-the mainline kernel build). After changing the patch series:
+The camera stack (the DKMS drivers, the overlays with their port and sensor
+`.dtso` files and `apply-overlays.sh`, and libcamera) lives in its own
+repository, [rk3588-cameras](https://github.com/peyton-howe/rk3588-cameras),
+and is installed from the Tachyn Labs apt repository, `https://apt.tachynlabs.com`
+(settings in `scripts/camera-apt.conf`). `scripts/setup-camera-apt.sh` adds the
+repository to the rootfs after checking its archive key against the fingerprint
+in that file, and `build-rootfs.sh` installs the camera packages from it once the
+board package is in. The source stays in the image, so `apt upgrade` updates
+them. The repository has a suite per Ubuntu release (`stonking` for now), and
+`build.sh` refuses `--kernel-type=stock` for any other release.
+The rootfs is rebuilt when the suite's packages change.
+
+To try packages that are not published yet, point `RK3588_CAMERA_DEBS_DIR` at
+their build output and they are installed instead:
 
 ```bash
-./scripts/extract-oot-from-patches.sh
+RK3588_CAMERA_DEBS_DIR=~/rk3588-cameras/build/debs:~/rk3588-cameras/build/libcamera/stonking \
+    sudo -E ./build.sh -b rock-5b-plus -r stonking -f desktop
 ```
 
-Kernel API differences for the stock kernel go in patch **0007**
-(`rkisp2-v4l2-compat.h`), feature-tested rather than version-tested, so the
-same source builds for the 7.2-based mainline tree and Ubuntu's 7.3.
+What stays here is the board side of it. Each board package ships its CSI port
+overlays (`files/ports/*.dtso`, built by `files/build-ports.sh` against the
+dt-bindings of the kernel the board DTS comes from) and a marker,
+`/usr/share/rk3588-camera/boards/<name>.conf`, with the board's name, port
+file prefix and port numbers. `apply-overlays.sh` reads the marker, so a new
+board only touches this repository. Constants that the kernel's headers do not
+have yet (`PHY_DIRECTION_RX`) are defined in the port file behind an `#ifndef`.
+
+`patches/kernel/mainline/` is kept for the custom mainline kernel build only;
+the DKMS sources are maintained in rk3588-cameras.
