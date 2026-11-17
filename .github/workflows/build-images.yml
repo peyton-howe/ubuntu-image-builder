@@ -359,12 +359,21 @@ jobs:
       # After the GitHub artifact, so a storage failure still leaves the
       # image to download. Pull requests never reach the public bucket.
       # Each job uploads only its own image.
+      #
+      # A push to main publishes to images/latest/, with the same object names
+      # every time so a download link never moves. Release, flavor, and board
+      # stay in the name so those images do not overwrite each other. A manual
+      # run from another branch uploads to images/<branch>/ instead, so it can
+      # never replace latest/.
       - name: Upload image to R2
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.upload_r2)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
           RELEASE: ${{ matrix.release }}
           FLAVOR: ${{ matrix.flavor }}
           BOARD: ${{ matrix.board }}
@@ -376,22 +385,12 @@ jobs:
           fi
           image="images/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64-${BOARD}.img.xz"
           sha256sum "${image}" > "${image}.sha256"
-          # A pull request's GITHUB_REF_NAME is "<number>/merge". This step
-          # does not run for pull requests; the head branch covers a manual run.
-          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
           name="$(basename "${image}")"
-          sum="$(basename "${image}.sha256")"
-          endpoint="https://d4c5965011f175a03fd911313e9c9062.r2.cloudflarestorage.com"
-          aws s3 cp "${image}" "s3://tachyn-downloads/images/${ref}/${name}" \
-            --endpoint-url "${endpoint}"
-          aws s3 cp "${image}.sha256" "s3://tachyn-downloads/images/${ref}/${sum}" \
-            --endpoint-url "${endpoint}"
-          # Same object names on every main build, so a wiki link does not move.
-          # Release, flavor, and board stay in the name so those images do not
-          # overwrite each other.
-          if [[ ${ref} == main ]]; then
-            aws s3 cp "${image}" "s3://tachyn-downloads/images/latest/${name}" \
-              --endpoint-url "${endpoint}"
-            aws s3 cp "${image}.sha256" "s3://tachyn-downloads/images/latest/${sum}" \
-              --endpoint-url "${endpoint}"
-          fi
+          # The bucket path of a main build is latest; another branch gets its own.
+          ref="${GITHUB_REF_NAME}"
+          dest="latest"
+          [[ ${ref} == main ]] || dest="${ref}"
+          aws s3 cp "${image}" "s3://tachyn-downloads/images/${dest}/${name}" \
+            --endpoint-url "${R2_ENDPOINT}"
+          aws s3 cp "${image}.sha256" "s3://tachyn-downloads/images/${dest}/${name}.sha256" \
+            --endpoint-url "${R2_ENDPOINT}"
