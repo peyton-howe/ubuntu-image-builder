@@ -200,6 +200,9 @@ EOF
 # =========================
 mkdir -p "${ROOTFS_DIR}/tmp/kernel-debs" "${ROOTFS_DIR}/tmp/rk3588-debs"
 
+# Camera packages to install from the apt repository inside the chroot.
+CAMERA_APT_INSTALL=""
+
 if is_stock_kernel; then
     echo "[+] Stock kernel path: staging board/camera packages from ${DEBS_DIR}"
     for pkg in $(stock_packages); do
@@ -208,8 +211,20 @@ if is_stock_kernel; then
             exit 1
         fi
     done
-    cp -v "${DEBS_DIR}/rk3588-camera-overlays_$(package_version "rk3588-camera-overlays")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
-    cp -v "${DEBS_DIR}/rk3588-camera-dkms_$(package_version "rk3588-camera-dkms")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+    # Camera packages (overlays, DKMS drivers, libcamera): from the Tachyn apt
+    # repository, installed after the board package below. The source stays in
+    # the image so `apt upgrade` updates them. RK3588_CAMERA_DEBS_DIR installs
+    # locally built packages instead, to try a change before it is published.
+    "${ROOT_DIR}/scripts/setup-camera-apt.sh" "${ROOTFS_DIR}" "${RELEASE}"
+    if [[ -n ${RK3588_CAMERA_DEBS_DIR:-} ]]; then
+        "${ROOT_DIR}/scripts/use-local-camera-debs.sh" "${RELEASE}"
+        for pkg in $(camera_packages); do
+            compgen -G "${DEBS_DIR}/${pkg}_*.deb" > /dev/null || continue
+            cp -v "${DEBS_DIR}/${pkg}_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
+        done
+    elif camera_apt_has_suite "${RELEASE}"; then
+        CAMERA_APT_INSTALL="$(camera_packages)"
+    fi
     if [[ -n ${BOARD_PKG} ]]; then
         cp -v "${DEBS_DIR}/${BOARD_PKG}_$(package_version "${BOARD_PKG}")_"*.deb "${ROOTFS_DIR}/tmp/rk3588-debs/"
     else
@@ -313,6 +328,13 @@ if [[ \"\${KERNEL_TYPE}\" == stock ]]; then
             echo \"Error: \${BOARD_PKG} did not install\" >&2
             exit 1
         fi
+    fi
+
+    # After the board package: the overlays package reads the board's marker.
+    if [[ -n '${CAMERA_APT_INSTALL}' ]]; then
+        echo '[+] Installing the camera packages from the Tachyn apt repository...'
+        apt-get update
+        apt-get install -y ${CAMERA_APT_INSTALL}
     fi
 else
     if compgen -G '/tmp/kernel-debs/*.deb' > /dev/null; then

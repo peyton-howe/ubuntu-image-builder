@@ -1,13 +1,5 @@
 rk3588-board-orangepi-5-pro (0.1.0-1) UNRELEASED; urgency=medium
 
-  * Initial board support package for the stock Ubuntu kernel: unwrap the
-    kernel for U-Boot booti, register the board with flash-kernel, boot the
-    stock kernel's own DTB, load the Rockchip MMC drivers in the initramfs
-    and enable panthor GPU profiling.
-  * Ship our own DTB, built from the upstream DTS with -@ (symbols), so the
-    camera overlays can apply; Ubuntu's DTB has no __symbols__.
-  * Ship the AP6256 WiFi and Bluetooth firmware (brcmfmac43456-sdio, BCM4345C5),
-    vendored from armbian/firmware, which Ubuntu's linux-firmware lacks, and
-    link the .bin to the board-specific name the driver asks for first.
+  * Initial release.
 
- -- Peyton Howe <peyton@localhost>  Sun, 08 Nov 2026 12:00:00 +0000
+ -- Peyton Howe <peyton@localhost>  Sat, 14 Nov 2026 12:00:00 +0000
