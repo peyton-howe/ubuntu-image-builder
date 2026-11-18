@@ -3,6 +3,10 @@
 Builds bootable Ubuntu images for RK3588 single-board computers from
 Ubuntu's official arm64 ISOs.
 
+**Just want an image?** Prebuilt images are on the
+[downloads page](https://tachynlabs.com/downloads/). The rest of this README is
+for building your own.
+
 The default (**stock**) path keeps Ubuntu's own kernel and rootfs, writes our
 U-Boot to the image, and installs a few small board and camera packages from
 [`packages/`](packages/README.md). Custom kernels (**vendor** or **mainline**)

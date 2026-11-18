@@ -149,12 +149,13 @@ deb_is_current() {
     compgen -G "${REPO_ROOT_DIR}/build/debs/$1_$(package_version "$1")_*.deb" > /dev/null
 }
 
-# The rootfs is named <release>-<flavor> but has one board's package (and, on
-# vendor/mainline, one kernel) installed, so its .done stamp records what it
-# was built for; a different BOARD or KERNEL_TYPE means it must be rebuilt.
-# On the stock path it also records the package versions, so bumping a
-# package under packages/ rebuilds the rootfs that has the old one installed,
-# and where the camera packages come from (camera_source_id).
+# The rootfs directory is named <release>-<flavor>. A stamp of "board= ..."
+# (nothing after the equals) is the shared stock rootfs: camera packages and
+# apt, no board package. build-rootfs.sh can install one board into that tree.
+# A stamp of "board=<name> ..." already has that board's package. Package
+# versions are recorded so a changelog bump rebuilds a rootfs that has the
+# old deb installed, and camera_source_id records where the camera
+# packages came from.
 rootfs_stamp_id() {
     local id="board=${BOARD:-} kernel=${KERNEL_TYPE:-stock}" pkg
     if is_stock_kernel; then
@@ -164,6 +165,21 @@ rootfs_stamp_id() {
         id+=" camera=$(camera_source_id)"
     fi
     echo "${id}"
+}
+
+# True when stamp file $1 is the shared stock rootfs for the current camera
+# package versions. BOARD is ignored: a shared stamp has an empty board field.
+rootfs_shared_is_current() {
+    local stamp="${1:?}" current
+    [[ -f ${stamp} ]] || return 1
+    # Command substitution is a subshell, so clearing BOARD does not leak.
+    current="$(BOARD=; rootfs_stamp_id)"
+    [[ "$(cat "${stamp}")" == "${current}" ]]
+}
+
+# Archive of a shared rootfs, relative to build/rootfs/.
+rootfs_tarball_name() {
+    echo "ubuntu-${RELEASE:?}-preinstalled-${FLAVOR:?}-arm64.rootfs.tar.xz"
 }
 
 # Where the camera packages come from: the apt repository (a hash of the
