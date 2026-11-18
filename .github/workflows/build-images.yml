@@ -57,7 +57,9 @@ permissions:
 jobs:
   matrix:
     name: Choose images
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    # Not for a pull request from a fork. A push and a manual run have no
+    # pull_request payload, so they are allowed by event name.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     outputs:
       include: ${{ steps.set.outputs.include }}
