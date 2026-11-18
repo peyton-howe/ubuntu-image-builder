@@ -26,7 +26,14 @@ for asset in "${ASSETS[@]}"; do
     echo "[+] Downloading ${file}"
     tmp="$(mktemp "${OUT_DIR}/.${file}.XXXXXX")"
     trap 'rm -f "${tmp}"' EXIT
-    curl -fsSL --retry 5 --retry-all-errors -H 'Accept: application/octet-stream' \
+    # An authenticated request gets a much higher API rate limit than the
+    # shared unauthenticated one (CI sets GITHUB_TOKEN).
+    auth=()
+    if [[ -n ${GITHUB_TOKEN:-} ]]; then
+        auth=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+    fi
+    curl -fsSL --retry 5 --retry-delay 15 --retry-all-errors \
+        -H 'Accept: application/octet-stream' "${auth[@]}" \
         -o "${tmp}" "https://api.github.com/repos/radxa-pkg/aic8800/releases/assets/${id}"
     echo "${sha256}  ${tmp}" | sha256sum -c --quiet - \
         || { echo "Error: ${file} does not match the pinned SHA-256"; exit 1; }

@@ -321,6 +321,9 @@ jobs:
       # deletes the archive before the image is packed.
       - name: Build stock image
         env:
+          # Lets fetch-aic8800-debs.sh send an authenticated request to the
+          # GitHub API; the unauthenticated limit is shared across runners.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BOARD: ${{ matrix.board }}
           RELEASE: ${{ matrix.release }}
           FLAVOR: ${{ matrix.flavor }}
@@ -332,7 +335,7 @@ jobs:
             ls -la build/rootfs || true
             exit 1
           fi
-          sudo ./build.sh \
+          sudo --preserve-env=GITHUB_TOKEN ./build.sh \
             --board="${BOARD}" \
             --release="${RELEASE}" \
             --flavor="${FLAVOR}" \
