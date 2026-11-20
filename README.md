@@ -1,5 +1,6 @@
 # ubuntu-image-builder
 
+> [!TIP]
 > **Looking for a ready-to-flash image?** Download prebuilt Ubuntu 26.10 images
 > for every supported board from the
 > **[Tachyn Labs downloads page](https://tachynlabs.com/downloads/)**.
