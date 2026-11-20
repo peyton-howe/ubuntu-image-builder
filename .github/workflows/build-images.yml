@@ -389,7 +389,9 @@ jobs:
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y awscli
           fi
           image="images/ubuntu-${RELEASE}-preinstalled-${FLAVOR}-arm64-${BOARD}.img.xz"
-          sha256sum "${image}" > "${image}.sha256"
+          # Hash from inside images/ so the .sha256 holds the bare file name and
+          # `sha256sum -c <file>.sha256` works next to the downloaded image.
+          (cd images && sha256sum "$(basename "${image}")") > "${image}.sha256"
           name="$(basename "${image}")"
           # The bucket path of a main build is latest; another branch gets its own.
           ref="${GITHUB_REF_NAME}"
