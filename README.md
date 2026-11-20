@@ -1,11 +1,15 @@
 # ubuntu-image-builder
 
-Builds bootable Ubuntu images for RK3588 single-board computers from
-Ubuntu's official arm64 ISOs.
+> **Looking for a ready-to-flash image?** Download prebuilt Ubuntu 26.10 images
+> for every supported board from the
+> **[Tachyn Labs downloads page](https://tachynlabs.com/downloads/)**.
+> Ubuntu 26.04 LTS images will be added there with 26.04.2 (Feb 2027).
+> You only need this repo if you want to build an image yourself.
 
-**Just want an image?** Prebuilt images are on the
-[downloads page](https://tachynlabs.com/downloads/). The rest of this README is
-for building your own.
+Builds bootable Ubuntu images for single-board computers from Ubuntu's
+official arm64 ISOs, with Raspberry Pi camera support for
+[Tachyn Labs camera adapters](https://tachynlabs.com/). RK3588 boards are
+supported today, and more SoCs are planned.
 
 The default (**stock**) path keeps Ubuntu's own kernel and rootfs, writes our
 U-Boot to the image, and installs a few small board and camera packages from
